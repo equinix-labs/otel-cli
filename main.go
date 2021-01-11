@@ -15,10 +15,9 @@ import (
 
 func main() {
 	// set up the stdout exporter
-	stdoutExporter, err := stdout.NewExporter([]stdout.Option{
+	stdoutExporter, err := stdout.NewExporter(
 		stdout.WithQuantiles([]float64{0.5, 0.95, 0.99}),
-		stdout.WithPrettyPrint(),
-	}...)
+		stdout.WithPrettyPrint())
 	if err != nil {
 		log.Fatalf("failed to initialize otel stdout exporter: %s", err)
 	}
