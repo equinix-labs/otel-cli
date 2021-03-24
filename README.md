@@ -28,7 +28,7 @@ otel-cli span --start 1616620946 --end 1616620950.241980634
 start=$(date --rfc-3339=ns) # rfc3339 with nanoseconds
 some-interesting-program --with-some-options
 end=$(date +%s.%N) # Unix epoch with nanoseconds
-otel-cli -n my-script -s some-interesting-program --start $start --end $end
+otel-cli span -n my-script -s some-interesting-program --start $start --end $end
 ```
 
 Note: just made-up examples for now for me to think through the CLI parameters
