@@ -1,0 +1,43 @@
+# opentelemetry-collector is a proxy for telemetry events. It can receive on
+# many protocols including OTLP and Jaeger, do some processing, and forward to
+# an observability tool.
+receivers:
+  otlp:
+    protocols:
+      # probably won't get used in Narwhal but seems to be the preferred path
+      grpc:
+        endpoint: "0.0.0.0:30080"
+      # the ruby otel gem only supports HTTP
+      http:
+        endpoint: "0.0.0.0:55681"
+
+processors:
+  batch:
+
+exporters:
+  logging:
+    # set to debug and your traces will get printed to the console spammily
+    logLevel: debug
+  # local Grafana Tempo
+  otlp/1:
+    # forwards to Tempo over gRPC which is configured locally to listen on 55683
+    # while the usual port is 55680 for gRPC
+    endpoint: "tempo:55683"
+    insecure: true
+  # honeycomb, set & export HONEYCOMB_TEAM to the auth token, and dataset to
+  # something like "playground" (which is what Amy uses)
+  otlp/2:
+    endpoint: "api.honeycomb.io:443"
+    headers:
+      "x-honeycomb-team": "${HONEYCOMB_TEAM}"
+      "x-honeycomb-dataset": "${HONEYCOMB_DATASET}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      # defaults to logging only
+      exporters: [logging]
+      # add the others like this if you want to send to Tempo or Honeycomb
+      #exporters: [logging,otlp/1,otlp/2]
