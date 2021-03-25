@@ -37,7 +37,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      # defaults to logging only
-      exporters: [logging]
-      # add the others like this if you want to send to Tempo or Honeycomb
+      # enable logging and Honeycomb, leave Tempo disabled
+      exporters: [logging,otlp/2]
+      # enabling all three looks like this:
       #exporters: [logging,otlp/1,otlp/2]

@@ -70,8 +70,17 @@ place this can hopefully stop using `--net host`
 Run opentelemetry collector locally in debug mode in one window, and
 hack on otel-cli in another..
 
+If you have a Honeycomb API key and want to forward your data there,
+put the API key in HONEYCOMB_TEAM and set HONEYCOMB_DATASET to the
+dataset, e.g. `playground`.
+
 ```shell
+export HONEYCOMB_TEAM= # put your api key here
+export HONEYCOMB_DATASET=playground
+
 docker run --name otel-collector --net host \
+   --env HONEYCOMB_TEAM \
+   --env HONEYCOMB_DATASET \
 	--volume $(pwd)/local/otel-local-config.yaml:/local.yaml \
 	public.ecr.aws/aws-observability/aws-otel-collector:latest \
 		--config /local.yaml
