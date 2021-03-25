@@ -81,9 +81,9 @@ export HONEYCOMB_DATASET=playground
 docker run --name otel-collector --net host \
    --env HONEYCOMB_TEAM \
    --env HONEYCOMB_DATASET \
-	--volume $(pwd)/local/otel-local-config.yaml:/local.yaml \
-	public.ecr.aws/aws-observability/aws-otel-collector:latest \
-		--config /local.yaml
+   --volume $(pwd)/local/otel-local-config.yaml:/local.yaml \
+   public.ecr.aws/aws-observability/aws-otel-collector:latest \
+      --config /local.yaml
 ```
 
 Then it should just work to run otel-cli:
