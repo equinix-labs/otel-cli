@@ -31,36 +31,7 @@ end=$(date +%s.%N) # Unix epoch with nanoseconds
 otel-cli span -n my-script -s some-interesting-program --start $start --end $end
 ```
 
-Note: just made-up examples for now for me to think through the CLI parameters
 
-```shell
-# send all events to the local OpenTelemetry OTLP endpoint and it will
-# forward to whatever is downstream, this also avoids spamming some external
-# server for connections in your shell scripts
-# (not implemented yet)
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:55681
-
-# (maybe bad) idea - persist context to a tempfile across executions
-otel_context=$(mktemp)
-otel-cli --context $otel_context --stdout ...
-
-# but probably a simple way to slurp some json or yaml or just key/value data
-# would make labeling more efficient for some folks?
-cat > labels.json <<EOJSON
-{
-  "someKey": "someValue"
-}
-EOJSON
-otel-cli --json-labels labels.json
-
-# silly idea...
-# not a reimplementation of curl, just smart enough to pass through params
-# and add the traceparent header automatically, maybe get curl into a mode
-# where more data can be pulled out of the request?
-otel-cli curl <regular curl options>
-# maybe adds "-o 'SendEnv TRACEPARENT'" to the command?
-otel-cli ssh <regular ssh options>
-```
 
 ## Easy local dev
 
@@ -89,7 +60,10 @@ docker run --name otel-collector --net host \
 Then it should just work to run otel-cli:
 
 ```shell
-go run . span --options...
+go build
+./otel-cli span -n "testing" -s "my first test span"
+# or for quick iterations:
+go run . span -n "testing" -s "my first test span"
 ```
 
 ## Ideas
