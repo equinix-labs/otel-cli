@@ -72,12 +72,20 @@ func getTraceparent(ctx context.Context) string {
 }
 
 func printSpanStdout(ctx context.Context, span trace.Span) {
-	if !printSpan {
+	// --print-tp --print-tp-export
+	if !printTraceparent && !printTraceparentExport {
 		return
+	}
+
+	// --print-tp-export will print "export TRACEPARENT" so it's
+	// one less step to print to a file & source, or eval
+	var exported string
+	if printTraceparentExport {
+		exported = "export "
 	}
 
 	tpout := getTraceparent(ctx)
 	tid := span.SpanContext().TraceID()
 	sid := span.SpanContext().SpanID()
-	fmt.Printf("# trace id: %s\n#  span id: %s\nTRACEPARENT=%s\n", tid, sid, tpout)
+	fmt.Printf("# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", tid, sid, exported, tpout)
 }

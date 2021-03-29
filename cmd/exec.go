@@ -35,6 +35,9 @@ to sh -c and should not be passed any untrusted input`,
 
 func init() {
 	rootCmd.AddCommand(execCmd)
+
+	// --span-name / -s
+	addSpanNameParam(execCmd) // see span.go
 }
 
 func doExec(cmd *cobra.Command, args []string) {

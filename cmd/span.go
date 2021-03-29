@@ -38,13 +38,23 @@ var epochNanoTimeRE *regexp.Regexp
 func init() {
 	rootCmd.AddCommand(spanCmd)
 
-	// this naming is kinda awkard hmm... `otel-cli span --name x --span foobar`
-	rootCmd.LocalFlags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the application sent on the traces")
+	// --span-name / -s
+	addSpanNameParam(spanCmd)
 
+	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
 	spanCmd.PersistentFlags().StringVar(&startTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
+
+	// --end $timestamp
 	spanCmd.PersistentFlags().StringVar(&endTime, "end", "", "an Unix epoch or RFC3339 timestamp for the end of the span")
 
 	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
+}
+
+// addSpanNameParam adds the --span-name/-s paramter to the passed-in command
+// as a local StringVarP bound to the global spanName
+// (this is here so exec can use the exact same code without copying)
+func addSpanNameParam(cmd *cobra.Command) {
+	cmd.LocalFlags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the span")
 }
 
 func doSpan(cmd *cobra.Command, args []string) {
@@ -58,7 +68,7 @@ func doSpan(cmd *cobra.Command, args []string) {
 
 	if endTime != "" {
 		t := parseTime(endTime, "end")
-		endOpts = append(startOpts, trace.WithTimestamp(t))
+		endOpts = append(endOpts, trace.WithTimestamp(t))
 	}
 
 	ctx, shutdown := initTracer()

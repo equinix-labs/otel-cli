@@ -13,7 +13,7 @@ import (
 
 var cfgFile, appName, spanName, spanKind string
 var attributes map[string]string
-var ignoreTraceparentEnv, printSpan bool
+var ignoreTraceparentEnv, printTraceparent, printTraceparentExport bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -52,7 +52,8 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVar(&ignoreTraceparentEnv, "ignore-tp-env", false, "ignore the TRACEPARENT envvar even if it's set")
 
-	rootCmd.PersistentFlags().BoolVarP(&printSpan, "print-span", "p", false, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
+	rootCmd.PersistentFlags().BoolVarP(&printTraceparent, "print-tp", "p", false, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
+	rootCmd.PersistentFlags().BoolVarP(&printTraceparentExport, "print-tp-export", "p", false, "same as --print-tp but it puts an 'export ' in front so it's more convinenient to source in scripts")
 }
 
 // initConfig reads in config file and ENV variables if set.
