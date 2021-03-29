@@ -5,11 +5,10 @@
 # environment variable carries the context from invocation to invocation
 # so that the tracing provider (e.g. Honeycomb) can put it all back together
 
-# generate a new trace & span, cli will print out the TRACEPARENT
+# generate a new trace & span, cli will print out the 'export TRACEPARENT'
 carrier=$(mktemp)
 ../otel-cli span -s $0 -n "traceparent demo" -p |tee $carrier
-source $carrier    # sets TRACEPARENT (todo - this is not entirely safe)
-export TRACEPARENT # make it visible to child processes
+source $carrier # sets TRACEPARENT (todo - this is not entirely safe)
 
 # this will start a child span, and run another otel-cli as its program
 ../otel-cli exec \
