@@ -37,6 +37,10 @@ var epochNanoTimeRE *regexp.Regexp
 
 func init() {
 	rootCmd.AddCommand(spanCmd)
+
+	// this naming is kinda awkard hmm... `otel-cli span --name x --span foobar`
+	rootCmd.LocalFlags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the application sent on the traces")
+
 	spanCmd.PersistentFlags().StringVar(&startTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
 	spanCmd.PersistentFlags().StringVar(&endTime, "end", "", "an Unix epoch or RFC3339 timestamp for the end of the span")
 

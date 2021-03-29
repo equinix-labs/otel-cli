@@ -42,9 +42,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&appName, "service-name", "n", "otel-cli", "set the name of the application sent on the traces")
 	// TODO: probably want to bind this to viper? seems handy...
 
-	// this naming is kinda awkard hmm... `otel-cli span --name x --span foobar`
-	rootCmd.PersistentFlags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the application sent on the traces")
-
 	// all commands and subcommands accept attributes, some might ignore
 	// e.g. `--attrs "foo=bar,baz=inga"`
 	rootCmd.PersistentFlags().StringToStringVarP(&attributes, "attrs", "a", map[string]string{}, "a comma-separated list of key=value attributes")
