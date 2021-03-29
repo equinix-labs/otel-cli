@@ -52,7 +52,7 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVar(&ignoreTraceparentEnv, "ignore-tp-env", false, "ignore the TRACEPARENT envvar even if it's set")
 
-	rootCmd.PersistentFlags().BoolVarP(&printTraceparent, "print-tp", "p", false, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
+	rootCmd.PersistentFlags().BoolVar(&printTraceparent, "print-tp", false, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
 	rootCmd.PersistentFlags().BoolVarP(&printTraceparentExport, "print-tp-export", "p", false, "same as --print-tp but it puts an 'export ' in front so it's more convinenient to source in scripts")
 }
 
