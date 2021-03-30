@@ -83,6 +83,8 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	span.End()
 
+	// set the global exit code so main() can grab it and os.Exit() properly
+	exitCode = child.ProcessState.ExitCode()
+
 	printSpanStdout(ctx, span)
-	// TODO: figure out how to make sure this program exits with the same code as the child program
 }

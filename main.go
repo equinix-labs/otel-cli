@@ -1,7 +1,12 @@
 package main
 
-import "github.com/packethost/otel-cli/cmd"
+import (
+	"os"
+
+	"github.com/packethost/otel-cli/cmd"
+)
 
 func main() {
 	cmd.Execute()
+	os.Exit(cmd.GetExitCode())
 }
