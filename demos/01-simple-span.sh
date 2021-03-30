@@ -15,7 +15,7 @@ et=$(date +%s.%N)
 	--kind         "client"      \
 	--start        $st           \
 	--end          $et           \
-	--print-tp                   \
+	--tp-print                   \
 	--attrs "my.data1=$data1,my.data2=$data2"
 
 cat >/dev/null<<EOF

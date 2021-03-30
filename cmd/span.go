@@ -23,7 +23,7 @@ Example:
 		--start 2021-03-24T07:28:05.12345Z \
 		--end $(date +%s.%N) \
 		--attrs "os.kernel=$(uname -r)" \
-		--print-traceparent
+		--tp-print
 `,
 	Run: doSpan,
 }
@@ -63,12 +63,12 @@ func doSpan(cmd *cobra.Command, args []string) {
 
 	ctx, shutdown := initTracer()
 	defer shutdown()
-	ctx = loadTraceparentFromEnv(ctx)
+	ctx = loadTraceparent(ctx, traceparentCarrierFile)
 	tracer := otel.Tracer("otel-cli/span")
 
 	ctx, span := tracer.Start(ctx, spanName, startOpts...)
 	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
 	span.End(endOpts...)
 
-	printSpanStdout(ctx, span)
+	finishOtelCliSpan(ctx, span)
 }

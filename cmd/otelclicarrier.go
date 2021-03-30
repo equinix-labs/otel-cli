@@ -1,19 +1,31 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
+	"regexp"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 )
 
 var envTp string // global state
+var checkTracecarrierRe *regexp.Regexp
 
 // OtelCliCarrier implements the OpenTelemetry TextMapCarrier interface that
 // supports only one key/value for the traceparent and does nothing else
 type OtelCliCarrier struct{}
+
+func init() {
+	// only anchored at the front because traceparents can include more things
+	// per the standard but only the first 4 are required for our uses
+	checkTracecarrierRe = regexp.MustCompile("^[[:xdigit:]]{2}-[[:xdigit:]]{32}-[[:xdigit:]]{16}-[[:xdigit:]]{2}")
+}
 
 func NewOtelCliCarrier() OtelCliCarrier {
 	return OtelCliCarrier{}
@@ -40,11 +52,78 @@ func (ec OtelCliCarrier) Keys() []string {
 	return []string{"traceparent"}
 }
 
+// loadTraceparent checks the environment first for TRACEPARENT then if filename
+// isn't empty, it will read that file and look for a bare traceparent in that
+// file.
+func loadTraceparent(ctx context.Context, filename string) context.Context {
+	ctx = loadTraceparentFromEnv(ctx)
+	if filename != "" {
+		ctx = loadTraceparentFromFile(ctx, filename)
+	}
+	if traceparentCarrierRequired {
+		// TODO: find a better way to do this
+		// maybe check with the RE first?
+		tp := getTraceparent(ctx)       // get the text representation in the context
+		parts := strings.Split(tp, "-") // e.g. 00-9765b2f71c68b04dc0ad2a4d73027d6f-1881444346b6296e-01
+		if parts[1] == "00000000000000000000000000000000" || parts[2] == "0000000000000000" {
+			log.Fatalf("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
+		}
+	}
+	return ctx
+}
+
+// loadTraceparentFromFile reads a traceparent from filename and returns a
+// context with the traceparent set.
+func loadTraceparentFromFile(ctx context.Context, filename string) context.Context {
+	file, err := os.Open(filename)
+	if err != nil {
+		// only fatal when the tp carrier file is required explicitly, otherwise
+		// just silently return the unmodified context
+		if traceparentCarrierRequired {
+			log.Fatalf("could not open file '%s' for read: %s", filename, err)
+		} else {
+			return ctx
+		}
+	}
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatalf("failure while reading from file '%s': %s", filename, err)
+	}
+
+	tp := bytes.TrimSpace(data)
+	if len(tp) == 0 {
+		return ctx
+	}
+	if !checkTracecarrierRe.Match(tp) {
+		// I have a doubt: should this be a soft failure?
+		log.Fatalf("file '%s' was read but does not contain a valid traceparent", filename)
+	}
+
+	carrier := NewOtelCliCarrier()
+	carrier.Set("traceparent", string(tp))
+	prop := otel.GetTextMapPropagator()
+	return prop.Extract(ctx, carrier)
+}
+
+// saveTraceparentToFile takes a context and filename and writes the tp from
+// that context into the specified file.
+func saveTraceparentToFile(ctx context.Context, filename string) {
+	if filename == "" {
+		return
+	}
+	tp := getTraceparent(ctx)
+	err := ioutil.WriteFile(filename, []byte(tp), 0600)
+	if err != nil {
+		log.Fatalf("failure while writing to file '%s': %s", filename, err)
+	}
+}
+
 // loadTraceparentFromEnv loads the traceparent from the environment variable
 // TRACEPARENT and sets it in the returned Go context.
 func loadTraceparentFromEnv(ctx context.Context) context.Context {
-	// don't load the envvar when --ignore-tp-env is set
-	if ignoreTraceparentEnv {
+	// don't load the envvar when --tp-ignore-env is set
+	if traceparentIgnoreEnv {
 		return ctx
 	}
 
@@ -71,16 +150,18 @@ func getTraceparent(ctx context.Context) string {
 	return carrier.Get("traceparent")
 }
 
-func printSpanStdout(ctx context.Context, span trace.Span) {
-	// --print-tp --print-tp-export
-	if !printTraceparent && !printTraceparentExport {
+func finishOtelCliSpan(ctx context.Context, span trace.Span) {
+	saveTraceparentToFile(ctx, traceparentCarrierFile)
+
+	// --tp-print / --tp-export
+	if !traceparentPrint && !traceparentPrintExport {
 		return
 	}
 
-	// --print-tp-export will print "export TRACEPARENT" so it's
+	// --tp-export will print "export TRACEPARENT" so it's
 	// one less step to print to a file & source, or eval
 	var exported string
-	if printTraceparentExport {
+	if traceparentPrintExport {
 		exported = "export "
 	}
 

@@ -70,7 +70,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	// pass the existing env but add the latest TRACEPARENT carrier so e.g.
 	// otel-cli exec 'otel-cli exec sleep 1' will relate the spans automatically
 	child.Env = os.Environ()
-	if !ignoreTraceparentEnv {
+	if !traceparentIgnoreEnv {
 		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", getTraceparent(ctx)))
 	}
 
@@ -86,5 +86,5 @@ func doExec(cmd *cobra.Command, args []string) {
 	// set the global exit code so main() can grab it and os.Exit() properly
 	exitCode = child.ProcessState.ExitCode()
 
-	printSpanStdout(ctx, span)
+	finishOtelCliSpan(ctx, span)
 }
