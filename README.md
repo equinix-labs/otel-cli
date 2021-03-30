@@ -68,9 +68,10 @@ go run . span -n "testing" -s "my first test span"
 
 ## Ideas
 
-   * a --spanContext file path or similar for persisting span context across executions
    * add some shell examples for:
       * using bash trap(1p) to send events
+   * examples for connecting collector to other vendors' OTLP endpoints
+   * span background doodles: https://gist.github.com/tobert/ceb2cd9b18ab7ab09e1ea7e3bf150d9d
 
 ## License
 
