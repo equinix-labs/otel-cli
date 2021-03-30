@@ -50,7 +50,8 @@ func doExec(cmd *cobra.Command, args []string) {
 	// there might be a better way in Cobra, maybe require passing it after a '--'?
 	commandString := strings.Join(args, " ")
 
-	ctx, span := tracer.Start(ctx, spanName, trace.WithSpanKind(otelSpanKind()))
+	kindOption := trace.WithSpanKind(otelSpanKind(spanKind))
+	ctx, span := tracer.Start(ctx, spanName, kindOption)
 	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
 
 	// put the command in the attributes
