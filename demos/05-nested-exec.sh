@@ -7,14 +7,14 @@
 
 # generate a new trace & span, cli will print out the 'export TRACEPARENT'
 carrier=$(mktemp)
-../otel-cli span -s $0 -n "traceparent demo" -p |tee $carrier
-source $carrier # sets TRACEPARENT (todo - this is not entirely safe)
+../otel-cli span -s $0 -n "traceparent demo" --tp-print --tp-carrier $carrier
 
 # this will start a child span, and run another otel-cli as its program
 ../otel-cli exec \
 	--service-name "fake-client" \
 	--span-name    "hammer the server for sweet sweet data" \
 	--kind         "client" \
+	--tp-carrier   $carrier \
 	"../otel-cli exec -n fake-server -s 'put up with the clients nonsense' -k server echo 500 NOPE"
 	# ^ child span, the responding "server" that just echos NOPE
 

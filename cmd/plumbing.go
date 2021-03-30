@@ -36,7 +36,7 @@ func initTracer() (context.Context, func()) {
 	}
 
 	// set the service name that will show up in tracing UIs
-	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(appName))
+	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(serviceName))
 	res, err := resource.New(ctx, resAttrs)
 	if err != nil {
 		log.Fatalf("failed to create OpenTelemetry service name resource: %s", err)
