@@ -111,3 +111,9 @@ func otelSpanKind(kind string) trace.SpanKind {
 		return trace.SpanKindUnspecified
 	}
 }
+
+// GetExitCode() returns the exitCode value which is mainly used in exec.go
+// so that the exit code of otel-cli matches the child program's exit code.
+func GetExitCode() int {
+	return exitCode
+}

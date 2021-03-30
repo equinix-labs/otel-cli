@@ -13,6 +13,7 @@ import (
 var cfgFile, appName, spanName, spanKind string
 var spanAttrs map[string]string
 var ignoreTraceparentEnv, printTraceparent, printTraceparentExport bool
+var exitCode int
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
