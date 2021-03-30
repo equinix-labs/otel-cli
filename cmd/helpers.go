@@ -95,8 +95,8 @@ func parseTime(ts, which string) time.Time {
 
 // otelSpanKind takes a supported string span kind and returns the otel
 // constant for it. Returns default of KindUnspecified on no match.
-func otelSpanKind() trace.SpanKind {
-	switch spanKind {
+func otelSpanKind(kind string) trace.SpanKind {
+	switch kind {
 	case "client":
 		return trace.SpanKindClient
 	case "server":

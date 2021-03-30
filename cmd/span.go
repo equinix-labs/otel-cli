@@ -48,7 +48,7 @@ func init() {
 }
 
 func doSpan(cmd *cobra.Command, args []string) {
-	startOpts := []trace.SpanOption{trace.WithSpanKind(otelSpanKind())}
+	startOpts := []trace.SpanOption{trace.WithSpanKind(otelSpanKind(spanKind))}
 	endOpts := []trace.SpanOption{}
 
 	if spanStartTime != "" {
