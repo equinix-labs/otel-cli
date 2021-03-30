@@ -8,12 +8,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var cfgFile, appName, spanName, spanKind string
-var attributes map[string]string
-var ignoreTraceparentEnv, printSpan bool
+var spanAttrs map[string]string
+var ignoreTraceparentEnv, printTraceparent, printTraceparentExport bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -29,7 +28,7 @@ func Execute() {
 }
 
 func init() {
-	attributes = make(map[string]string)
+	spanAttrs = make(map[string]string)
 	cobra.EnableCommandSorting = false
 	cobra.OnInitialize(initConfig)
 
@@ -42,12 +41,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&appName, "service-name", "n", "otel-cli", "set the name of the application sent on the traces")
 	// TODO: probably want to bind this to viper? seems handy...
 
-	// this naming is kinda awkard hmm... `otel-cli span --name x --span foobar`
-	rootCmd.PersistentFlags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the application sent on the traces")
-
 	// all commands and subcommands accept attributes, some might ignore
 	// e.g. `--attrs "foo=bar,baz=inga"`
-	rootCmd.PersistentFlags().StringToStringVarP(&attributes, "attrs", "a", map[string]string{}, "a comma-separated list of key=value attributes")
+	rootCmd.PersistentFlags().StringToStringVarP(&spanAttrs, "attrs", "a", map[string]string{}, "a comma-separated list of key=value attributes")
 	// TODO: this is just a guess for now
 	viperBindFlag("otel-cli.attributes", rootCmd.PersistentFlags().Lookup("attrs"))
 
@@ -55,7 +51,8 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVar(&ignoreTraceparentEnv, "ignore-tp-env", false, "ignore the TRACEPARENT envvar even if it's set")
 
-	rootCmd.PersistentFlags().BoolVarP(&printSpan, "print-span", "p", false, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
+	rootCmd.PersistentFlags().BoolVar(&printTraceparent, "print-tp", false, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
+	rootCmd.PersistentFlags().BoolVarP(&printTraceparentExport, "print-tp-export", "p", false, "same as --print-tp but it puts an 'export ' in front so it's more convinenient to source in scripts")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -86,22 +83,5 @@ func viperBindFlag(name string, flag *pflag.Flag) {
 	err := viper.BindPFlag(name, flag)
 	if err != nil {
 		panic(err)
-	}
-}
-
-func otelSpanKind() trace.SpanKind {
-	switch spanKind {
-	case "client":
-		return trace.SpanKindClient
-	case "server":
-		return trace.SpanKindServer
-	case "producer":
-		return trace.SpanKindProducer
-	case "consumer":
-		return trace.SpanKindConsumer
-	case "internal":
-		return trace.SpanKindInternal
-	default:
-		return trace.SpanKindUnspecified
 	}
 }

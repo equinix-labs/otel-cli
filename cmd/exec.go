@@ -35,6 +35,9 @@ to sh -c and should not be passed any untrusted input`,
 
 func init() {
 	rootCmd.AddCommand(execCmd)
+
+	// --span-name / -s, see span.go
+	execCmd.Flags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the span")
 }
 
 func doExec(cmd *cobra.Command, args []string) {
@@ -47,8 +50,9 @@ func doExec(cmd *cobra.Command, args []string) {
 	// there might be a better way in Cobra, maybe require passing it after a '--'?
 	commandString := strings.Join(args, " ")
 
-	ctx, span := tracer.Start(ctx, spanName, trace.WithSpanKind(otelSpanKind()))
-	span.SetAttributes(cliAttrsToOtel()...) // applies CLI attributes to the span
+	kindOption := trace.WithSpanKind(otelSpanKind(spanKind))
+	ctx, span := tracer.Start(ctx, spanName, kindOption)
+	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
 
 	// put the command in the attributes
 	span.SetAttributes(attribute.KeyValue{
