@@ -3,10 +3,8 @@ package cmd
 import (
 	"context"
 	"log"
-	"strconv"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
 	"go.opentelemetry.io/otel/propagation"
@@ -73,33 +71,4 @@ func initTracer() (context.Context, func()) {
 			log.Fatalf("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
 		}
 	}
-}
-
-// cliAttrsToOtel grabs the attributes passed via -a or --attrs and returns
-// them in an []attribute.KeyValue
-func cliAttrsToOtel() []attribute.KeyValue {
-	otAttrs := []attribute.KeyValue{}
-	for k, v := range attributes {
-
-		// try to parse as numbers, and fall through to string
-		var av attribute.Value
-		if i, err := strconv.ParseInt(v, 0, 64); err == nil {
-			av = attribute.Int64Value(i)
-		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
-			av = attribute.Float64Value(f)
-		} else if b, err := strconv.ParseBool(v); err == nil {
-			av = attribute.BoolValue(b)
-		} else {
-			av = attribute.StringValue(v)
-		}
-
-		akv := attribute.KeyValue{
-			Key:   attribute.Key(k),
-			Value: av,
-		}
-
-		otAttrs = append(otAttrs, akv)
-	}
-
-	return otAttrs
 }

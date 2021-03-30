@@ -36,8 +36,8 @@ to sh -c and should not be passed any untrusted input`,
 func init() {
 	rootCmd.AddCommand(execCmd)
 
-	// --span-name / -s
-	addSpanNameParam(execCmd) // see span.go
+	// --span-name / -s, see span.go
+	execCmd.Flags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the span")
 }
 
 func doExec(cmd *cobra.Command, args []string) {
@@ -51,7 +51,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	commandString := strings.Join(args, " ")
 
 	ctx, span := tracer.Start(ctx, spanName, trace.WithSpanKind(otelSpanKind()))
-	span.SetAttributes(cliAttrsToOtel()...) // applies CLI attributes to the span
+	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
 
 	// put the command in the attributes
 	span.SetAttributes(attribute.KeyValue{

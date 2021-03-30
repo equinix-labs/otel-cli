@@ -8,11 +8,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var cfgFile, appName, spanName, spanKind string
-var attributes map[string]string
+var spanAttrs map[string]string
 var ignoreTraceparentEnv, printTraceparent, printTraceparentExport bool
 
 // rootCmd represents the base command when called without any subcommands
@@ -29,7 +28,7 @@ func Execute() {
 }
 
 func init() {
-	attributes = make(map[string]string)
+	spanAttrs = make(map[string]string)
 	cobra.EnableCommandSorting = false
 	cobra.OnInitialize(initConfig)
 
@@ -44,7 +43,7 @@ func init() {
 
 	// all commands and subcommands accept attributes, some might ignore
 	// e.g. `--attrs "foo=bar,baz=inga"`
-	rootCmd.PersistentFlags().StringToStringVarP(&attributes, "attrs", "a", map[string]string{}, "a comma-separated list of key=value attributes")
+	rootCmd.PersistentFlags().StringToStringVarP(&spanAttrs, "attrs", "a", map[string]string{}, "a comma-separated list of key=value attributes")
 	// TODO: this is just a guess for now
 	viperBindFlag("otel-cli.attributes", rootCmd.PersistentFlags().Lookup("attrs"))
 
@@ -84,22 +83,5 @@ func viperBindFlag(name string, flag *pflag.Flag) {
 	err := viper.BindPFlag(name, flag)
 	if err != nil {
 		panic(err)
-	}
-}
-
-func otelSpanKind() trace.SpanKind {
-	switch spanKind {
-	case "client":
-		return trace.SpanKindClient
-	case "server":
-		return trace.SpanKindServer
-	case "producer":
-		return trace.SpanKindProducer
-	case "consumer":
-		return trace.SpanKindConsumer
-	case "internal":
-		return trace.SpanKindInternal
-	default:
-		return trace.SpanKindUnspecified
 	}
 }
