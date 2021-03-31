@@ -27,15 +27,15 @@ timeout, (catchable) signals, or deliberate exit.
 
     socket_dir=$(mktemp -d)
 	otel-cli span background \
-		--system-name "my-long-script.sh" \
-		--span-name "run the script" \
+		--system "my-long-script.sh" \
+		--name "run the script" \
 		--attrs "os.kernel=$(uname -r)" \
 		--timeout 60 \
 		--sockdir $socket_dir & # <-- notice the &
 	
 	otel-cli span event \
 		--sockdir $socket_dir \
-		--event-name "something interesting happened!" \
+		--name "something interesting happened!" \
 		--attrs "foo=bar"
 `,
 	Run: doSpanBackground,

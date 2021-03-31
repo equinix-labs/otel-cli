@@ -28,7 +28,7 @@ go build
 
 ```shell
 # run a program inside a span
-otel-cli exec --service-name my-service --span-name "curl google" curl https://google.com
+otel-cli exec --service my-service --name "curl google" curl https://google.com
 
 # otel-cli propagates span parents via envvars so you can chain it to create spans
 otel-cli exec --kind producer "otel-cli exec --kind consumer sleep 1"
@@ -51,11 +51,11 @@ otel-cli span -n my-script -s some-interesting-program --start $start --end $end
 # add events to it, finally closing it later in your script
 sockdir=$(mktemp -d)
 otel-cli span background \
-   --service-name $0           \
-   --span-name "$0 runtime"    \
+   --service $0          \
+   --name "$0 runtime"   \
    --sockdir $sockdir & # the & is important here, background server will block
 sleep 0.1 # give the background server just a few ms to start up
-otel-cli span event --event-name "cool thing" --attrs "foo=bar" --sockdir $sockdir
+otel-cli span event --name "cool thing" --attrs "foo=bar" --sockdir $sockdir
 otel-cli span end --sockdir $sockdir
 # or you can kill the background process and it will end the span cleanly
 kill %1

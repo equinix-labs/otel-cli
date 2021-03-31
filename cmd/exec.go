@@ -23,7 +23,7 @@ passed to the child process's environment as TRACEPARENT.
 
 Examples:
 
-otel-cli exec --name my-cool-thing --span interesting-step curl https://cool-service/api/v1/endpoint
+otel-cli exec -n my-cool-thing -s interesting-step curl https://cool-service/api/v1/endpoint
 
 otel-cli exec -s "outer span" 'otel-cli exec -s "inner span" sleep 1'
 
@@ -36,8 +36,8 @@ to sh -c and should not be passed any untrusted input`,
 func init() {
 	rootCmd.AddCommand(execCmd)
 
-	// --span-name / -s, see span.go
-	execCmd.Flags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the span")
+	// --name / -s, see span.go
+	execCmd.Flags().StringVarP(&spanName, "name", "s", "todo-generate-default-span-names", "set the name of the span")
 }
 
 func doExec(cmd *cobra.Command, args []string) {
