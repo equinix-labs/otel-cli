@@ -21,6 +21,7 @@ type BgSpan struct {
 	Traceparent string `json:"traceparent"`
 	Error       string `json:"error"`
 	span        trace.Span
+	shutdown    func()
 }
 
 // BgSpanEvent is a span event that the client will send.
@@ -29,6 +30,9 @@ type BgSpanEvent struct {
 	Timestamp  string `json:"timestamp"`
 	Attributes map[string]string
 }
+
+// BgEnd is an empty struct that can be sent to call End().
+type BgEnd struct{}
 
 // Ping is an exported RPC that takes any string and returns BgSpan.
 func (bs BgSpan) Ping(arg *string, reply *BgSpan) error {
@@ -63,6 +67,18 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	return nil
 }
 
+// End takes a BgEnd (empty) struct, replies with the usual trace info, then
+// ends the span end exits the background process.
+func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
+	// TODO: maybe accept an end timestamp?
+	bs.span.End()
+	go func() {
+		//time.Sleep(time.Millisecond * time.Duration(100))
+		bs.shutdown()
+	}()
+	return nil
+}
+
 // bgServer is a handle for a span background server.
 type bgServer struct {
 	sockfile string
@@ -87,9 +103,10 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 	}
 
 	bgspan := BgSpan{
-		TraceID: span.SpanContext().TraceID().String(),
-		SpanID:  span.SpanContext().SpanID().String(),
-		span:    span,
+		TraceID:  span.SpanContext().TraceID().String(),
+		SpanID:   span.SpanContext().SpanID().String(),
+		span:     span,
+		shutdown: func() { bgs.Shutdown() },
 	}
 	// makes methods on BgSpan available over RPC
 	rpc.Register(&bgspan)
@@ -112,7 +129,6 @@ func (bgs *bgServer) Run() {
 		if err != nil {
 			select {
 			case <-bgs.quit: // quitting gracefully
-				log.Println("quit channel closed, returning")
 				return
 			default:
 				log.Fatalf("error while accepting connection: %s", err)
@@ -134,4 +150,17 @@ func (bgs *bgServer) Shutdown() {
 	close(bgs.quit)
 	bgs.listener.Close()
 	bgs.wg.Wait()
+}
+
+// createBgClient sets up a client connection to the unix socket jsonrpc server
+// and returns the rpc client handle and a shutdown function that should be
+// deferred.
+func createBgClient() (*rpc.Client, func()) {
+	sock := net.UnixAddr{Name: spanBgSockfile(), Net: "unix"}
+	conn, err := net.DialUnix(sock.Net, nil, &sock)
+	if err != nil {
+		log.Fatalf("unable to connect to span background server at '%s': %s", spanBgSockdir, err)
+	}
+
+	return jsonrpc.NewClient(conn), func() { conn.Close() }
 }

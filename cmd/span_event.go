@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"log"
-	"net"
-	"net/rpc/jsonrpc"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -51,16 +49,10 @@ func doSpanEvent(cmd *cobra.Command, args []string) {
 		Attributes: spanAttrs,
 	}
 
-	sock := net.UnixAddr{Name: spanBgSockfile(), Net: "unix"}
-	conn, err := net.DialUnix(sock.Net, nil, &sock)
-	if err != nil {
-		log.Fatalf("unable to connect to span background server at '%s': %s", spanBgSockdir, err)
-	}
-	defer conn.Close()
-
-	client := jsonrpc.NewClient(conn)
 	res := BgSpan{}
-	err = client.Call("BgSpan.AddEvent", rpcArgs, &res)
+	client, shutdown := createBgClient()
+	defer shutdown()
+	err := client.Call("BgSpan.AddEvent", rpcArgs, &res)
 	if err != nil {
 		log.Fatalf("error while calling background server rpc BgSpan.AddEvent: %s", err)
 	}
