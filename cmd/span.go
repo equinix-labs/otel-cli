@@ -19,8 +19,8 @@ with support for nanoseconds on both.
 
 Example:
 	otel-cli span \
-		--system-name "my-application" \
-		--span-name "send data to the server" \
+		--system "my-application" \
+		--name "send data to the server" \
 		--start 2021-03-24T07:28:05.12345Z \
 		--end $(date +%s.%N) \
 		--attrs "os.kernel=$(uname -r)" \
@@ -36,8 +36,8 @@ func init() {
 	rootCmd.AddCommand(spanCmd)
 	spanCmd.Flags().SortFlags = false
 
-	// --span-name / -s
-	spanCmd.PersistentFlags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the span")
+	// --name / -s
+	spanCmd.PersistentFlags().StringVarP(&spanName, "name", "s", "todo-generate-default-span-names", "set the name of the span")
 
 	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
 	spanCmd.Flags().StringVar(&spanStartTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")

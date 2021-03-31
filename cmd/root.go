@@ -29,7 +29,7 @@ func init() {
 	rootCmd.Flags().SortFlags = false
 
 	// TODO: put in global flags for the otel endpoint and stuff like that here
-	rootCmd.PersistentFlags().StringVarP(&serviceName, "service-name", "n", "otel-cli", "set the name of the application sent on the traces")
+	rootCmd.PersistentFlags().StringVarP(&serviceName, "service", "n", "otel-cli", "set the name of the application sent on the traces")
 
 	// all commands and subcommands accept attributes, some might ignore
 	// e.g. `--attrs "foo=bar,baz=inga"`

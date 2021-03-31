@@ -19,7 +19,7 @@ See: otel-cli span background
 
 	otel-cli span event \
 	    --sockdir $sockdir \
-		--event-name "did a cool thing" \
+		--name "did a cool thing" \
 		--time $(date +%s.%N) \
 		--attrs "os.kernel=$(uname -r)"
 `,
@@ -30,8 +30,8 @@ func init() {
 	spanCmd.AddCommand(spanEventCmd)
 	spanEventCmd.Flags().SortFlags = false
 
-	// --event-name / -e
-	spanEventCmd.Flags().StringVarP(&spanEventName, "event-name", "e", "todo-generate-default-event-names", "set the name of the event")
+	// --name / -n
+	spanEventCmd.Flags().StringVarP(&spanEventName, "name", "e", "todo-generate-default-event-names", "set the name of the event")
 
 	// --time / -t
 	spanEventCmd.Flags().StringVarP(&spanEventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
