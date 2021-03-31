@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"regexp"
 
 	"github.com/spf13/cobra"
@@ -36,7 +37,7 @@ func init() {
 	spanCmd.Flags().SortFlags = false
 
 	// --span-name / -s
-	spanCmd.Flags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the span")
+	spanCmd.PersistentFlags().StringVarP(&spanName, "span-name", "s", "todo-generate-default-span-names", "set the name of the span")
 
 	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
 	spanCmd.Flags().StringVar(&spanStartTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
@@ -48,27 +49,38 @@ func init() {
 }
 
 func doSpan(cmd *cobra.Command, args []string) {
+	ctx, span, shutdown := startSpan()
+	defer shutdown()
+	endSpan(span)
+	finishOtelCliSpan(ctx, span)
+}
+
+// remember to defer the shutdown
+func startSpan() (context.Context, trace.Span, func()) {
 	startOpts := []trace.SpanOption{trace.WithSpanKind(otelSpanKind(spanKind))}
-	endOpts := []trace.SpanOption{}
 
 	if spanStartTime != "" {
 		t := parseTime(spanStartTime, "start")
 		startOpts = append(startOpts, trace.WithTimestamp(t))
 	}
 
-	if spanEndTime != "" {
-		t := parseTime(spanEndTime, "end")
-		endOpts = append(endOpts, trace.WithTimestamp(t))
-	}
-
 	ctx, shutdown := initTracer()
-	defer shutdown()
 	ctx = loadTraceparent(ctx, traceparentCarrierFile)
 	tracer := otel.Tracer("otel-cli/span")
 
 	ctx, span := tracer.Start(ctx, spanName, startOpts...)
 	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
-	span.End(endOpts...)
 
-	finishOtelCliSpan(ctx, span)
+	return ctx, span, shutdown
+}
+
+func endSpan(span trace.Span) {
+	endOpts := []trace.SpanOption{}
+
+	if spanEndTime != "" {
+		t := parseTime(spanEndTime, "end")
+		endOpts = append(endOpts, trace.WithTimestamp(t))
+	}
+
+	span.End(endOpts...)
 }
