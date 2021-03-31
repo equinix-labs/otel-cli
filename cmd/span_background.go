@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const spanBgSockfilename = "otel-cli-background.sock"
@@ -57,6 +59,7 @@ func spanBgSockfile() string {
 }
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
+	startup := time.Now()
 	ctx, span, shutdown := startSpan() // from span.go
 	defer shutdown()
 
@@ -74,6 +77,13 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	// has to be up for this to make much sense
 	go func() {
 		time.Sleep(time.Second * time.Duration(spanBgTimeout))
+
+		uptime := time.Since(startup).Milliseconds()
+		attrs := trace.WithAttributes([]attribute.KeyValue{
+			{Key: attribute.Key("uptime.milliseconds"), Value: attribute.Int64Value(uptime)},
+			{Key: attribute.Key("timeout.seconds"), Value: attribute.IntValue(spanBgTimeout)},
+		}...)
+		span.AddEvent("timeout", attrs)
 		bgs.Shutdown()
 	}()
 
