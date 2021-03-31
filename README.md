@@ -103,9 +103,11 @@ go run . span -n "testing" -s "my first test span"
    * examples for connecting collector to other vendors' OTLP endpoints
    * span background doodles: https://gist.github.com/tobert/ceb2cd9b18ab7ab09e1ea7e3bf150d9d
 
+## Contributing
+
+Please file issues and PRs on the GitHub project at https://github.com/packethost/otel-cli
+
 ## License
 
-Proprietary
+Apache 2.0, see LICENSE
 
-BUT: I'm writing this so it can be open sourced later and do wish to avoid making anything
-Equinix or observability provider specific.
