@@ -8,7 +8,24 @@ Since this needs to connect to the OTLP endpoint on each run, it is highly recom
 to have a localhost opentelemetry collector running so this doesn't slow down your
 program too much and you don't spam outbound connections on each command.
 
-Examples:
+## Getting Started
+
+The easiest way is a simple go get:
+
+```shell
+go get github.com/packethost/otel-cli
+```
+
+Alternatively, clone the repo and build it locally:
+
+```shell
+git clone git@github.com:packethost/otel-cli.git
+cd otel-cli
+go build
+```
+
+## Examples
+
 ```shell
 # run a program inside a span
 otel-cli exec --service-name my-service --span-name "curl google" curl https://google.com
