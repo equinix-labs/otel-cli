@@ -14,6 +14,7 @@ import (
 
 //const bgSocketFile = "background-server.sock"
 
+// BgSpan is what is returned to all RPC clients and its methods are exported.
 type BgSpan struct {
 	TraceID string `json:"trace_id"`
 	SpanID  string `json:"span_id"`
@@ -21,18 +22,21 @@ type BgSpan struct {
 	span    trace.Span
 }
 
+// BgSpanEvent is a span event that the client will send.
 type BgSpanEvent struct {
 	Name       string `json:"name"`
 	Timestamp  string `json:"timestamp"`
 	Attributes map[string]string
 }
 
+// Ping is an exported RPC that takes any string and returns BgSpan.
 func (bs BgSpan) Ping(arg *string, reply *BgSpan) error {
 	reply.TraceID = bs.TraceID
 	reply.SpanID = bs.SpanID
 	return nil
 }
 
+// AddEvent takes a BgSpanEvent from the client and attaches an event to the span.
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	reply.TraceID = bs.TraceID
 	reply.SpanID = bs.SpanID
@@ -53,6 +57,7 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	return nil
 }
 
+// bgServer is a handle for a span background server.
 type bgServer struct {
 	sockfile string
 	span     trace.Span
@@ -61,9 +66,8 @@ type bgServer struct {
 	wg       sync.WaitGroup
 }
 
-// startServer opens a new span background server on a unix socket
-// and blocks until either an end span command is sent or a signal
-// TODO: write signal handlers
+// createBgServer opens a new span background server on a unix socket and
+// returns with the server ready to go. Not expected to block.
 func createBgServer(sockfile string, span trace.Span) *bgServer {
 	var err error
 
@@ -95,8 +99,9 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 	return &bgs
 }
 
-// TODO: add controls to exit loop
+// Run will block until shutdown, accepting connections and processing them.
 func (bgs *bgServer) Run() {
+	// TODO: add controls to exit loop
 	for {
 		conn, err := bgs.listener.Accept()
 		if err != nil {
@@ -118,6 +123,8 @@ func (bgs *bgServer) Run() {
 	}
 }
 
+// Shutdown does a controlled shutdown of the background server. Blocks until
+// the server is turned down cleanly and it's safe to exit.
 func (bgs *bgServer) Shutdown() {
 	close(bgs.quit)
 	bgs.listener.Close()
