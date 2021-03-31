@@ -29,6 +29,18 @@ start=$(date --rfc-3339=ns) # rfc3339 with nanoseconds
 some-interesting-program --with-some-options
 end=$(date +%s.%N) # Unix epoch with nanoseconds
 otel-cli span -n my-script -s some-interesting-program --start $start --end $end
+
+# for advanced cases you can start a span in the background, and
+# add events to it, finally closing it later in your script
+sockdir=$(mktemp -d)
+otel-cli span background \
+   --service-name $0           \
+   --span-name "$0 runtime"    \
+   --sockdir $sockdir & # the & is important here, background server will block
+otel-cli span event --event-name "cool thing" --attrs "foo=bar" --sockdir $sockdir
+otel-cli span end --service-name $0 --span-name "$0 runtime" --sockdir $sockdir
+# or you can kill the background process and it will end the span cleanly
+kill %1
 ```
 
 
