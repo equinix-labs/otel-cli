@@ -12,8 +12,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-//const bgSocketFile = "background-server.sock"
-
 // BgSpan is what is returned to all RPC clients and its methods are exported.
 type BgSpan struct {
 	TraceID string `json:"trace_id"`
@@ -60,7 +58,6 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 // bgServer is a handle for a span background server.
 type bgServer struct {
 	sockfile string
-	span     trace.Span
 	listener net.Listener
 	quit     chan struct{}
 	wg       sync.WaitGroup
@@ -73,7 +70,6 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 
 	bgs := bgServer{
 		sockfile: sockfile,
-		span:     span,
 		quit:     make(chan struct{}),
 	}
 
@@ -85,6 +81,7 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 	bgspan := BgSpan{
 		TraceID: span.SpanContext().TraceID().String(),
 		SpanID:  span.SpanContext().SpanID().String(),
+		span:    span,
 	}
 	// makes methods on BgSpan available over RPC
 	rpc.Register(&bgspan)
