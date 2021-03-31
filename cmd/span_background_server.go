@@ -62,11 +62,10 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 // ends the span end exits the background process.
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
 	// TODO: maybe accept an end timestamp?
-	bs.span.End()
-	go func() {
-		//time.Sleep(time.Millisecond * time.Duration(100))
-		bs.shutdown()
-	}()
+	endSpan(bs.span)
+	// running the shutdown as a goroutine prevents the client from getting an
+	// error here when the server gets closed. defer didn't do the trick.
+	go bs.shutdown()
 	return nil
 }
 
