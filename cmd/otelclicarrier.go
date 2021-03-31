@@ -150,9 +150,21 @@ func getTraceparent(ctx context.Context) string {
 	return carrier.Get("traceparent")
 }
 
+// finishOtelCliSpan saves the traceparent to file if necessary, then prints
+// span info to the console according to command-line args.
 func finishOtelCliSpan(ctx context.Context, span trace.Span) {
 	saveTraceparentToFile(ctx, traceparentCarrierFile)
 
+	tpout := getTraceparent(ctx)
+	tid := span.SpanContext().TraceID().String()
+	sid := span.SpanContext().SpanID().String()
+
+	printSpanData(tid, sid, tpout)
+}
+
+// printSpanData takes the provided strings and prints them in a consitent format,
+// depending on which command line arguments were set.
+func printSpanData(traceId, spanId, tp string) {
 	// --tp-print / --tp-export
 	if !traceparentPrint && !traceparentPrintExport {
 		return
@@ -165,8 +177,5 @@ func finishOtelCliSpan(ctx context.Context, span trace.Span) {
 		exported = "export "
 	}
 
-	tpout := getTraceparent(ctx)
-	tid := span.SpanContext().TraceID()
-	sid := span.SpanContext().SpanID()
-	fmt.Printf("# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", tid, sid, exported, tpout)
+	fmt.Printf("# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp)
 }

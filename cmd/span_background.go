@@ -3,11 +3,14 @@ package cmd
 import (
 	"os"
 	"os/signal"
+	"path"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 )
+
+const spanBgSockfilename = "otel-cli-background.sock"
 
 var spanBgSockdir string
 var spanBgTimeout int
@@ -39,15 +42,25 @@ timeout, (catchable) signals, or deliberate exit.
 func init() {
 	spanCmd.AddCommand(spanBgCmd)
 	spanBgCmd.Flags().SortFlags = false
+	// it seems like the socket should be required for background but it's
+	// only necessary for adding events to the span. it should be fine to
+	// start a background span at the top of a script then let it fall off
+	// at the end to get an easy span
 	spanBgCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 	spanBgCmd.Flags().IntVar(&spanBgTimeout, "timeout", 10, "how long the background server should run before timeout")
+}
+
+// spanBgSockfile returns the full filename for the socket file under the
+// provided background socket directory provided by the user.
+func spanBgSockfile() string {
+	return path.Join(spanBgSockdir, spanBgSockfilename)
 }
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
 	ctx, span, shutdown := startSpan() // from span.go
 	defer shutdown()
 
-	bgs := createBgServer(spanBgSockdir, span)
+	bgs := createBgServer(spanBgSockfile(), span)
 
 	// set up signal handlers to cleanly exit on SIGINT/SIGTERM etc
 	signals := make(chan os.Signal)

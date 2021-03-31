@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/rpc"
@@ -14,10 +16,11 @@ import (
 
 // BgSpan is what is returned to all RPC clients and its methods are exported.
 type BgSpan struct {
-	TraceID string `json:"trace_id"`
-	SpanID  string `json:"span_id"`
-	Error   string `json:"error"`
-	span    trace.Span
+	TraceID     string `json:"trace_id"`
+	SpanID      string `json:"span_id"`
+	Traceparent string `json:"traceparent"`
+	Error       string `json:"error"`
+	span        trace.Span
 }
 
 // BgSpanEvent is a span event that the client will send.
@@ -31,6 +34,8 @@ type BgSpanEvent struct {
 func (bs BgSpan) Ping(arg *string, reply *BgSpan) error {
 	reply.TraceID = bs.TraceID
 	reply.SpanID = bs.SpanID
+	ctx := trace.ContextWithSpan(context.Background(), bs.span)
+	reply.Traceparent = getTraceparent(ctx)
 	return nil
 }
 
@@ -38,10 +43,13 @@ func (bs BgSpan) Ping(arg *string, reply *BgSpan) error {
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	reply.TraceID = bs.TraceID
 	reply.SpanID = bs.SpanID
+	ctx := trace.ContextWithSpan(context.Background(), bs.span)
+	reply.Traceparent = getTraceparent(ctx)
 
 	ts, err := time.Parse(time.RFC3339Nano, bse.Timestamp)
 	if err != nil {
-		log.Fatalf("failed to parse timestamp field in request: %s", err)
+		reply.Error = fmt.Sprintf("%s", err)
+		return err
 	}
 
 	otelOpts := []trace.EventOption{
