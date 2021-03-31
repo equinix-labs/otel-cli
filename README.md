@@ -37,8 +37,9 @@ otel-cli span background \
    --service-name $0           \
    --span-name "$0 runtime"    \
    --sockdir $sockdir & # the & is important here, background server will block
+sleep 0.1 # give the background server just a few ms to start up
 otel-cli span event --event-name "cool thing" --attrs "foo=bar" --sockdir $sockdir
-otel-cli span end --service-name $0 --span-name "$0 runtime" --sockdir $sockdir
+otel-cli span end --sockdir $sockdir
 # or you can kill the background process and it will end the span cleanly
 kill %1
 ```
