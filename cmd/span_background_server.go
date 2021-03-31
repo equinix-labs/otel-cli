@@ -34,15 +34,6 @@ type BgSpanEvent struct {
 // BgEnd is an empty struct that can be sent to call End().
 type BgEnd struct{}
 
-// Ping is an exported RPC that takes any string and returns BgSpan.
-func (bs BgSpan) Ping(arg *string, reply *BgSpan) error {
-	reply.TraceID = bs.TraceID
-	reply.SpanID = bs.SpanID
-	ctx := trace.ContextWithSpan(context.Background(), bs.span)
-	reply.Traceparent = getTraceparent(ctx)
-	return nil
-}
-
 // AddEvent takes a BgSpanEvent from the client and attaches an event to the span.
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	reply.TraceID = bs.TraceID
