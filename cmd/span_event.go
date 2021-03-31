@@ -37,8 +37,8 @@ func init() {
 	spanEventCmd.Flags().StringVarP(&spanEventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
 
 	// --sockdir
-	// TODO: make this required for events
 	spanEventCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanEventCmd.MarkFlagRequired("sockdir")
 }
 
 func doSpanEvent(cmd *cobra.Command, args []string) {

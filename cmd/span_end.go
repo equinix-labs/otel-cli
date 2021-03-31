@@ -21,9 +21,8 @@ See: otel-cli span background
 
 func init() {
 	spanCmd.AddCommand(spanEndCmd)
-
-	// --sockdir TODO: make this required
 	spanEndCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanEndCmd.MarkFlagRequired("sockdir")
 }
 
 func doSpanEnd(cmd *cobra.Command, args []string) {
