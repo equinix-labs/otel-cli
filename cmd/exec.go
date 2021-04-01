@@ -43,7 +43,7 @@ func init() {
 func doExec(cmd *cobra.Command, args []string) {
 	ctx, shutdown := initTracer()
 	defer shutdown()
-	ctx = loadTraceparentFromEnv(ctx)
+	ctx = loadTraceparent(ctx, traceparentCarrierFile)
 	tracer := otel.Tracer("otel-cli/exec")
 
 	// joining the string here is kinda gross... but should be fine
