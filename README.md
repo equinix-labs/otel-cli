@@ -1,3 +1,8 @@
+# otel-cli
+
+[![](https://img.shields.io/badge/stability-experimental-lightgrey.svg)](https://github.com/packethost/standards/blob/master/experimental-statement.md)
+[![GoDoc](https://godoc.org/github.com/packethost/otel-cli?status.svg)](https://godoc.org/github.com/packethost/otel-cli)
+
 ## Synopsis
 
 otel-cli is a command-line tool for sending OpenTelemetry events. It is written in
@@ -106,6 +111,10 @@ go run . span -n "testing" -s "my first test span"
 ## Contributing
 
 Please file issues and PRs on the GitHub project at https://github.com/packethost/otel-cli
+
+## Releases
+
+This project is really new and still experiemental, releases are TBD.
 
 ## License
 
