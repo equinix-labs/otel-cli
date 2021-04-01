@@ -1,11 +1,10 @@
 # otel-cli
 
 [![](https://img.shields.io/badge/stability-experimental-lightgrey.svg)](https://github.com/packethost/standards/blob/master/experimental-statement.md)
-[![GoDoc](https://godoc.org/github.com/packethost/otel-cli?status.svg)](https://godoc.org/github.com/packethost/otel-cli)
 
 ## Synopsis
 
-otel-cli is a command-line tool for sending OpenTelemetry events. It is written in
+otel-cli is a command-line tool for sending OpenTelemetry traces. It is written in
 Go and intended to be used in shell scripts and other places where the best option
 available for sending events is executing another program.
 
@@ -35,7 +34,7 @@ go build
 # run a program inside a span
 otel-cli exec --service my-service --name "curl google" curl https://google.com
 
-# otel-cli propagates span parents via envvars so you can chain it to create spans
+# otel-cli propagates context via envvars so you can chain it to create child spans
 otel-cli exec --kind producer "otel-cli exec --kind consumer sleep 1"
 
 # if a traceparent envvar is set it will be automatically picked up and
@@ -65,8 +64,6 @@ otel-cli span end --sockdir $sockdir
 # or you can kill the background process and it will end the span cleanly
 kill %1
 ```
-
-
 
 ## Easy local dev
 

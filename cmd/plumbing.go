@@ -14,14 +14,12 @@ import (
 )
 
 // initTracer sets up the OpenTelemetry plumbing so it's ready to use.
-// Returns a func() that encapuslates clean shutdown.
-// TODO(@tobert): this pass does not configure metrics at all, and that will
-// probably be handy for some users of otel-cli
+// Returns a context and a func() that encapuslates clean shutdown.
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
 	// TODO: make this configurable
-	// probably copy the Ruby otel envvars
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/sdk-environment-variables.md
 	driver := otlpgrpc.NewDriver(
 		otlpgrpc.WithInsecure(),                  // TODO: make configurable
 		otlpgrpc.WithEndpoint("localhost:30080"), // TODO: make configurable

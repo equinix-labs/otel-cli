@@ -95,6 +95,7 @@ func parseTime(ts, which string) time.Time {
 
 // otelSpanKind takes a supported string span kind and returns the otel
 // constant for it. Returns default of KindUnspecified on no match.
+// TODO: figure out the best way to report invalid values
 func otelSpanKind(kind string) trace.SpanKind {
 	switch kind {
 	case "client":

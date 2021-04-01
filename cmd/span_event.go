@@ -17,8 +17,10 @@ var spanEventCmd = &cobra.Command{
 
 See: otel-cli span background
 
+    sd=$(mktemp -d)
+	otel-cli span background --sockdir $sd
 	otel-cli span event \
-	    --sockdir $sockdir \
+	    --sockdir $sd \
 		--name "did a cool thing" \
 		--time $(date +%s.%N) \
 		--attrs "os.kernel=$(uname -r)"

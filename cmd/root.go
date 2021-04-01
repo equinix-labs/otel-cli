@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO: that's a lot of globals, maybe move this into a struct
 var serviceName, spanName, spanKind, traceparentCarrierFile string
 var spanAttrs map[string]string
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
