@@ -2,11 +2,9 @@
 
 [![](https://img.shields.io/badge/stability-experimental-lightgrey.svg)](https://github.com/packethost/standards/blob/master/experimental-statement.md)
 
-## Synopsis
-
 otel-cli is a command-line tool for sending OpenTelemetry traces. It is written in
 Go and intended to be used in shell scripts and other places where the best option
-available for sending events is executing another program.
+available for sending spans is executing another program.
 
 Since this needs to connect to the OTLP endpoint on each run, it is highly recommended
 to have a localhost opentelemetry collector running so this doesn't slow down your
@@ -14,7 +12,7 @@ program too much and you don't spam outbound connections on each command.
 
 ## Getting Started
 
-The easiest way is a simple go get:
+The easiest way is a go get:
 
 ```shell
 go get github.com/packethost/otel-cli
@@ -78,12 +76,19 @@ put the API key in HONEYCOMB_TEAM and set HONEYCOMB_DATASET to the
 dataset, e.g. `playground`.
 
 ```shell
-export HONEYCOMB_TEAM= # put your api key here
-export HONEYCOMB_DATASET=playground
+# optional: to send data to an an OTLP-enabled tracing vendor, pass in your
+# API auth token over an environment variable and modify
+# `local/otel-local-config.yaml` according to the comments inside
+export LIGHTSTEP_TOKEN= # Lightstep API key (otlp/1 in the yaml)
+export HONEYCOMB_TEAM=  # Honeycomb API key (otlp/2 in the yaml)
+export HONEYCOMB_DATASET=playground # Honeycomb dataset
 
-docker run --name otel-collector --net host \
-   --env HONEYCOMB_TEAM \
+docker run \
+   --env LIGHTSTEP_TOKEN \
    --env HONEYCOMB_DATASET \
+   --env HONEYCOMB_DATASET \
+   --name otel-collector \
+   --net host \
    --volume $(pwd)/local/otel-local-config.yaml:/local.yaml \
    public.ecr.aws/aws-observability/aws-otel-collector:latest \
       --config /local.yaml
@@ -96,20 +101,6 @@ go build
 ./otel-cli span -n "testing" -s "my first test span"
 # or for quick iterations:
 go run . span -n "testing" -s "my first test span"
-```
-
-Any vendor or service that supports OTLP is straightfoward to add,
-as seen here. To send data to Lightstep, edit `local/otel-local-config.yaml`
-to enable the `otlp/3` exporter, then run it like so -
-
-```shell
-export LIGHTSTEP_TOKEN=# add project access token here
-
-docker run --name otel-collector --net host \
-   --env LIGHTSTEP_TOKEN
-   --volume $(pwd)/local/otel-local-config.yaml:/local.yaml \
-   public.ecr.aws/aws-observability/aws-otel-collector:latest \
-      --config /local.yaml
 ```
 
 ## Ideas
