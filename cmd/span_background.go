@@ -13,9 +13,11 @@ import (
 )
 
 const spanBgSockfilename = "otel-cli-background.sock"
+const spanBgParentPollMs = 10 // check parent pid every 10ms
 
 var spanBgSockdir string
 var spanBgTimeout int
+var spanBgStarted time.Time // for measuring uptime
 
 // spanBgCmd represents the span background command
 var spanBgCmd = &cobra.Command{
@@ -42,6 +44,9 @@ timeout, (catchable) signals, or deliberate exit.
 }
 
 func init() {
+	// mark the time when the process started for putting uptime in attributes
+	spanBgStarted = time.Now()
+
 	spanCmd.AddCommand(spanBgCmd)
 	spanBgCmd.Flags().SortFlags = false
 	// it seems like the socket should be required for background but it's
@@ -59,7 +64,6 @@ func spanBgSockfile() string {
 }
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
-	startup := time.Now()
 	ctx, span, shutdown := startSpan() // from span.go
 	defer shutdown()
 
@@ -73,17 +77,30 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 		bgs.Shutdown()
 	}()
 
+	// in order to exit at the end of scripts this program needs a way to know
+	// when the parent is gone. the most straightforward approach that should
+	// be fine on most Unix-ish operating systems is to poll getppid and exit
+	// when the parent process pid changes
+	// TODO: make this configurable?
+	ppid := os.Getppid()
+	go func() {
+		for {
+			time.Sleep(time.Duration(spanBgParentPollMs) * time.Millisecond)
+
+			// check if the parent process has changed, exit when it does
+			cppid := os.Getppid()
+			if cppid != ppid {
+				spanBgEndEvent("parent_exited", span)
+				bgs.Shutdown()
+			}
+		}
+	}()
+
 	// start the timeout goroutine, this is a little late but the server
 	// has to be up for this to make much sense
 	go func() {
 		time.Sleep(time.Second * time.Duration(spanBgTimeout))
-
-		uptime := time.Since(startup).Milliseconds()
-		attrs := trace.WithAttributes([]attribute.KeyValue{
-			{Key: attribute.Key("uptime.milliseconds"), Value: attribute.Int64Value(uptime)},
-			{Key: attribute.Key("timeout.seconds"), Value: attribute.IntValue(spanBgTimeout)},
-		}...)
-		span.AddEvent("timeout", attrs)
+		spanBgEndEvent("timeout", span)
 		bgs.Shutdown()
 	}()
 
@@ -92,4 +109,13 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 
 	endSpan(span)
 	finishOtelCliSpan(ctx, span)
+}
+
+func spanBgEndEvent(name string, span trace.Span) {
+	uptime := time.Since(spanBgStarted)
+	attrs := trace.WithAttributes([]attribute.KeyValue{
+		{Key: attribute.Key("uptime.milliseconds"), Value: attribute.Int64Value(uptime.Milliseconds())},
+		{Key: attribute.Key("timeout.seconds"), Value: attribute.IntValue(spanBgTimeout)},
+	}...)
+	span.AddEvent(name, attrs)
 }
