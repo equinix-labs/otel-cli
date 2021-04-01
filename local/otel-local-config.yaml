@@ -1,13 +1,17 @@
-# opentelemetry-collector is a proxy for telemetry events. It can receive on
-# many protocols including OTLP and Jaeger, do some processing, and forward to
-# an observability tool.
+# opentelemetry-collector is a proxy for telemetry events.
+#
+# This configuration is set up for use in otel-cli development.
+# With collector in debug mode every trace is printed to the console
+# which makes working on otel-cli quick & easy. There are also
+# examples below for how to send to Lightstep and Honeycomb.
+
 receivers:
   otlp:
     protocols:
-      # probably won't get used in Narwhal but seems to be the preferred path
+      # OTLP over gRPC
       grpc:
         endpoint: "0.0.0.0:30080"
-      # the ruby otel gem only supports HTTP
+      # OTLP over HTTP (opentelemetry-ruby only works on this proto for now)
       http:
         endpoint: "0.0.0.0:55681"
 
@@ -15,35 +19,30 @@ processors:
   batch:
 
 exporters:
+  # set to debug and your traces will get printed to the console spammily
   logging:
-    # set to debug and your traces will get printed to the console spammily
     logLevel: debug
-  # local Grafana Tempo
+  # Lightstep: set & export LIGHTSTEP_TOKEN and enable below
   otlp/1:
-    # forwards to Tempo over gRPC which is configured locally to listen on 55683
-    # while the usual port is 55680 for gRPC
-    endpoint: "tempo:55683"
-    insecure: true
-  # honeycomb, set & export HONEYCOMB_TEAM to the auth token, and dataset to
-  # something like "playground" (which is what Amy uses)
+    endpoint: "ingest.lightstep.com:443"
+    headers:
+      "lightstep-access-token": "${LIGHTSTEP_TOKEN}"
+  # Honeycomb: set & export HONEYCOMB_TEAM to the auth token, and set/export
+  # HONEYCOMB_DATASET to the dataset name you want to use, then enable below
   otlp/2:
     endpoint: "api.honeycomb.io:443"
     headers:
       "x-honeycomb-team": "${HONEYCOMB_TEAM}"
       "x-honeycomb-dataset": "${HONEYCOMB_DATASET}"
-  otlp/3:
-    endpoint: "ingest.lightstep.com:443"
-    headers:
-      "lightstep-access-token": "${LIGHTSTEP_TOKEN}"
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      # enable logging and Honeycomb, leave Tempo disabled
-      exporters: [logging,otlp/2]
-      # enabling all three looks like this:
-      #exporters: [logging,otlp/1,otlp/2]
-      # enabling logging and lightstep:
-      # exporters: [logging, otlp/3]
+      # only enable logging by default
+      exporters: [logging]
+      # Lightstep:
+      # exporters: [logging, otlp/1]
+      # Honeycomb:
+      # exporters: [logging, otlp/2]
