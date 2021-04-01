@@ -31,6 +31,10 @@ exporters:
     headers:
       "x-honeycomb-team": "${HONEYCOMB_TEAM}"
       "x-honeycomb-dataset": "${HONEYCOMB_DATASET}"
+  otlp/3:
+    endpoint: "ingest.lightstep.com:443"
+    headers:
+      "lightstep-access-token": "${LIGHTSTEP_TOKEN}"
 
 service:
   pipelines:
@@ -41,3 +45,5 @@ service:
       exporters: [logging,otlp/2]
       # enabling all three looks like this:
       #exporters: [logging,otlp/1,otlp/2]
+      # enabling logging and lightstep:
+      # exporters: [logging, otlp/3]

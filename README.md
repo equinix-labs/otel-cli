@@ -98,6 +98,20 @@ go build
 go run . span -n "testing" -s "my first test span"
 ```
 
+Any vendor or service that supports OTLP is straightfoward to add,
+as seen here. To send data to Lightstep, edit `local/otel-local-config.yaml`
+to enable the `otlp/3` exporter, then run it like so -
+
+```shell
+export LIGHTSTEP_TOKEN=# add project access token here
+
+docker run --name otel-collector --net host \
+   --env LIGHTSTEP_TOKEN
+   --volume $(pwd)/local/otel-local-config.yaml:/local.yaml \
+   public.ecr.aws/aws-observability/aws-otel-collector:latest \
+      --config /local.yaml
+```
+
 ## Ideas
 
    * add some shell examples for:
