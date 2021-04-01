@@ -55,7 +55,9 @@ func doSpan(cmd *cobra.Command, args []string) {
 	finishOtelCliSpan(ctx, span)
 }
 
-// remember to defer the shutdown
+// startSpan processes the optional --start option, starts a span, and returns a
+// context, the span, and a deferrable function for clean shutdown (it ends the
+// span).
 func startSpan() (context.Context, trace.Span, func()) {
 	startOpts := []trace.SpanOption{trace.WithSpanKind(otelSpanKind(spanKind))}
 
@@ -74,6 +76,7 @@ func startSpan() (context.Context, trace.Span, func()) {
 	return ctx, span, shutdown
 }
 
+// endSpan takes a span, checks for a --end command-line option, and ends the span.
 func endSpan(span trace.Span) {
 	endOpts := []trace.SpanOption{}
 
