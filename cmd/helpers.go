@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"log"
 	"strconv"
 	"strings"
@@ -117,4 +120,34 @@ func otelSpanKind(kind string) trace.SpanKind {
 // so that the exit code of otel-cli matches the child program's exit code.
 func GetExitCode() int {
 	return exitCode
+}
+
+// finishOtelCliSpan saves the traceparent to file if necessary, then prints
+// span info to the console according to command-line args.
+func finishOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
+	saveTraceparentToFile(ctx, traceparentCarrierFile)
+
+	tpout := getTraceparent(ctx)
+	tid := span.SpanContext().TraceID().String()
+	sid := span.SpanContext().SpanID().String()
+
+	printSpanData(target, tid, sid, tpout)
+}
+
+// printSpanData takes the provided strings and prints them in a consitent format,
+// depending on which command line arguments were set.
+func printSpanData(target io.Writer, traceId, spanId, tp string) {
+	// --tp-print / --tp-export
+	if !traceparentPrint && !traceparentPrintExport {
+		return
+	}
+
+	// --tp-export will print "export TRACEPARENT" so it's
+	// one less step to print to a file & source, or eval
+	var exported string
+	if traceparentPrintExport {
+		exported = "export "
+	}
+
+	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp)
 }

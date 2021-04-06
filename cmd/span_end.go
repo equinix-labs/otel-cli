@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"log"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -36,5 +37,5 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 	}
 	shutdown()
 
-	printSpanData(res.TraceID, res.SpanID, res.Traceparent)
+	printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
 }

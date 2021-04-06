@@ -108,7 +108,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	bgs.Run()
 
 	endSpan(span)
-	finishOtelCliSpan(ctx, span)
+	finishOtelCliSpan(ctx, span, os.Stdout)
 }
 
 func spanBgEndEvent(name string, span trace.Span) {
