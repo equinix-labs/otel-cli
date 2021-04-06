@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+var detectBrokenRFC3339PrefixRe *regexp.Regexp
+
+func init() {
+	detectBrokenRFC3339PrefixRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} `)
+}
 
 // cliAttrsToOtel takes a map of string:string, such as that from --attrs
 // and returns them in an []attribute.KeyValue.
@@ -53,6 +60,12 @@ func parseTime(ts, which string) time.Time {
 	// Unix epoch time
 	if i, uterr := strconv.ParseInt(ts, 10, 64); uterr == nil {
 		return time.Unix(i, 0)
+	}
+
+	// date --rfc-3339 returns an invalid format for Go because it has a
+	// space instead of 'T' between date and time
+	if detectBrokenRFC3339PrefixRe.MatchString(ts) {
+		ts = strings.Replace(ts, " ", "T", 1)
 	}
 
 	// Unix epoch time with nanoseconds
