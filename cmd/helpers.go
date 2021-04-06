@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +13,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+var detectBrokenRFC3339PrefixRe *regexp.Regexp
+
+func init() {
+	detectBrokenRFC3339PrefixRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} `)
+}
 
 // cliAttrsToOtel takes a map of string:string, such as that from --attrs
 // and returns them in an []attribute.KeyValue.
@@ -50,6 +60,12 @@ func parseTime(ts, which string) time.Time {
 	// Unix epoch time
 	if i, uterr := strconv.ParseInt(ts, 10, 64); uterr == nil {
 		return time.Unix(i, 0)
+	}
+
+	// date --rfc-3339 returns an invalid format for Go because it has a
+	// space instead of 'T' between date and time
+	if detectBrokenRFC3339PrefixRe.MatchString(ts) {
+		ts = strings.Replace(ts, " ", "T", 1)
 	}
 
 	// Unix epoch time with nanoseconds
@@ -117,4 +133,34 @@ func otelSpanKind(kind string) trace.SpanKind {
 // so that the exit code of otel-cli matches the child program's exit code.
 func GetExitCode() int {
 	return exitCode
+}
+
+// finishOtelCliSpan saves the traceparent to file if necessary, then prints
+// span info to the console according to command-line args.
+func finishOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
+	saveTraceparentToFile(ctx, traceparentCarrierFile)
+
+	tpout := getTraceparent(ctx)
+	tid := span.SpanContext().TraceID().String()
+	sid := span.SpanContext().SpanID().String()
+
+	printSpanData(target, tid, sid, tpout)
+}
+
+// printSpanData takes the provided strings and prints them in a consitent format,
+// depending on which command line arguments were set.
+func printSpanData(target io.Writer, traceId, spanId, tp string) {
+	// --tp-print / --tp-export
+	if !traceparentPrint && !traceparentPrintExport {
+		return
+	}
+
+	// --tp-export will print "export TRACEPARENT" so it's
+	// one less step to print to a file & source, or eval
+	var exported string
+	if traceparentPrintExport {
+		exported = "export "
+	}
+
+	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp)
 }

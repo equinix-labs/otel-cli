@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"os"
 	"regexp"
 
 	"github.com/spf13/cobra"
@@ -52,7 +53,7 @@ func doSpan(cmd *cobra.Command, args []string) {
 	ctx, span, shutdown := startSpan()
 	defer shutdown()
 	endSpan(span)
-	finishOtelCliSpan(ctx, span)
+	finishOtelCliSpan(ctx, span, os.Stdout)
 }
 
 // startSpan processes the optional --start option, starts a span, and returns a

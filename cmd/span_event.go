@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -59,5 +60,5 @@ func doSpanEvent(cmd *cobra.Command, args []string) {
 		log.Fatalf("error while calling background server rpc BgSpan.AddEvent: %s", err)
 	}
 
-	printSpanData(res.TraceID, res.SpanID, res.Traceparent)
+	printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
 }

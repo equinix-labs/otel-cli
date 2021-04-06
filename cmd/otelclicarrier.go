@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var envTp string // global state
@@ -52,6 +50,11 @@ func (ec OtelCliCarrier) Keys() []string {
 	return []string{"traceparent"}
 }
 
+// Clear sets the traceparent to empty string. Mainly for testing.
+func (ec OtelCliCarrier) Clear() {
+	envTp = ""
+}
+
 // loadTraceparent checks the environment first for TRACEPARENT then if filename
 // isn't empty, it will read that file and look for a bare traceparent in that
 // file.
@@ -73,7 +76,9 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 }
 
 // loadTraceparentFromFile reads a traceparent from filename and returns a
-// context with the traceparent set.
+// context with the traceparent set. The format for the file as written is
+// just a bare traceparent string. Whitespace, "export " and "TRACEPARENT=" are
+// stripped automatically so the file can also be a valid shell snippet.
 func loadTraceparentFromFile(ctx context.Context, filename string) context.Context {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -95,6 +100,11 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 	if len(tp) == 0 {
 		return ctx
 	}
+
+	// also accept 'export TRACEPARENT=' and 'TRACEPARENT='
+	tp = bytes.TrimPrefix(tp, []byte("export "))
+	tp = bytes.TrimPrefix(tp, []byte("TRACEPARENT="))
+
 	if !checkTracecarrierRe.Match(tp) {
 		// I have a doubt: should this be a soft failure?
 		log.Fatalf("file '%s' was read but does not contain a valid traceparent", filename)
@@ -148,34 +158,4 @@ func getTraceparent(ctx context.Context) string {
 	carrier := NewOtelCliCarrier()
 	prop.Inject(ctx, carrier)
 	return carrier.Get("traceparent")
-}
-
-// finishOtelCliSpan saves the traceparent to file if necessary, then prints
-// span info to the console according to command-line args.
-func finishOtelCliSpan(ctx context.Context, span trace.Span) {
-	saveTraceparentToFile(ctx, traceparentCarrierFile)
-
-	tpout := getTraceparent(ctx)
-	tid := span.SpanContext().TraceID().String()
-	sid := span.SpanContext().SpanID().String()
-
-	printSpanData(tid, sid, tpout)
-}
-
-// printSpanData takes the provided strings and prints them in a consitent format,
-// depending on which command line arguments were set.
-func printSpanData(traceId, spanId, tp string) {
-	// --tp-print / --tp-export
-	if !traceparentPrint && !traceparentPrintExport {
-		return
-	}
-
-	// --tp-export will print "export TRACEPARENT" so it's
-	// one less step to print to a file & source, or eval
-	var exported string
-	if traceparentPrintExport {
-		exported = "export "
-	}
-
-	fmt.Printf("# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp)
 }
