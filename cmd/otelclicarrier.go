@@ -63,7 +63,7 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 	if filename != "" {
 		ctx = loadTraceparentFromFile(ctx, filename)
 	}
-	if traceparentCarrierRequired {
+	if traceparentRequired {
 		// TODO: find a better way to do this
 		// maybe check with the RE first?
 		tp := getTraceparent(ctx)       // get the text representation in the context
@@ -84,7 +84,7 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 	if err != nil {
 		// only fatal when the tp carrier file is required explicitly, otherwise
 		// just silently return the unmodified context
-		if traceparentCarrierRequired {
+		if traceparentRequired {
 			log.Fatalf("could not open file '%s' for read: %s", filename, err)
 		} else {
 			return ctx

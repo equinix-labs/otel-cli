@@ -10,7 +10,7 @@ receivers:
     protocols:
       # OTLP over gRPC
       grpc:
-        endpoint: "0.0.0.0:30080"
+        endpoint: "0.0.0.0:4317"
       # OTLP over HTTP (opentelemetry-ruby only works on this proto for now)
       http:
         endpoint: "0.0.0.0:55681"
