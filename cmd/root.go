@@ -12,7 +12,7 @@ var spanAttrs, otlpHeaders map[string]string
 var otlpEndpoint string
 var otlpInsecure, otlpBlocking bool
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
-var traceparentRequired bool
+var traceparentRequired, testMode bool
 var exitCode int
 
 // rootCmd represents the base command when called without any subcommands
@@ -90,6 +90,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&traceparentPrintExport, "tp-export", "p", false, "same as --tp-print but it puts an 'export ' in front so it's more convinenient to source in scripts")
 	viper.BindPFlag("tp-export", rootCmd.PersistentFlags().Lookup("tp-export"))
 	viper.BindEnv("OTEL_CLI_EXPORT_TRACEPARENT", "tp-export")
+
+	rootCmd.PersistentFlags().BoolVar(&testMode, "test", false, "configure noop exporter and dump data to json on stdout instead of sending")
 }
 
 func initViperConfig() {
