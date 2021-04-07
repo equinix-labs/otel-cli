@@ -3,6 +3,10 @@ package cmd
 import (
 	"context"
 	"log"
+	"net"
+	"net/url"
+	"regexp"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp"
@@ -11,22 +15,41 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/semconv"
+	"google.golang.org/grpc"
 )
 
 // initTracer sets up the OpenTelemetry plumbing so it's ready to use.
 // Returns a context and a func() that encapuslates clean shutdown.
+//
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
-	// TODO: make this configurable
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/sdk-environment-variables.md
-	driver := otlpgrpc.NewDriver(
-		otlpgrpc.WithInsecure(),                  // TODO: make configurable
-		otlpgrpc.WithEndpoint("localhost:30080"), // TODO: make configurable
-	)
-	// ^^ examples usually show this with the grpc.WithBlock() dial option to make
-	// the connection synchronous, but we don't want that and instead rely on
-	// the shutdown methods to make sure everything is done by the time we exit
+	driverOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(otlpEndpoint)}
+
+	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
+	// but I expect most users of this program to point at a localhost endpoint that might not
+	// have any encryption available, or setting it up raises the bar of entry too high.
+	// The compromise is to automatically flip this flag to true when endpoint contains an
+	// an obvious "localhost", "127.0.0.x", or "::1" address.
+	if otlpInsecure || isLoopbackAddr(otlpEndpoint) {
+		driverOpts = append(driverOpts, otlpgrpc.WithInsecure())
+	}
+
+	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
+	if len(otlpHeaders) > 0 {
+		// fortunately WithHeaders can accept the string map as-is
+		driverOpts = append(driverOpts, otlpgrpc.WithHeaders(otlpHeaders))
+	}
+
+	// OTLP examples usually show this with the grpc.WithBlock() dial option to
+	// make the connection synchronous, but it's not the right default for cli
+	// instead, rely on the shutdown methods to make sure everything is flushed
+	// by the time the program exits.
+	if otlpBlocking {
+		driverOpts = append(driverOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
+	}
+
+	driver := otlpgrpc.NewDriver(driverOpts...)
 
 	otlpExp, err := otlp.NewExporter(ctx, driver)
 	if err != nil {
@@ -69,4 +92,46 @@ func initTracer() (context.Context, func()) {
 			log.Fatalf("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
 		}
 	}
+}
+
+// isLoopbackAddr takes a dial string, looks up the address, then returns true
+// if it points at either a v4 or v6 loopback address.
+// As I understood the OTLP spec, only host:port or an HTTP URL are acceptable.
+// This function is _not_ meant to validate the endpoint, that will happen when
+// otel-go attempts to connect to the endpoint as a gRPC dial address.
+func isLoopbackAddr(endpoint string) bool {
+	hpRe := regexp.MustCompile(`^[\w.-]+:\d+$`)
+	uriRe := regexp.MustCompile(`^(http|https)`)
+
+	endpoint = strings.TrimSpace(endpoint)
+
+	var hostname string
+	if hpRe.MatchString(endpoint) {
+		parts := strings.SplitN(endpoint, ":", 2)
+		hostname = parts[0]
+	} else if uriRe.MatchString(endpoint) {
+		u, err := url.Parse(endpoint)
+		if err != nil {
+			log.Fatalf("error parsing provided URI '%s': %s", endpoint, err)
+		}
+		hostname = u.Hostname()
+	} else {
+		log.Fatalf("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
+	}
+
+	ips, err := net.LookupIP(hostname)
+	if err != nil {
+		log.Fatalf("unable to look up hostname '%s': %s", hostname, err)
+	}
+
+	// all ips returned must be loopback to return true
+	// cases where that isn't true should be super rare, and probably all shenanigans
+	allAreLoopback := true
+	for _, ip := range ips {
+		if !ip.IsLoopback() {
+			allAreLoopback = false
+		}
+	}
+
+	return allAreLoopback
 }

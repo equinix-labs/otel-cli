@@ -63,6 +63,26 @@ otel-cli span end --sockdir $sockdir
 kill %1
 ```
 
+## Configuration
+
+Everything is configurable via CLI arguments, and many of those arguments can
+also be configured via file or environment variables.
+
+| CLI argument    | environment variable          | config file key | example value  |
+| --------------- | ----------------------------- | --------------- | -------------- |
+| --endpoint      | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint        | localhost:4317 |
+| --insecure      | OTEL_EXPORTER_OTLP_INSECURE   | insecure        | false          |
+| --otlp-headers  | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers    | key=value      |
+| --otlp-blocking | OTEL_EXPORTER_OTLP_BLOCKING   | otlp-blocking   | false          |
+| --service       | OTEL_CLI_SERVICE_NAME         | service         | myapp          |
+| --kind          | OTEL_CLI_TRACE_KIND           | kind            | server         |
+| --attrs         | OTEL_CLI_ATTRIBUTES           | attrs           | k=v,a=b        |
+| --tp-required   | OTEL_CLI_TRACEPARENT_REQUIRED | tp-required     | false          |
+| --tp-carrier    | OTEL_CLI_CARRIER_FILE         | tp-carrier      | filename.txt   |
+| --tp-ignore-env | OTEL_CLI_IGNORE_ENV           | tp-ignore-env   | false          |
+| --tp-print      | OTEL_CLI_PRINT_TRACEPARENT    | tp-print        | false          |
+| --tp-export     | OTEL_CLI_EXPORT_TRACEPARENT   | tp-export       | false          |
+
 ## Easy local dev
 
 First, this needs some work to be good. Once the config plumbing is in
@@ -85,7 +105,7 @@ export HONEYCOMB_DATASET=playground # Honeycomb dataset
 
 docker run \
    --env LIGHTSTEP_TOKEN \
-   --env HONEYCOMB_DATASET \
+   --env HONEYCOMB_TEAM \
    --env HONEYCOMB_DATASET \
    --name otel-collector \
    --net host \
