@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/semconv"
+	"google.golang.org/grpc"
 )
 
 // initTracer sets up the OpenTelemetry plumbing so it's ready to use.
@@ -34,9 +35,20 @@ func initTracer() (context.Context, func()) {
 		driverOpts = append(driverOpts, otlpgrpc.WithInsecure())
 	}
 
-	// OTLP examples usually show this with the grpc.WithBlock() dial option to make
-	// the connection synchronous, but we don't want that and instead rely on
-	// the shutdown methods to make sure everything is done by the time we exit.
+	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
+	if len(otlpHeaders) > 0 {
+		// fortunately WithHeaders can accept the string map as-is
+		driverOpts = append(driverOpts, otlpgrpc.WithHeaders(otlpHeaders))
+	}
+
+	// OTLP examples usually show this with the grpc.WithBlock() dial option to
+	// make the connection synchronous, but it's not the right default for cli
+	// instead, rely on the shutdown methods to make sure everything is flushed
+	// by the time the program exits.
+	if otlpBlocking {
+		driverOpts = append(driverOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
+	}
+
 	driver := otlpgrpc.NewDriver(driverOpts...)
 
 	otlpExp, err := otlp.NewExporter(ctx, driver)

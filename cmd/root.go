@@ -8,9 +8,9 @@ import (
 
 // TODO: that's a lot of globals, maybe move this into a struct
 var cfgFile, serviceName, spanName, spanKind, traceparentCarrierFile string
-var spanAttrs map[string]string
+var spanAttrs, otlpHeaders map[string]string
 var otlpEndpoint string
-var otlpInsecure bool
+var otlpInsecure, otlpBlocking bool
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
 var traceparentRequired bool
 var exitCode int
@@ -30,6 +30,7 @@ func Execute() {
 
 func init() {
 	spanAttrs = make(map[string]string)
+	otlpHeaders = make(map[string]string)
 	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
@@ -48,6 +49,14 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&otlpInsecure, "insecure", false, "refuse to connect if TLS is unavailable (true by default when endpoint is localhost)")
 	viper.BindPFlag("insecure", rootCmd.PersistentFlags().Lookup("insecure"))
 	viper.BindEnv("OTEL_EXPORTER_OTLP_INSECURE", "insecure")
+
+	rootCmd.PersistentFlags().StringToStringVar(&otlpHeaders, "otlp-headers", map[string]string{}, "a comma-sparated list of key=value headers to send on OTLP connection")
+	viper.BindPFlag("otlp-headers", rootCmd.PersistentFlags().Lookup("otlp-headers"))
+	viper.BindEnv("OTEL_EXPORTER_OTLP_HEADERS", "otlp-headers")
+
+	rootCmd.PersistentFlags().BoolVar(&otlpBlocking, "otlp-blocking", false, "block on connecting to the OTLP server before proceding")
+	viper.BindPFlag("otlp-blocking", rootCmd.PersistentFlags().Lookup("otlp-blocking"))
+	viper.BindEnv("OTEL_EXPORTER_OTLP_BLOCKING", "otlp-blocking")
 
 	rootCmd.PersistentFlags().StringVarP(&serviceName, "service", "n", "otel-cli", "set the name of the application sent on the traces")
 	viper.BindPFlag("service", rootCmd.PersistentFlags().Lookup("service"))
