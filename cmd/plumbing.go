@@ -11,7 +11,9 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/exporters/stdout"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/export/trace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/semconv"
@@ -51,9 +53,19 @@ func initTracer() (context.Context, func()) {
 
 	driver := otlpgrpc.NewDriver(driverOpts...)
 
-	otlpExp, err := otlp.NewExporter(ctx, driver)
+	var exporter trace.SpanExporter // allows overwrite in --test mode
+	exporter, err := otlp.NewExporter(ctx, driver)
 	if err != nil {
 		log.Fatalf("failed to configure OTLP exporter: %s", err)
+	}
+
+	// when in test mode, let the otlp exporter setup happen, then overwrite it
+	// with the stdout exporter so spans only go to stdout
+	if testMode {
+		exporter, err = stdout.NewExporter()
+		if err != nil {
+			log.Fatalf("failed to configure stdout exporter in --test mode: %s", err)
+		}
 	}
 
 	// set the service name that will show up in tracing UIs
@@ -66,7 +78,7 @@ func initTracer() (context.Context, func()) {
 	// SSP sends all completed spans to the exporter immediately and that is
 	// exactly what we want/need in this app
 	// https://github.com/open-telemetry/opentelemetry-go/blob/main/sdk/trace/simple_span_processor.go
-	ssp := sdktrace.NewSimpleSpanProcessor(otlpExp)
+	ssp := sdktrace.NewSimpleSpanProcessor(exporter)
 
 	// ParentBased/AlwaysSample Sampler is the default and that's fine for this
 	tracerProvider := sdktrace.NewTracerProvider(
@@ -87,7 +99,7 @@ func initTracer() (context.Context, func()) {
 			log.Fatalf("shutdown of OpenTelemetry tracerProvider failed: %s", err)
 		}
 
-		err = otlpExp.Shutdown(ctx)
+		err = exporter.Shutdown(ctx)
 		if err != nil {
 			log.Fatalf("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
 		}
