@@ -67,6 +67,11 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	ctx, span, shutdown := startSpan() // from span.go
 	defer shutdown()
 
+	// span background is a bit different from span/exec in that it might be
+	// hanging out while other spans are created, so it does the traceparent
+	// propagation before the server starts, instead of after
+	propagateOtelCliSpan(ctx, span, os.Stdout)
+
 	bgs := createBgServer(spanBgSockfile(), span)
 
 	// set up signal handlers to cleanly exit on SIGINT/SIGTERM etc
@@ -108,9 +113,10 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	bgs.Run()
 
 	endSpan(span)
-	finishOtelCliSpan(ctx, span, os.Stdout)
 }
 
+// spanBgEndEvent adds an event with the provided name, to the provided span
+// with uptime.milliseconds and timeout.seconds attributes.
 func spanBgEndEvent(name string, span trace.Span) {
 	uptime := time.Since(spanBgStarted)
 	attrs := trace.WithAttributes([]attribute.KeyValue{

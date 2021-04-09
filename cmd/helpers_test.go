@@ -164,7 +164,7 @@ func TestOtelSpanKind(t *testing.T) {
 	}
 }
 
-func TestFinishOtelCliSpan(t *testing.T) {
+func TestPropagateOtelCliSpan(t *testing.T) {
 	// TODO: should this noop the tracing backend?
 
 	// set package globals to a known state
@@ -176,13 +176,13 @@ func TestFinishOtelCliSpan(t *testing.T) {
 	tid := "3433d5ae39bdfee397f44be5146867b3"
 	sid := "8a5518f1e5c54d0a"
 	os.Setenv("TRACEPARENT", tp)
-	tracer := otel.Tracer("testing/finishOtelCliSpan")
-	ctx, span := tracer.Start(context.Background(), "testing finishOtelCliSpan")
+	tracer := otel.Tracer("testing/propagateOtelCliSpan")
+	ctx, span := tracer.Start(context.Background(), "testing propagateOtelCliSpan")
 
 	buf := new(bytes.Buffer)
 	// mostly smoke testing this, will validate printSpanData output
 	// TODO: maybe validate the file write works, but that's tested elsewhere...
-	finishOtelCliSpan(ctx, span, buf)
+	propagateOtelCliSpan(ctx, span, buf)
 	if buf.Len() != 0 {
 		t.Errorf("nothing was supposed to be written but %d bytes were", buf.Len())
 	}
