@@ -146,7 +146,26 @@ func (bgs *bgServer) Shutdown() {
 // and returns the rpc client handle and a shutdown function that should be
 // deferred.
 func createBgClient() (*rpc.Client, func()) {
-	sock := net.UnixAddr{Name: spanBgSockfile(), Net: "unix"}
+	sockfile := spanBgSockfile()
+	started := time.Now()
+
+	// wait for the socket file to show up, polling every 25ms until it does or timeout
+	for {
+		_, err := os.Stat(sockfile)
+		if os.IsNotExist(err) {
+			time.Sleep(time.Millisecond * 25) // sleep 25ms between checks
+		} else if err != nil {
+			log.Fatalf("failed to stat file '%s': %s", sockfile, err)
+		} else {
+			break
+		}
+
+		if time.Since(started) > time.Duration(spanBgTimeout)*time.Second {
+			log.Fatalf("timeout while waiting for span background socket '%s' to appear", sockfile)
+		}
+	}
+
+	sock := net.UnixAddr{Name: sockfile, Net: "unix"}
 	conn, err := net.DialUnix(sock.Net, nil, &sock)
 	if err != nil {
 		log.Fatalf("unable to connect to span background server at '%s': %s", spanBgSockdir, err)

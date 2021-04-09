@@ -21,9 +21,6 @@ sockdir=$(mktemp -d) # a unix socket will be created here
     --name "$0 script execution" \
     --timeout 10 &
 
-# TODO: figure out how to get rid of this, or make 'span event' block...
-sleep 0.1 # give span background 100ms to start up
-
 data1=$(uuidgen)
 
 # add an event to the span running in the background, with an attribute
