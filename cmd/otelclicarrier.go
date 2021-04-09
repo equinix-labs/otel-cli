@@ -64,13 +64,15 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 		ctx = loadTraceparentFromFile(ctx, filename)
 	}
 	if traceparentRequired {
-		// TODO: find a better way to do this
-		// maybe check with the RE first?
-		tp := getTraceparent(ctx)       // get the text representation in the context
-		parts := strings.Split(tp, "-") // e.g. 00-9765b2f71c68b04dc0ad2a4d73027d6f-1881444346b6296e-01
-		if parts[1] == "00000000000000000000000000000000" || parts[2] == "0000000000000000" {
-			log.Fatalf("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
+		tp := getTraceparent(ctx) // get the text representation in the context
+		if len(tp) > 0 && checkTracecarrierRe.MatchString(tp) {
+			parts := strings.Split(tp, "-") // e.g. 00-9765b2f71c68b04dc0ad2a4d73027d6f-1881444346b6296e-01
+			// return from here if everything looks ok, otherwise fall through to the log.Fatal
+			if len(parts) > 3 && parts[1] != "00000000000000000000000000000000" && parts[2] != "0000000000000000" {
+				return ctx
+			}
 		}
+		log.Fatalf("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
 	}
 	return ctx
 }

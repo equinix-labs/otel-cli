@@ -135,9 +135,9 @@ func GetExitCode() int {
 	return exitCode
 }
 
-// finishOtelCliSpan saves the traceparent to file if necessary, then prints
+// propagateOtelCliSpan saves the traceparent to file if necessary, then prints
 // span info to the console according to command-line args.
-func finishOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
+func propagateOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
 	saveTraceparentToFile(ctx, traceparentCarrierFile)
 
 	tpout := getTraceparent(ctx)
