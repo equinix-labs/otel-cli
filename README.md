@@ -102,6 +102,7 @@ README. However, the good news is that it's fairly easy to do! You can follow th
 #### 2. A built (or installed) copy of otel-cli itself
 
 If you're planning on making changes to otel-cli, we recommend building the project locally: `go build`
+
 But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/packethost/otel-cli`
 
 #### 3. A system to receive/inspect the traces you generate
