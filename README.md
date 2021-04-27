@@ -85,20 +85,55 @@ also be configured via file or environment variables.
 
 ## Easy local dev
 
-First, this needs some work to be good. Once the config plumbing is in
-place this can hopefully stop using `--net host`
+We want working on otel-cli to be easy, so we've provided a few different ways to get
+started. In general, there are three things you need:
 
-Run opentelemetry collector locally in debug mode in one window, and
-hack on otel-cli in another..
+- A working Go environment
+- A built (or installed) copy of otel-cli itself
+- A system to receive/inspect the traces you generate
 
-If you have a Honeycomb API key and want to forward your data there,
-put the API key in HONEYCOMB_TEAM and set HONEYCOMB_DATASET to the
-dataset, e.g. `playground`.
+#### 1. A working Go environment
+
+Providing instructions on getting Go up and running on your machine is out of scope for this
+README. However, the good news is that it's fairly easy to do! You can follow the normal
+[Installation instructions](https://golang.org/doc/install) from the Go project itself.
+
+
+#### 2. A built (or installed) copy of otel-cli itself
+
+If you're planning on making changes to otel-cli, we recommend building the project locally: `go build`
+But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/packethost/otel-cli`
+
+#### 3. A system to receive/inspect the traces you generate
+
+Here you have one more choice: you can either send traces to a SaaS tracing vendor or other
+system that you already have, or you can run our `docker-compose` configuration to launch a local Jaeger system.
+
+If you're not sure what to choose, we recommend trying our Jaeger configuration, which requires no configuration.
+
+##### Local Jaeger setup
+
+Just run `docker-compose up` from this repository, and you'll get an OpenTelemetry collector and a local
+Jaeger all-in-one setup ready to go.
+
+The OpenTelemetry collector is listening on `localhost:4317`, and the Jaeger UI will be running on
+`localhost:16686`. Since these are the expected defaults of `otel-cli`, you can get started with no further configuration:
+
+```shell
+./otel-cli exec -n my-cool-thing -s interesting-step echo 'hello world'
+```
+
+This trace will be available in the Jaeger UI at `localhost:16686`.
+
+##### SaaS tracing vendor
+
+We've provided Honeycomb and LightStep configurations that you could also use, if you're using one of
+those vendors today. It's still pretty easy to get started:
 
 ```shell
 # optional: to send data to an an OTLP-enabled tracing vendor, pass in your
 # API auth token over an environment variable and modify
-# `local/otel-local-config.yaml` according to the comments inside
+# `local/otel-vendor-config.yaml` according to the comments inside
 export LIGHTSTEP_TOKEN= # Lightstep API key (otlp/1 in the yaml)
 export HONEYCOMB_TEAM=  # Honeycomb API key (otlp/2 in the yaml)
 export HONEYCOMB_DATASET=playground # Honeycomb dataset
@@ -109,7 +144,7 @@ docker run \
    --env HONEYCOMB_DATASET \
    --name otel-collector \
    --net host \
-   --volume $(pwd)/local/otel-local-config.yaml:/local.yaml \
+   --volume $(pwd)/local/otel-vendor-config.yaml:/local.yaml \
    public.ecr.aws/aws-observability/aws-otel-collector:latest \
       --config /local.yaml
 ```
@@ -117,7 +152,6 @@ docker run \
 Then it should just work to run otel-cli:
 
 ```shell
-go build
 ./otel-cli span -n "testing" -s "my first test span"
 # or for quick iterations:
 go run . span -n "testing" -s "my first test span"
