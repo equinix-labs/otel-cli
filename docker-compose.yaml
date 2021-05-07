@@ -1,0 +1,18 @@
+---
+version: '2.1'
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.22.0
+    ports:
+      - "16686:16686"
+      - "14268"
+      - "14250"
+  otel-collector:
+    image: otel/opentelemetry-collector:0.24.0
+    volumes:
+      - ./configs/otel-collector.yaml:/local.yaml
+    command: --config /local.yaml
+    ports:
+      - "4317:4317"
+    depends_on:
+      - jaeger
