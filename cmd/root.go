@@ -105,6 +105,12 @@ func initViperConfig() {
 		viper.SetConfigName(".otel-cli") // e.g. ~/.otel-cli.yaml
 	}
 
-	err := viper.ReadInConfig()
-	cobra.CheckErr(err)
+	if err := viper.ReadInConfig(); err != nil {
+		// We want to suppress errors here if the config is not found, but only if the user has not expressly given us a location to search.
+		// Otherwise, we'll raise any config-reading error up to the user.
+		_, cfgNotFound := err.(viper.ConfigFileNotFoundError)
+		if cfgFile != "" || !cfgNotFound {
+			cobra.CheckErr(err)
+		}
+	}
 }
