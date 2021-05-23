@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"regexp"
 
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -73,6 +75,10 @@ func startSpan() (context.Context, trace.Span, func()) {
 
 	ctx, span := tracer.Start(ctx, spanName, startOpts...)
 	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
+
+	// span.SetStatus(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
+
+	span.SetStatus(codes.Error, fmt.Sprintf("command failed: %s", "testMsg"))
 
 	return ctx, span, shutdown
 }
