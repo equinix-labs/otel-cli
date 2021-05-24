@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"regexp"
 
@@ -76,9 +75,10 @@ func startSpan() (context.Context, trace.Span, func()) {
 	ctx, span := tracer.Start(ctx, spanName, startOpts...)
 	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
 
-	// span.SetStatus(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
-
-	span.SetStatus(codes.Error, fmt.Sprintf("command failed: %s", "testMsg"))
+	if spanStatus == true {
+		span.SetStatus(codes.Error, "error")	
+	}
+	
 
 	return ctx, span, shutdown
 }

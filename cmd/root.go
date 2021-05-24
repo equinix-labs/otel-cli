@@ -9,6 +9,7 @@ import (
 // TODO: that's a lot of globals, maybe move this into a struct
 var cfgFile, serviceName, spanName, spanKind, traceparentCarrierFile string
 var spanAttrs, otlpHeaders map[string]string
+var spanStatus bool
 var otlpEndpoint string
 var otlpInsecure, otlpBlocking bool
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
@@ -30,6 +31,7 @@ func Execute() {
 
 func init() {
 	spanAttrs = make(map[string]string)
+	spanStatus = false
 	otlpHeaders = make(map[string]string)
 	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
@@ -69,6 +71,10 @@ func init() {
 	rootCmd.PersistentFlags().StringToStringVarP(&spanAttrs, "attrs", "a", map[string]string{}, "a comma-separated list of key=value attributes")
 	viper.BindPFlag("attrs", rootCmd.PersistentFlags().Lookup("attrs"))
 	viper.BindEnv("OTEL_CLI_ATTRIBUTES", "attrs")
+
+	rootCmd.PersistentFlags().StringToStringVarP(&spanStatus, "status", "s", false, "when set to true, mark span status as Error")
+	viper.BindPFlag("status", rootCmd.PersistentFlags().Lookup("status"))
+	viper.BindEnv("OTEL_SPAN_STATUS", "status")
 
 	// trace propagation options
 	rootCmd.PersistentFlags().BoolVar(&traceparentRequired, "tp-required", false, "when set to true, fail and log if a traceparent can't be picked up from TRACEPARENT ennvar or a carrier file")
