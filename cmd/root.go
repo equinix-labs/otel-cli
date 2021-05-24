@@ -74,7 +74,7 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVarP(&spanStatus, "status", "s", false, "when set to true, mark span status as Error")
 	viper.BindPFlag("status", rootCmd.PersistentFlags().Lookup("status"))
-	viper.BindEnv("OTEL_SPAN_STATUS", "status")
+	viper.BindEnv("OTEL_CLI_SPAN_STATUS", "status")
 
 	// trace propagation options
 	rootCmd.PersistentFlags().BoolVar(&traceparentRequired, "tp-required", false, "when set to true, fail and log if a traceparent can't be picked up from TRACEPARENT ennvar or a carrier file")
