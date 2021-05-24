@@ -72,7 +72,7 @@ func init() {
 	viper.BindPFlag("attrs", rootCmd.PersistentFlags().Lookup("attrs"))
 	viper.BindEnv("OTEL_CLI_ATTRIBUTES", "attrs")
 
-	rootCmd.PersistentFlags().StringToStringVarP(&spanStatus, "status", "s", false, "when set to true, mark span status as Error")
+	rootCmd.PersistentFlags().BoolVarP(&spanStatus, "status", "s", false, "when set to true, mark span status as Error")
 	viper.BindPFlag("status", rootCmd.PersistentFlags().Lookup("status"))
 	viper.BindEnv("OTEL_SPAN_STATUS", "status")
 
