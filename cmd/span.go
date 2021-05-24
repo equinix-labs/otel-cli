@@ -78,7 +78,6 @@ func startSpan() (context.Context, trace.Span, func()) {
 	if spanStatus == true {
 		span.SetStatus(codes.Error, "error")	
 	}
-	
 
 	return ctx, span, shutdown
 }
