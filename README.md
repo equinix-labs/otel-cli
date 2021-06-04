@@ -128,6 +128,8 @@ This trace will be available in the Jaeger UI at `localhost:16686`.
 
 ##### SaaS tracing vendor
 
+###### Honeycomb and LightStep
+
 We've provided Honeycomb and LightStep configurations that you could also use, if you're using one of
 those vendors today. It's still pretty easy to get started:
 
@@ -156,6 +158,30 @@ Then it should just work to run otel-cli:
 ./otel-cli span -n "testing" -s "my first test span"
 # or for quick iterations:
 go run . span -n "testing" -s "my first test span"
+```
+
+###### Elastic APM Server
+
+Since 7.13.0 Elastic [APM Server](https://github.com/elastic/apm-server) support OpenTelemetry, 
+the following configuration allow you launch an APM Server in a Docker container
+to send OpenTelemetry traces to an Elasticsearch. 
+
+```shell
+docker run -it \
+  --name apm-server \
+  -p 8200:8200 \
+  docker.elastic.co/apm/apm-server:7.13.0 \
+    -E output.elasticsearch.hosts="https://elasticsearch.example.com:9200" \
+    -E output.elasticsearch.username=elastic \
+    -E output.elasticsearch.password=changeme \
+    -E output.elasticsearch.enabled=true \
+    -E secret_token=MyApmToken
+```
+
+When the APM Server is up and running you can start sending your spans with otel-cli:
+
+```shell
+/otel-cli span -n "testing" -s "my first test span" --endpoint=localhost:8200 --otlp-headers "authorization=Beared MyApmToken"
 ```
 
 ## Ideas
