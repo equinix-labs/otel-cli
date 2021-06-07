@@ -39,6 +39,11 @@ func initTracer() (context.Context, func()) {
 		driverOpts = append(driverOpts, otlpgrpc.WithInsecure())
 	} else {
 		var config *tls.Config
+		if noTlsVerify {
+			config = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+		}
 		driverOpts = append(driverOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(config))))
 	}
 

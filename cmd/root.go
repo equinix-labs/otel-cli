@@ -10,7 +10,7 @@ import (
 var cfgFile, serviceName, spanName, spanKind, traceparentCarrierFile string
 var spanAttrs, otlpHeaders map[string]string
 var otlpEndpoint string
-var otlpInsecure, otlpBlocking bool
+var otlpInsecure, otlpBlocking, noTlsVerify bool
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
 var traceparentRequired, testMode bool
 var exitCode int
@@ -90,6 +90,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&traceparentPrintExport, "tp-export", "p", false, "same as --tp-print but it puts an 'export ' in front so it's more convinenient to source in scripts")
 	viper.BindPFlag("tp-export", rootCmd.PersistentFlags().Lookup("tp-export"))
 	viper.BindEnv("OTEL_CLI_EXPORT_TRACEPARENT", "tp-export")
+
+	rootCmd.PersistentFlags().BoolVar(&noTlsVerify, "no-tls-verify", false, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing and usign self-seigned certificates.")
+	viper.BindPFlag("no-tls-verify", rootCmd.PersistentFlags().Lookup("no-tls-verify"))
+	viper.BindEnv("OTEL_CLI_NO_TLS_VERIFY", "no-tls-verify")
 
 	rootCmd.PersistentFlags().BoolVar(&testMode, "test", false, "configure noop exporter and dump data to json on stdout instead of sending")
 }
