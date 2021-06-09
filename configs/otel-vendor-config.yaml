@@ -34,7 +34,11 @@ exporters:
     headers:
       "x-honeycomb-team": "${HONEYCOMB_TEAM}"
       "x-honeycomb-dataset": "${HONEYCOMB_DATASET}"
-
+  # Elastic: set & export the ELASTIC_TOKEN to the auth token for the APM server.
+  otlp/3:
+    endpoint: "xxx.elastic-cloud.com:443"
+    headers:
+        Authorization: "Bearer ${ELASTIC_TOKEN}"
 service:
   pipelines:
     traces:
@@ -46,3 +50,5 @@ service:
       # exporters: [logging, otlp/1]
       # Honeycomb:
       # exporters: [logging, otlp/2]
+      # Elastic:
+      # exporters: [logging, otlp/3]

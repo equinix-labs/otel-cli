@@ -128,7 +128,7 @@ This trace will be available in the Jaeger UI at `localhost:16686`.
 
 ##### SaaS tracing vendor
 
-We've provided Honeycomb and LightStep configurations that you could also use, if you're using one of
+We've provided Honeycomb, LightStep, and Elastic configurations that you could also use, if you're using one of
 those vendors today. It's still pretty easy to get started:
 
 ```shell
@@ -138,11 +138,13 @@ those vendors today. It's still pretty easy to get started:
 export LIGHTSTEP_TOKEN= # Lightstep API key (otlp/1 in the yaml)
 export HONEYCOMB_TEAM=  # Honeycomb API key (otlp/2 in the yaml)
 export HONEYCOMB_DATASET=playground # Honeycomb dataset
+export ELASTIC_TOKEN= # Elastic token for the APM server.
 
 docker run \
    --env LIGHTSTEP_TOKEN \
    --env HONEYCOMB_TEAM \
    --env HONEYCOMB_DATASET \
+   --env ELASTIC_TOKEN \
    --name otel-collector \
    --net host \
    --volume $(pwd)/local/otel-vendor-config.yaml:/local.yaml \
