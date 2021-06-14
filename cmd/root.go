@@ -91,7 +91,7 @@ func init() {
 	viper.BindPFlag("tp-export", rootCmd.PersistentFlags().Lookup("tp-export"))
 	viper.BindEnv("OTEL_CLI_EXPORT_TRACEPARENT", "tp-export")
 
-	rootCmd.PersistentFlags().BoolVar(&noTlsVerify, "no-tls-verify", false, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing and usign self-seigned certificates.")
+	rootCmd.PersistentFlags().BoolVar(&noTlsVerify, "no-tls-verify", false, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing and usign self-signed certificates.")
 	viper.BindPFlag("no-tls-verify", rootCmd.PersistentFlags().Lookup("no-tls-verify"))
 	viper.BindEnv("OTEL_CLI_NO_TLS_VERIFY", "no-tls-verify")
 
