@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
 	"log"
 	"net"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/semconv"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // initTracer sets up the OpenTelemetry plumbing so it's ready to use.
@@ -35,6 +37,14 @@ func initTracer() (context.Context, func()) {
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
 	if otlpInsecure || isLoopbackAddr(otlpEndpoint) {
 		driverOpts = append(driverOpts, otlpgrpc.WithInsecure())
+	} else {
+		var config *tls.Config
+		if noTlsVerify {
+			config = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+		}
+		driverOpts = append(driverOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(config))))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints

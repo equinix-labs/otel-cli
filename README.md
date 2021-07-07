@@ -82,6 +82,7 @@ also be configured via file or environment variables.
 | --tp-ignore-env | OTEL_CLI_IGNORE_ENV           | tp-ignore-env   | false          |
 | --tp-print      | OTEL_CLI_PRINT_TRACEPARENT    | tp-print        | false          |
 | --tp-export     | OTEL_CLI_EXPORT_TRACEPARENT   | tp-export       | false          |
+| --no-tls-verify | OTEL_CLI_NO_TLS_VERIFY        | no-tls-verify   | false          |
 
 ## Easy local dev
 
