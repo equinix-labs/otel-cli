@@ -10,14 +10,12 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
-	"go.opentelemetry.io/otel/exporters/stdout"
+	otlpgrpc "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	stdout "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/export/trace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/semconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -28,7 +26,7 @@ import (
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
-	driverOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(otlpEndpoint)}
+	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(otlpEndpoint)}
 
 	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
 	// but I expect most users of this program to point at a localhost endpoint that might not
@@ -36,7 +34,7 @@ func initTracer() (context.Context, func()) {
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
 	if otlpInsecure || isLoopbackAddr(otlpEndpoint) {
-		driverOpts = append(driverOpts, otlpgrpc.WithInsecure())
+		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else {
 		var config *tls.Config
 		if noTlsVerify {
@@ -44,13 +42,13 @@ func initTracer() (context.Context, func()) {
 				InsecureSkipVerify: true,
 			}
 		}
-		driverOpts = append(driverOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(config))))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(config))))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
 	if len(otlpHeaders) > 0 {
 		// fortunately WithHeaders can accept the string map as-is
-		driverOpts = append(driverOpts, otlpgrpc.WithHeaders(otlpHeaders))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(otlpHeaders))
 	}
 
 	// OTLP examples usually show this with the grpc.WithBlock() dial option to
@@ -58,13 +56,11 @@ func initTracer() (context.Context, func()) {
 	// instead, rely on the shutdown methods to make sure everything is flushed
 	// by the time the program exits.
 	if otlpBlocking {
-		driverOpts = append(driverOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
 	}
 
-	driver := otlpgrpc.NewDriver(driverOpts...)
-
-	var exporter trace.SpanExporter // allows overwrite in --test mode
-	exporter, err := otlp.NewExporter(ctx, driver)
+	var exporter sdktrace.SpanExporter // allows overwrite in --test mode
+	exporter, err := otlpgrpc.New(ctx, grpcOpts...)
 	if err != nil {
 		log.Fatalf("failed to configure OTLP exporter: %s", err)
 	}
@@ -72,7 +68,7 @@ func initTracer() (context.Context, func()) {
 	// when in test mode, let the otlp exporter setup happen, then overwrite it
 	// with the stdout exporter so spans only go to stdout
 	if testMode {
-		exporter, err = stdout.NewExporter()
+		exporter, err = stdout.New()
 		if err != nil {
 			log.Fatalf("failed to configure stdout exporter in --test mode: %s", err)
 		}
