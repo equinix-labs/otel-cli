@@ -60,7 +60,7 @@ func doSpan(cmd *cobra.Command, args []string) {
 // context, the span, and a deferrable function for clean shutdown (it ends the
 // span).
 func startSpan() (context.Context, trace.Span, func()) {
-	startOpts := []trace.SpanOption{trace.WithSpanKind(otelSpanKind(spanKind))}
+	startOpts := []trace.SpanStartOption{trace.WithSpanKind(otelSpanKind(spanKind))}
 
 	if spanStartTime != "" {
 		t := parseTime(spanStartTime, "start")
@@ -79,7 +79,7 @@ func startSpan() (context.Context, trace.Span, func()) {
 
 // endSpan takes a span, checks for a --end command-line option, and ends the span.
 func endSpan(span trace.Span) {
-	endOpts := []trace.SpanOption{}
+	endOpts := []trace.SpanEndOption{}
 
 	if spanEndTime != "" {
 		t := parseTime(spanEndTime, "end")
