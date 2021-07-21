@@ -54,7 +54,7 @@ func init() {
 	viper.BindPFlag("otlp-headers", rootCmd.PersistentFlags().Lookup("otlp-headers"))
 	viper.BindEnv("OTEL_EXPORTER_OTLP_HEADERS", "otlp-headers")
 
-	rootCmd.PersistentFlags().BoolVar(&otlpBlocking, "otlp-blocking", false, "block on connecting to the OTLP server before proceding")
+	rootCmd.PersistentFlags().BoolVar(&otlpBlocking, "otlp-blocking", false, "block on connecting to the OTLP server before proceeding")
 	viper.BindPFlag("otlp-blocking", rootCmd.PersistentFlags().Lookup("otlp-blocking"))
 	viper.BindEnv("OTEL_EXPORTER_OTLP_BLOCKING", "otlp-blocking")
 

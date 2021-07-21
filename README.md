@@ -174,7 +174,7 @@ Please file issues and PRs on the GitHub project at https://github.com/packethos
 
 ## Releases
 
-This project is really new and still experiemental, releases are TBD.
+This project is really new and still experimental, releases are TBD.
 
 ## License
 
