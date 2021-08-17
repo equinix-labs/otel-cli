@@ -36,20 +36,62 @@ otel-cli server --stdout
 
 // serverConf holds the command-line configured settings for otel-cli server
 var serverConf struct {
-	outDir   string
-	pterm    bool
-	maxSpans int
-	timeout  int
-	verbose  bool
+	listenAddr string
+	outDir     string
+	pterm      bool
+	maxSpans   int
+	timeout    int
+	verbose    bool
 }
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
+	serverCmd.Flags().StringVar(&serverConf.listenAddr, "listen", "127.0.0.1:4317", "the IP:PORT pair to listen on for OTLP/gRPC connections")
 	serverCmd.Flags().StringVar(&serverConf.outDir, "json-out", "", "write spans to json in the specified directory")
 	serverCmd.Flags().IntVar(&serverConf.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
 	serverCmd.Flags().IntVar(&serverConf.timeout, "timeout", 0, "exit the server after timeout seconds")
 	serverCmd.Flags().BoolVar(&serverConf.verbose, "verbose", false, "print a log every time a span comes in")
 	serverCmd.Flags().BoolVar(&serverConf.pterm, "pterm", false, "draw spans in the console with pterm")
+}
+
+// doServer implements the cobra command for otel-cli server.
+func doServer(cmd *cobra.Command, args []string) {
+	listener, err := net.Listen("tcp", serverConf.listenAddr)
+	if err != nil {
+		log.Fatalf("failed to listen: %s", err)
+	}
+
+	cs := cliServer{stopper: make(chan bool)}
+	if serverConf.pterm {
+		cs.events = []CliEvent{}
+
+		area, err := pterm.DefaultArea.Start()
+		if err != nil {
+			log.Fatalf("failed to set up terminal for rendering: %s", err)
+		}
+		cs.area = area
+	}
+	gs := grpc.NewServer()
+	v1.RegisterTraceServiceServer(gs, &cs)
+
+	// stops the grpc server after timeout
+	go func() {
+		time.Sleep(time.Duration(serverConf.timeout) * time.Second)
+		cs.stopper <- true
+	}()
+
+	// single place to stop the server, used by timeout and max-spans
+	go func() {
+		<-cs.stopper
+		if serverConf.pterm {
+			cs.area.Stop()
+		}
+		gs.Stop()
+	}()
+
+	if err := gs.Serve(listener); err != nil {
+		log.Fatalf("failed to serve: %s", err)
+	}
 }
 
 // cliServer is a gRPC/OTLP server handle.
@@ -129,6 +171,8 @@ func (cs *cliServer) writeFile(span CliEvent, events []CliEvent) {
 	}
 }
 
+// drawPterm takes the given span and events, appends them to the in-memory
+// event list, sorts that, then prints it as a pterm table.
 func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
 	// append the span and its events to allocate space, might reorder
 	cs.events = append(cs.events, span)
@@ -169,48 +213,7 @@ func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
 		})
 	}
 
-	// clear the screen
-	//fmt.Print("\033[H\033[2J")
 	cs.area.Update(pterm.DefaultTable.WithHasHeader().WithData(td).Srender())
-}
-
-func doServer(cmd *cobra.Command, args []string) {
-	listener, err := net.Listen("tcp", "127.0.0.1:4317")
-	if err != nil {
-		log.Fatalf("failed to listen: %s", err)
-	}
-
-	cs := cliServer{stopper: make(chan bool)}
-	if serverConf.pterm {
-		cs.events = []CliEvent{}
-
-		area, err := pterm.DefaultArea.Start()
-		if err != nil {
-			log.Fatalf("failed to set up terminal for rendering: %s", err)
-		}
-		cs.area = area
-	}
-	gs := grpc.NewServer()
-	v1.RegisterTraceServiceServer(gs, &cs)
-
-	// stops the grpc server after timeout
-	go func() {
-		time.Sleep(time.Duration(serverConf.timeout) * time.Second)
-		cs.stopper <- true
-	}()
-
-	// single place to stop the server, used by timeout and max-spans
-	go func() {
-		<-cs.stopper
-		if serverConf.pterm {
-			cs.area.Stop()
-		}
-		gs.Stop()
-	}()
-
-	if err := gs.Serve(listener); err != nil {
-		log.Fatalf("failed to serve: %s", err)
-	}
 }
 
 // Event is a span or event decoded & copied for human consumption.
@@ -228,53 +231,14 @@ type CliEvent struct {
 	nanos      uint64            // only used to sort
 }
 
-// CliEventList implements sort.Interface for []CliEvent
+// CliEventList implements sort.Interface for []CliEvent sorted by time
 type CliEventList []CliEvent
 
-func (cel CliEventList) Len() int      { return len(cel) }
-func (cel CliEventList) Swap(i, j int) { cel[i], cel[j] = cel[j], cel[i] }
-func (cel CliEventList) Less(i, j int) bool {
-	/*
-		// always sort events after spans
-		if cel[i].Kind == "event" && cel[j].Kind != "event" {
-			return true
-		}
+func (cel CliEventList) Len() int           { return len(cel) }
+func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
+func (cel CliEventList) Less(i, j int) bool { return cel[i].nanos < cel[j].nanos }
 
-		// always sort events after their parents
-		if cel[i].Parent == cel[j].SpanID {
-			return true
-		}
-	*/
-
-	// otherwise just go by time
-	return cel[i].nanos < cel[j].nanos
-}
-
-// newCliEventFromSpanEvent takes a span event, span, and ils and returns an event
-// with all the span event info filled in
-func newCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
-	// start with the span, rewrite it for the event
-	e := CliEvent{
-		TraceID:    hex.EncodeToString(span.GetTraceId()),
-		SpanID:     hex.EncodeToString(span.GetSpanId()),
-		Parent:     hex.EncodeToString(span.GetSpanId()),
-		Library:    ils.InstrumentationLibrary.Name,
-		Kind:       "event",
-		Start:      time.Unix(0, int64(se.GetTimeUnixNano())),
-		End:        time.Unix(0, int64(se.GetTimeUnixNano())),
-		ElapsedMs:  int64(se.GetTimeUnixNano()-span.GetStartTimeUnixNano()) / 1000000,
-		Name:       se.GetName(),
-		Attributes: make(map[string]string), // overwrite the one from the span
-		nanos:      se.GetTimeUnixNano(),
-	}
-
-	for _, attr := range se.GetAttributes() {
-		e.Attributes[attr.GetKey()] = attr.Value.String()
-	}
-
-	return e
-}
-
+// newCliEventFromSpan converts a raw span into a CliEvent.
 func newCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
 	e := CliEvent{
 		TraceID:    hex.EncodeToString(span.GetTraceId()),
@@ -306,6 +270,31 @@ func newCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrary
 
 	for _, attr := range span.GetAttributes() {
 		// TODO: break down by type so it doesn't return e.g. "int_value:99"
+		e.Attributes[attr.GetKey()] = attr.Value.String()
+	}
+
+	return e
+}
+
+// newCliEventFromSpanEvent takes a span event, span, and ils and returns an event
+// with all the span event info filled in
+func newCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
+	// start with the span, rewrite it for the event
+	e := CliEvent{
+		TraceID:    hex.EncodeToString(span.GetTraceId()),
+		SpanID:     hex.EncodeToString(span.GetSpanId()),
+		Parent:     hex.EncodeToString(span.GetSpanId()),
+		Library:    ils.InstrumentationLibrary.Name,
+		Kind:       "event",
+		Start:      time.Unix(0, int64(se.GetTimeUnixNano())),
+		End:        time.Unix(0, int64(se.GetTimeUnixNano())),
+		ElapsedMs:  int64(se.GetTimeUnixNano()-span.GetStartTimeUnixNano()) / 1000000,
+		Name:       se.GetName(),
+		Attributes: make(map[string]string), // overwrite the one from the span
+		nanos:      se.GetTimeUnixNano(),
+	}
+
+	for _, attr := range se.GetAttributes() {
 		e.Attributes[attr.GetKey()] = attr.Value.String()
 	}
 
