@@ -23,13 +23,18 @@ import (
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "run a simple OTLP server",
-	Long: `
+	Long: `Run otel-cli as an OTLP server that can write to JSON files, print
+that data to JSON, or just drop all the data.
 
+# run otel-cli as a local server and print spans to the console as a table
+otel-cli server --pterm
+
+# write every span and event to json files in the specified directory
 outdir=$(mktemp -d)
-otel-cli server -j $outdir
+otel-cli server --json-out $outdir
 
+# do that, but exit after 4 spans or a 30 second timeout, whichever comes first
 otel-cli server --json-out $outdir --max-spans 4 --timeout 30
-otel-cli server --stdout
 `,
 	Run: doServer,
 }
@@ -63,6 +68,7 @@ func doServer(cmd *cobra.Command, args []string) {
 
 	cs := cliServer{stopper: make(chan bool)}
 	if serverConf.pterm {
+		// TODO: implement a limit on this, drop old spans, etc.
 		cs.events = []CliEvent{}
 
 		area, err := pterm.DefaultArea.Start()
