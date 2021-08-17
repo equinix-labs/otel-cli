@@ -189,10 +189,20 @@ func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
 		{"Trace ID", "Span ID", "Parent", "Name", "Kind", "Start", "End", "Elapsed"},
 	}
 
-	top := cs.events[0]
+	top := cs.events[0] // for calculating time offsets
 	for _, e := range cs.events {
+		// if the trace id changes, reset the top event used to calculate offsets
 		if e.TraceID != top.TraceID {
+			// make sure we have the youngest possible (expensive but whatever)
+			// TODO: figure out how events are even getting inserted before a span
 			top = e
+			for _, te := range cs.events {
+				if te.TraceID == top.TraceID && te.nanos < top.nanos {
+					log.Println("SWITCHED YER TOP")
+					top = te
+					break
+				}
+			}
 		}
 
 		var startOffset, endOffset string
