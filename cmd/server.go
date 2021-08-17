@@ -12,6 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+
 	"google.golang.org/grpc"
 )
 
@@ -65,38 +67,44 @@ func (cs *cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReque
 					return &v1.ExportTraceServiceResponse{}, nil
 				}
 
-				// create trace directory
-				outpath := filepath.Join(serverConf.outDir, tid)
-				os.Mkdir(outpath, 0755) // ignore errors for now
-
-				// create span directory
-				outpath = filepath.Join(outpath, sid)
-				os.Mkdir(outpath, 0755) // ignore errors for now
-
-				// write instrumentation library (no idea why this is separate)
-				ijs, _ := json.Marshal(ilSpan.InstrumentationLibrary)
-				ilfile := filepath.Join(outpath, "il.json")
-				err := os.WriteFile(ilfile, ijs, 0644)
-				if err != nil {
-					log.Fatalf("could not write to %q: %s", ilfile, err)
-				}
-
-				// write span to file
-				sjs, _ := json.Marshal(span)
-				spanfile := filepath.Join(outpath, "span.json")
-				err = os.WriteFile(spanfile, sjs, 0644)
-				if err != nil {
-					log.Fatalf("could not write to %q: %s", spanfile, err)
-				}
-
-				if serverConf.verbose {
-					log.Printf("[%d] wrote trace id %s span id %s to %s\n", cs.spansSeen, tid, sid, spanfile)
-				}
+				cs.writeFile(tid, sid, ilSpan, span)
 			}
 		}
 	}
 
 	return &v1.ExportTraceServiceResponse{}, nil
+}
+
+// writeFile takes the span info and writes it out to a json file in the
+// tid/sid/span.json and tid/sid/il.json files.
+func (cs *cliServer) writeFile(tid, sid string, ilSpans *tracepb.InstrumentationLibrarySpans, span *tracepb.Span) {
+	// create trace directory
+	outpath := filepath.Join(serverConf.outDir, tid)
+	os.Mkdir(outpath, 0755) // ignore errors for now
+
+	// create span directory
+	outpath = filepath.Join(outpath, sid)
+	os.Mkdir(outpath, 0755) // ignore errors for now
+
+	// write instrumentation library (no idea why this is separate)
+	ijs, _ := json.Marshal(ilSpans.InstrumentationLibrary)
+	ilfile := filepath.Join(outpath, "il.json")
+	err := os.WriteFile(ilfile, ijs, 0644)
+	if err != nil {
+		log.Fatalf("could not write to %q: %s", ilfile, err)
+	}
+
+	// write span to file
+	sjs, _ := json.Marshal(span)
+	spanfile := filepath.Join(outpath, "span.json")
+	err = os.WriteFile(spanfile, sjs, 0644)
+	if err != nil {
+		log.Fatalf("could not write to %q: %s", spanfile, err)
+	}
+
+	if serverConf.verbose {
+		log.Printf("[%d] wrote trace id %s span id %s to %s\n", cs.spansSeen, tid, sid, spanfile)
+	}
 }
 
 func doServer(cmd *cobra.Command, args []string) {
