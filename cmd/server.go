@@ -31,6 +31,7 @@ otel-cli server --stdout
 	Run: doServer,
 }
 
+// serverConf holds the command-line configured settings for otel-cli server
 var serverConf struct {
 	outDir   string
 	maxSpans int
@@ -46,12 +47,14 @@ func init() {
 	serverCmd.Flags().BoolVar(&serverConf.verbose, "verbose", false, "print a log every time a span comes in")
 }
 
+// cliServer is a gRPC/OTLP server handle.
 type cliServer struct {
 	spansSeen int
 	stopper   chan bool
 	v1.UnimplementedTraceServiceServer
 }
 
+// Export implements the gRPC server interface for exporting messages.
 func (cs *cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
