@@ -84,8 +84,8 @@ func (cs *cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReque
 	return &v1.ExportTraceServiceResponse{}, nil
 }
 
-// writeFile takes the span info and writes it out to a json file in the
-// tid/sid/span.json and tid/sid/il.json files.
+// writeFile takes the spans and events and writes them out to json files in the
+// tid/sid/span.json and tid/sid/events.json files.
 func (cs *cliServer) writeFile(span CliEvent, events []CliEvent) {
 	// create trace directory
 	outpath := filepath.Join(serverConf.outDir, span.TraceID)
