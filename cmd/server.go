@@ -81,10 +81,12 @@ func doServer(cmd *cobra.Command, args []string) {
 	v1.RegisterTraceServiceServer(gs, &cs)
 
 	// stops the grpc server after timeout
-	go func() {
-		time.Sleep(time.Duration(serverConf.timeout) * time.Second)
-		cs.stopper <- true
-	}()
+	if serverConf.timeout > 0 {
+		go func() {
+			time.Sleep(time.Duration(serverConf.timeout) * time.Second)
+			cs.stopper <- true
+		}()
+	}
 
 	// single place to stop the server, used by timeout and max-spans
 	go func() {
