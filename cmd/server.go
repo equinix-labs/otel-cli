@@ -41,17 +41,15 @@ otel-cli server --json-out $outdir --max-spans 4 --timeout 30
 
 // serverConf holds the command-line configured settings for otel-cli server
 var serverConf struct {
-	listenAddr string
-	outDir     string
-	pterm      bool
-	maxSpans   int
-	timeout    int
-	verbose    bool
+	outDir   string
+	pterm    bool
+	maxSpans int
+	timeout  int
+	verbose  bool
 }
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
-	serverCmd.Flags().StringVar(&serverConf.listenAddr, "listen", "127.0.0.1:4317", "the IP:PORT pair to listen on for OTLP/gRPC connections")
 	serverCmd.Flags().StringVar(&serverConf.outDir, "json-out", "", "write spans to json in the specified directory")
 	serverCmd.Flags().IntVar(&serverConf.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
 	serverCmd.Flags().IntVar(&serverConf.timeout, "timeout", 0, "exit the server after timeout seconds")
@@ -61,7 +59,7 @@ func init() {
 
 // doServer implements the cobra command for otel-cli server.
 func doServer(cmd *cobra.Command, args []string) {
-	listener, err := net.Listen("tcp", serverConf.listenAddr)
+	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to listen: %s", err)
 	}
