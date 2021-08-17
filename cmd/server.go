@@ -40,18 +40,32 @@ func (cs cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReques
 			for _, span := range ilSpan.GetSpans() {
 				tid := hex.EncodeToString(span.TraceId)
 				sid := hex.EncodeToString(span.SpanId)
-				js, _ := json.Marshal(span)
 
+				// create trace directory
 				outpath := filepath.Join(serverOutDir, tid)
 				os.Mkdir(outpath, 0755) // ignore errors for now
 
-				outfile := filepath.Join(outpath, sid+".json")
-				err := os.WriteFile(outfile, js, 0644)
+				// create span directory
+				outpath = filepath.Join(outpath, sid)
+				os.Mkdir(outpath, 0755) // ignore errors for now
+
+				// write instrumentation library (no idea why this is separate)
+				ijs, _ := json.Marshal(ilSpan.InstrumentationLibrary)
+				ilfile := filepath.Join(outpath, "il.json")
+				err := os.WriteFile(ilfile, ijs, 0644)
 				if err != nil {
-					log.Fatalf("could not write to %q: %s", outfile, err)
+					log.Fatalf("could not write to %q: %s", ilfile, err)
 				}
 
-				log.Printf("wrote trace id %s span id %s to %s\n", tid, sid, outfile)
+				// write span to file
+				sjs, _ := json.Marshal(span)
+				spanfile := filepath.Join(outpath, "span.json")
+				err = os.WriteFile(spanfile, sjs, 0644)
+				if err != nil {
+					log.Fatalf("could not write to %q: %s", spanfile, err)
+				}
+
+				log.Printf("wrote trace id %s span id %s to %s\n", tid, sid, spanfile)
 			}
 		}
 	}
