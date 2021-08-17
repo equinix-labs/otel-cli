@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -18,14 +19,27 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "run a simple OTLP server",
 	Long: `
+
 outdir=$(mktemp -d)
-otel-cli server -d $outdir`,
+otel-cli server -j $outdir
+
+otel-cli server --json-out $outdir --max-spans 4 --timeout 30
+otel-cli server --stdout
+`,
 	Run: doServer,
+}
+
+var serverConf struct {
+	outDir   string
+	maxSpans int
+	timeout  int
 }
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
-	serverCmd.Flags().StringVarP(&serverOutDir, "outdir", "d", "", "write spans to json in the specified directory")
+	serverCmd.Flags().StringVar(&serverConf.outDir, "json-out", "", "write spans to json in the specified directory")
+	serverCmd.Flags().IntVar(&serverConf.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
+	serverCmd.Flags().IntVar(&serverConf.timeout, "timeout", 0, "exit the server after timeout seconds")
 }
 
 type cliServer struct {
@@ -42,7 +56,7 @@ func (cs cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReques
 				sid := hex.EncodeToString(span.SpanId)
 
 				// create trace directory
-				outpath := filepath.Join(serverOutDir, tid)
+				outpath := filepath.Join(serverConf.outDir, tid)
 				os.Mkdir(outpath, 0755) // ignore errors for now
 
 				// create span directory
@@ -81,6 +95,12 @@ func doServer(cmd *cobra.Command, args []string) {
 
 	gs := grpc.NewServer()
 	v1.RegisterTraceServiceServer(gs, cliServer{})
+
+	// stops the grpc server after timeout
+	go func() {
+		time.Sleep(time.Duration(serverConf.timeout) * time.Second)
+		gs.Stop()
+	}()
 
 	if err := gs.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %s", err)

@@ -11,7 +11,6 @@ var cfgFile, serviceName, spanName, spanKind, traceparentCarrierFile string
 var spanAttrs, otlpHeaders map[string]string
 var otlpEndpoint string
 var otlpInsecure, otlpBlocking, noTlsVerify bool
-var serverOutDir string
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
 var traceparentRequired, testMode bool
 var exitCode int
