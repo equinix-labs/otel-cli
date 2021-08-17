@@ -33,6 +33,7 @@ var serverConf struct {
 	outDir   string
 	maxSpans int
 	timeout  int
+	verbose  bool
 }
 
 func init() {
@@ -40,13 +41,16 @@ func init() {
 	serverCmd.Flags().StringVar(&serverConf.outDir, "json-out", "", "write spans to json in the specified directory")
 	serverCmd.Flags().IntVar(&serverConf.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
 	serverCmd.Flags().IntVar(&serverConf.timeout, "timeout", 0, "exit the server after timeout seconds")
+	serverCmd.Flags().BoolVar(&serverConf.verbose, "verbose", false, "print a log every time a span comes in")
 }
 
 type cliServer struct {
+	spansSeen int
+	stopper   chan bool
 	v1.UnimplementedTraceServiceServer
 }
 
-func (cs cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
+func (cs *cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
 		ilSpans := resource.GetInstrumentationLibrarySpans()
@@ -54,6 +58,12 @@ func (cs cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReques
 			for _, span := range ilSpan.GetSpans() {
 				tid := hex.EncodeToString(span.TraceId)
 				sid := hex.EncodeToString(span.SpanId)
+
+				cs.spansSeen++ // count spans for exiting on --max-spans
+				if serverConf.maxSpans > 0 && cs.spansSeen >= serverConf.maxSpans {
+					cs.stopper <- true // shus the server down
+					return &v1.ExportTraceServiceResponse{}, nil
+				}
 
 				// create trace directory
 				outpath := filepath.Join(serverConf.outDir, tid)
@@ -79,7 +89,9 @@ func (cs cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReques
 					log.Fatalf("could not write to %q: %s", spanfile, err)
 				}
 
-				log.Printf("wrote trace id %s span id %s to %s\n", tid, sid, spanfile)
+				if serverConf.verbose {
+					log.Printf("[%d] wrote trace id %s span id %s to %s\n", cs.spansSeen, tid, sid, spanfile)
+				}
 			}
 		}
 	}
@@ -93,12 +105,19 @@ func doServer(cmd *cobra.Command, args []string) {
 		log.Fatalf("failed to listen: %s", err)
 	}
 
+	cs := cliServer{stopper: make(chan bool)}
 	gs := grpc.NewServer()
-	v1.RegisterTraceServiceServer(gs, cliServer{})
+	v1.RegisterTraceServiceServer(gs, &cs)
 
 	// stops the grpc server after timeout
 	go func() {
 		time.Sleep(time.Duration(serverConf.timeout) * time.Second)
+		cs.stopper <- true
+	}()
+
+	// single place to stop the server, used by timeout and max-spans
+	go func() {
+		<-cs.stopper
 		gs.Stop()
 	}()
 
