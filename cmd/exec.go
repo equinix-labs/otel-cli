@@ -35,9 +35,10 @@ to sh -c and should not be passed any untrusted input`,
 
 func init() {
 	rootCmd.AddCommand(execCmd)
-
-	// --name / -s, see span.go
-	execCmd.Flags().StringVarP(&spanName, "name", "s", "todo-generate-default-span-names", "set the name of the span")
+	addCommonParams(execCmd)
+	addSpanParams(execCmd)
+	addAttrParams(execCmd)
+	addClientParams(execCmd)
 }
 
 func doExec(cmd *cobra.Command, args []string) {

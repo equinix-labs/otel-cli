@@ -37,14 +37,16 @@ func init() {
 	rootCmd.AddCommand(spanCmd)
 	spanCmd.Flags().SortFlags = false
 
-	// --name / -s
-	spanCmd.PersistentFlags().StringVarP(&spanName, "name", "s", "todo-generate-default-span-names", "set the name of the span")
-
 	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
 	spanCmd.Flags().StringVar(&spanStartTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
 
 	// --end $timestamp
 	spanCmd.Flags().StringVar(&spanEndTime, "end", "", "an Unix epoch or RFC3339 timestamp for the end of the span")
+
+	addCommonParams(spanCmd)
+	addSpanParams(spanCmd)
+	addAttrParams(spanCmd)
+	addClientParams(spanCmd)
 
 	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
 }

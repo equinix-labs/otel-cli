@@ -29,6 +29,10 @@ go build
 ## Examples
 
 ```shell
+# run otel-cli as a local OTLP server and print traces to your console
+# run this in its own terminal and try some of the commands below!
+otel-cli server tui
+
 # run a program inside a span
 otel-cli exec --service my-service --name "curl google" curl https://google.com
 
@@ -61,6 +65,10 @@ otel-cli span event --name "cool thing" --attrs "foo=bar" --sockdir $sockdir
 otel-cli span end --sockdir $sockdir
 # or you can kill the background process and it will end the span cleanly
 kill %1
+
+# server mode can also write traces to the filesystem, e.g. for testing
+dir=$(mktemp -d)
+otel-cli server json --dir $dir --timeout 60 --max-spans 5
 ```
 
 ## Configuration
@@ -91,29 +99,39 @@ started. In general, there are three things you need:
 
 - A working Go environment
 - A built (or installed) copy of otel-cli itself
-- A system to receive/inspect the traces you generate
 
-#### 1. A working Go environment
+### 1. A working Go environment
 
 Providing instructions on getting Go up and running on your machine is out of scope for this
 README. However, the good news is that it's fairly easy to do! You can follow the normal
 [Installation instructions](https://golang.org/doc/install) from the Go project itself.
 
-
-#### 2. A built (or installed) copy of otel-cli itself
+### 2. A built (or installed) copy of otel-cli itself
 
 If you're planning on making changes to otel-cli, we recommend building the project locally: `go build`
 
-But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/packethost/otel-cli`
+But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/packethost/otel-cli`. This will place the command in your `GOPATH`. If your `GOPATH` is in your `PATH` you should be all set.
 
-#### 3. A system to receive/inspect the traces you generate
+### 3. A system to receive/inspect the traces you generate
 
-Here you have one more choice: you can either send traces to a SaaS tracing vendor or other
-system that you already have, or you can run our `docker-compose` configuration to launch a local Jaeger system.
+otel-cli can run as a server and accept OTLP connections. It has two modes, one prints to your console
+while the other writes to JSON files.
 
-If you're not sure what to choose, we recommend trying our Jaeger configuration, which requires no configuration.
+```shell
+otel-cli server tui
+otel-cli server json --dir $dir --timeout 60 --max-spans 5
+```
 
-##### Local Jaeger setup
+Many SaaS vendors accept OTLP these days so one option is to send directly to those. This is not
+recommended for production since it will slow your code down on the roundtrips. It is recommended
+to use an opentelemetry-collector locally.
+
+Another option is to run the local docker compose Jaeger setup in the root of this repo with
+`docker-compose up`. This will bring up a stock Jaeger instance that can accept OTLP connections.
+
+If you're not sure what to choose, try `otel-cli server tui` or `docker-compose up`.
+
+### Local Jaeger setup
 
 Just run `docker-compose up` from this repository, and you'll get an OpenTelemetry collector and a local
 Jaeger all-in-one setup ready to go.
@@ -122,15 +140,16 @@ The OpenTelemetry collector is listening on `localhost:4317`, and the Jaeger UI 
 `localhost:16686`. Since these are the expected defaults of `otel-cli`, you can get started with no further configuration:
 
 ```shell
+docker-compose up
 ./otel-cli exec -n my-cool-thing -s interesting-step echo 'hello world'
 ```
 
 This trace will be available in the Jaeger UI at `localhost:16686`.
 
-##### SaaS tracing vendor
+### SaaS tracing vendor
 
-We've provided Honeycomb, LightStep, and Elastic configurations that you could also use, if you're using one of
-those vendors today. It's still pretty easy to get started:
+We've provided Honeycomb, LightStep, and Elastic configurations that you could also use,
+if you're using one of those vendors today. It's still pretty easy to get started:
 
 ```shell
 # optional: to send data to an an OTLP-enabled tracing vendor, pass in your
