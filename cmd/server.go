@@ -180,10 +180,10 @@ func (cs *cliServer) writeFile(span CliEvent, events []CliEvent) {
 // drawPterm takes the given span and events, appends them to the in-memory
 // event list, sorts that, then prints it as a pterm table.
 func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
-	// append the span and its events to allocate space, might reorder
 	cs.events = append(cs.events, span)
 	cs.events = append(cs.events, events...)
 	sort.Sort(cs.events)
+	cs.trimEvents()
 
 	td := pterm.TableData{
 		{"Trace ID", "Span ID", "Parent", "Name", "Kind", "Start", "End", "Elapsed"},
@@ -233,6 +233,37 @@ func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
 	}
 
 	cs.area.Update(pterm.DefaultTable.WithHasHeader().WithData(td).Srender())
+}
+
+// trimEvents looks to see if there's room on the screen for the number of incoming
+// events and removes the oldest traces until there's room
+// TODO: how to hand really huge traces that would scroll off the screen entirely?
+func (cs *cliServer) trimEvents() {
+	maxRows := pterm.GetTerminalHeight() // TODO: allow override of this?
+
+	if len(cs.events) == 0 || len(cs.events) < maxRows {
+		return // plenty of room, nothing to do
+	}
+
+	end := len(cs.events) - 1              // should never happen but default to all
+	need := (len(cs.events) - maxRows) + 2 // trim at least this many
+	tid := cs.events[0].TraceID            // we always remove the whole trace
+	for i, v := range cs.events {
+		if v.TraceID == tid {
+			end = i
+		} else {
+			if end+1 < need {
+				// trace id changed, advance the trim point, and change trace ids
+				tid = v.TraceID
+				end = i
+			} else {
+				break // made enough room, we can quit early
+			}
+		}
+	}
+
+	// might need to realloc to not leak memory here?
+	cs.events = cs.events[end:]
 }
 
 // Event is a span or event decoded & copied for human consumption.
