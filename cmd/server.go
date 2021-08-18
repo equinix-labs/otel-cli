@@ -3,16 +3,10 @@ package cmd
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"log"
 	"net"
-	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
 	"time"
 
-	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -22,91 +16,68 @@ import (
 
 var serverCmd = &cobra.Command{
 	Use:   "server",
-	Short: "run a simple OTLP server",
-	Long: `Run otel-cli as an OTLP server that can write to JSON files, print
-that data to JSON, or just drop all the data.
-
-# run otel-cli as a local server and print spans to the console as a table
-otel-cli server --pterm
-
-# write every span and event to json files in the specified directory
-outdir=$(mktemp -d)
-otel-cli server --json-out $outdir
-
-# do that, but exit after 4 spans or a 30 second timeout, whichever comes first
-otel-cli server --json-out $outdir --max-spans 4 --timeout 30
-`,
-	Run: doServer,
-}
-
-// serverConf holds the command-line configured settings for otel-cli server
-var serverConf struct {
-	outDir   string
-	pterm    bool
-	maxSpans int
-	timeout  int
-	verbose  bool
+	Short: "run an embedded OTLP server",
+	Long:  "Run otel-cli as an OTLP server. See subcommands.",
 }
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
-	serverCmd.Flags().StringVar(&serverConf.outDir, "json-out", "", "write spans to json in the specified directory")
-	serverCmd.Flags().IntVar(&serverConf.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
-	serverCmd.Flags().IntVar(&serverConf.timeout, "timeout", 0, "exit the server after timeout seconds")
-	serverCmd.Flags().BoolVar(&serverConf.verbose, "verbose", false, "print a log every time a span comes in")
-	serverCmd.Flags().BoolVar(&serverConf.pterm, "pterm", false, "draw spans in the console with pterm")
 }
 
-// doServer implements the cobra command for otel-cli server.
-func doServer(cmd *cobra.Command, args []string) {
+// serverCallback is a type for the function passed to newServer that is
+// called for each incoming span
+type serverCallback func(CliEvent, CliEventList) bool
+
+// serverStop is the function passed to newServer to be called when the
+// server is shut down.
+type serverStop func(*cliServer)
+
+// cliServer is a gRPC/OTLP server handle.
+type cliServer struct {
+	server   *grpc.Server
+	callback serverCallback
+	stopper  chan bool
+	v1.UnimplementedTraceServiceServer
+}
+
+// newServer takes a callback and stop function and returns a cliServer ready
+// to run with .ServeGRPC().
+func newServer(cb serverCallback, stop serverStop) *cliServer {
+	cs := cliServer{
+		server:   grpc.NewServer(),
+		callback: cb,
+		stopper:  make(chan bool),
+	}
+
+	v1.RegisterTraceServiceServer(cs.server, &cs)
+
+	// single place to stop the server, used by timeout and max-spans
+	go func() {
+		<-cs.stopper
+		stop(&cs)
+		cs.server.Stop()
+	}()
+
+	return &cs
+}
+
+// ServeGRPC creates a listener on otlpEndpoint and starts the GRPC server
+// on that listener. Blocks until stopped by sending a value to cs.stopper.
+func (cs *cliServer) ServeGPRC() {
 	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to listen: %s", err)
 	}
 
-	cs := cliServer{stopper: make(chan bool)}
-	if serverConf.pterm {
-		// TODO: implement a limit on this, drop old spans, etc.
-		cs.events = []CliEvent{}
-
-		area, err := pterm.DefaultArea.Start()
-		if err != nil {
-			log.Fatalf("failed to set up terminal for rendering: %s", err)
-		}
-		cs.area = area
-	}
-	gs := grpc.NewServer()
-	v1.RegisterTraceServiceServer(gs, &cs)
-
-	// stops the grpc server after timeout
-	if serverConf.timeout > 0 {
-		go func() {
-			time.Sleep(time.Duration(serverConf.timeout) * time.Second)
-			cs.stopper <- true
-		}()
-	}
-
-	// single place to stop the server, used by timeout and max-spans
-	go func() {
-		<-cs.stopper
-		if serverConf.pterm {
-			cs.area.Stop()
-		}
-		gs.Stop()
-	}()
-
-	if err := gs.Serve(listener); err != nil {
+	if err := cs.server.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
 }
 
-// cliServer is a gRPC/OTLP server handle.
-type cliServer struct {
-	spansSeen int
-	stopper   chan bool
-	events    CliEventList // a queue for pterm drawing mode
-	area      *pterm.AreaPrinter
-	v1.UnimplementedTraceServiceServer
+// Stop sends a value to the server shutdown goroutine so it stops GRPC
+// and calls the stop function given to newServer.
+func (cs *cliServer) Stop() {
+	cs.stopper <- true
 }
 
 // Export implements the gRPC server interface for exporting messages.
@@ -118,22 +89,14 @@ func (cs *cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReque
 			for _, span := range ils.GetSpans() {
 				// convert protobuf spans to something easier for humans to consume
 				ces := newCliEventFromSpan(span, ils)
-				events := []CliEvent{}
+				events := CliEventList{}
 				for _, se := range span.GetEvents() {
 					events = append(events, newCliEventFromSpanEvent(se, span, ils))
 				}
 
-				if serverConf.outDir != "" {
-					cs.writeFile(ces, events)
-				}
-
-				if serverConf.pterm {
-					cs.drawPterm(ces, events)
-				}
-
-				cs.spansSeen++ // count spans for exiting on --max-spans
-				if serverConf.maxSpans > 0 && cs.spansSeen >= serverConf.maxSpans {
-					cs.stopper <- true // shus the server down
+				f := cs.callback
+				done := f(ces, events)
+				if done {
 					return &v1.ExportTraceServiceResponse{}, nil
 				}
 			}
@@ -141,128 +104,6 @@ func (cs *cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceReque
 	}
 
 	return &v1.ExportTraceServiceResponse{}, nil
-}
-
-// writeFile takes the spans and events and writes them out to json files in the
-// tid/sid/span.json and tid/sid/events.json files.
-func (cs *cliServer) writeFile(span CliEvent, events []CliEvent) {
-	// create trace directory
-	outpath := filepath.Join(serverConf.outDir, span.TraceID)
-	os.Mkdir(outpath, 0755) // ignore errors for now
-
-	// create span directory
-	outpath = filepath.Join(outpath, span.SpanID)
-	os.Mkdir(outpath, 0755) // ignore errors for now
-
-	// write span to file
-	sjs, _ := json.Marshal(span)
-	spanfile := filepath.Join(outpath, "span.json")
-	err := os.WriteFile(spanfile, sjs, 0644)
-	if err != nil {
-		log.Fatalf("could not write span json to %q: %s", spanfile, err)
-	}
-
-	// only write events out if there is at least one
-	if len(events) > 0 {
-		ejs, _ := json.Marshal(events)
-		eventsfile := filepath.Join(outpath, "events.json")
-		err = os.WriteFile(eventsfile, ejs, 0644)
-		if err != nil {
-			log.Fatalf("could not write span events json to %q: %s", eventsfile, err)
-		}
-	}
-
-	if serverConf.verbose {
-		log.Printf("[%d] wrote trace id %s span id %s to %s\n", cs.spansSeen, span.TraceID, span.SpanID, spanfile)
-	}
-}
-
-// drawPterm takes the given span and events, appends them to the in-memory
-// event list, sorts that, then prints it as a pterm table.
-func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
-	cs.events = append(cs.events, span)
-	cs.events = append(cs.events, events...)
-	sort.Sort(cs.events)
-	cs.trimEvents()
-
-	td := pterm.TableData{
-		{"Trace ID", "Span ID", "Parent", "Name", "Kind", "Start", "End", "Elapsed"},
-	}
-
-	top := cs.events[0] // for calculating time offsets
-	for _, e := range cs.events {
-		// if the trace id changes, reset the top event used to calculate offsets
-		if e.TraceID != top.TraceID {
-			// make sure we have the youngest possible (expensive but whatever)
-			// TODO: figure out how events are even getting inserted before a span
-			top = e
-			for _, te := range cs.events {
-				if te.TraceID == top.TraceID && te.nanos < top.nanos {
-					top = te
-					break
-				}
-			}
-		}
-
-		var startOffset, endOffset string
-		if e.Kind == "event" {
-			e.TraceID = ""
-			e.SpanID = ""
-			startOffset = strconv.FormatInt(e.Start.Sub(top.Start).Milliseconds(), 10)
-		} else {
-			if e.TraceID == top.TraceID && e.SpanID != top.SpanID {
-				e.TraceID = "" // hide it after printing the first trace id
-			}
-			so := e.Start.Sub(top.Start).Milliseconds()
-			startOffset = strconv.FormatInt(so, 10)
-			eo := e.End.Sub(top.Start).Milliseconds()
-			endOffset = strconv.FormatInt(eo, 10)
-		}
-
-		td = append(td, []string{
-			e.TraceID,
-			e.SpanID,
-			e.Parent,
-			e.Name,
-			e.Kind,
-			startOffset,
-			endOffset,
-			strconv.FormatInt(e.ElapsedMs, 10),
-		})
-	}
-
-	cs.area.Update(pterm.DefaultTable.WithHasHeader().WithData(td).Srender())
-}
-
-// trimEvents looks to see if there's room on the screen for the number of incoming
-// events and removes the oldest traces until there's room
-// TODO: how to hand really huge traces that would scroll off the screen entirely?
-func (cs *cliServer) trimEvents() {
-	maxRows := pterm.GetTerminalHeight() // TODO: allow override of this?
-
-	if len(cs.events) == 0 || len(cs.events) < maxRows {
-		return // plenty of room, nothing to do
-	}
-
-	end := len(cs.events) - 1              // should never happen but default to all
-	need := (len(cs.events) - maxRows) + 2 // trim at least this many
-	tid := cs.events[0].TraceID            // we always remove the whole trace
-	for i, v := range cs.events {
-		if v.TraceID == tid {
-			end = i
-		} else {
-			if end+1 < need {
-				// trace id changed, advance the trim point, and change trace ids
-				tid = v.TraceID
-				end = i
-			} else {
-				break // made enough room, we can quit early
-			}
-		}
-	}
-
-	// might need to realloc to not leak memory here?
-	cs.events = cs.events[end:]
 }
 
 // Event is a span or event decoded & copied for human consumption.
