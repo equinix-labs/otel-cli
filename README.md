@@ -30,7 +30,8 @@ go build
 
 ```shell
 # run otel-cli as a local OTLP server and print traces to your console
-otel-cli server --pterm
+# run this in its own terminal and try some of the commands below!
+otel-cli server tui
 
 # run a program inside a span
 otel-cli exec --service my-service --name "curl google" curl https://google.com
@@ -67,7 +68,7 @@ kill %1
 
 # server mode can also write traces to the filesystem, e.g. for testing
 dir=$(mktemp -d)
-otel-cli server --json-out $dir --timeout 60 --max-spans 5
+otel-cli server json --dir $dir --timeout 60 --max-spans 5
 ```
 
 ## Configuration
@@ -117,8 +118,8 @@ otel-cli can run as a server and accept OTLP connections. It has two modes, one 
 while the other writes to JSON files.
 
 ```shell
-otel-cli server --pterm
-otel-cli server --json-out $dir --timeout 60 --max-spans 5
+otel-cli server tui
+otel-cli server json --dir $dir --timeout 60 --max-spans 5
 ```
 
 Many SaaS vendors accept OTLP these days so one option is to send directly to those. This is not
@@ -128,7 +129,7 @@ to use an opentelemetry-collector locally.
 Another option is to run the local docker compose Jaeger setup in the root of this repo with
 `docker-compose up`. This will bring up a stock Jaeger instance that can accept OTLP connections.
 
-If you're not sure what to choose, try `otel-cli server --pterm` or `docker-compose up`.
+If you're not sure what to choose, try `otel-cli server tui` or `docker-compose up`.
 
 ### Local Jaeger setup
 
