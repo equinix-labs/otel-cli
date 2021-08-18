@@ -211,6 +211,9 @@ func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
 			e.SpanID = ""
 			startOffset = strconv.FormatInt(e.Start.Sub(top.Start).Milliseconds(), 10)
 		} else {
+			if e.TraceID == top.TraceID && e.SpanID != top.SpanID {
+				e.TraceID = "" // hide it after printing the first trace id
+			}
 			so := e.Start.Sub(top.Start).Milliseconds()
 			startOffset = strconv.FormatInt(so, 10)
 			eo := e.End.Sub(top.Start).Milliseconds()
