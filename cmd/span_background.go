@@ -55,6 +55,10 @@ func init() {
 	// at the end to get an easy span
 	spanBgCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 	spanBgCmd.Flags().IntVar(&spanBgTimeout, "timeout", 10, "how long the background server should run before timeout")
+
+	addCommonParams(spanBgCmd)
+	addSpanParams(spanBgCmd)
+	addClientParams(spanBgCmd)
 }
 
 // spanBgSockfile returns the full filename for the socket file under the

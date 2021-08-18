@@ -38,6 +38,8 @@ func init() {
 	spanEventCmd.Flags().IntVar(&spanBgTimeout, "timeout", 5, "how long to wait for the background server socket to be available")
 	spanEventCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 	spanEventCmd.MarkFlagRequired("sockdir")
+
+	addAttrParams(spanEventCmd)
 }
 
 func doSpanEvent(cmd *cobra.Command, args []string) {
