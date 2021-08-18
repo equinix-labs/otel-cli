@@ -8,7 +8,25 @@ builds:
       - linux
       - windows
       - darwin
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    goarm:
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: freebsd
+        goarch: arm64
+
 archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
   - replacements:
       darwin: Darwin
       linux: Linux
@@ -18,10 +36,11 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ incpatch .Tag }}-next"
+  name_template: 'SNAPSHOT-{{ .Commit }}'
 changelog:
   sort: asc
   filters:
     exclude:
       - '^demos:'
       - '^configs:'
+
