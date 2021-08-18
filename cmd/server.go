@@ -198,7 +198,6 @@ func (cs *cliServer) drawPterm(span CliEvent, events []CliEvent) {
 			top = e
 			for _, te := range cs.events {
 				if te.TraceID == top.TraceID && te.nanos < top.nanos {
-					log.Println("SWITCHED YER TOP")
 					top = te
 					break
 				}
