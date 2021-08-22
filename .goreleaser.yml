@@ -1,6 +1,23 @@
 before:
   hooks:
     - go mod tidy
+brews:
+  # This means the repository must be packethost/homebrew-otel-cli
+  - name: "otel-cli"
+    url_template: "https://github.com/packethost/otel-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    tap:
+      owner: "packethost"
+      name: "homebrew-otel-cli"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: "ahayworth"
+      email: "ahayworth@gmail.com"
+    homepage: "https://github.com/packethost/otel-cli"
+    description: "OpenTelemetry command-line tool for sending events from shell scripts & similar environments"
+    license: "Apache-2.0"
+    # If set to auto, the release will not be uploaded to the homebrew tap
+    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
+    skip_upload: "auto"
 builds:
   - env:
       - CGO_ENABLED=0
