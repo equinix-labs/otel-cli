@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/packethost/otel-cli/cmd"
+	"github.com/equinix-labs/otel-cli/cmd"
 )
 
 func main() {

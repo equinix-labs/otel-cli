@@ -10,7 +10,7 @@ builds:
       - darwin
 nfpms:
   - package_name: otel-cli
-    homepage: https://github.com/packethost/otel-cli
+    homepage: https://github.com/equinix-labs/otel-cli
     description: OpenTelemetry CLI Application (Server & Client)
     license: Apache 2.0
     file_name_template: "{{.ProjectName}}_{{.Version}}_{{.Arch}}"
