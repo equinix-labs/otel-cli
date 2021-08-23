@@ -39,7 +39,6 @@ func init() {
 func doServerJson(cmd *cobra.Command, args []string) {
 	stop := func(cs *cliServer) {}
 	cs := newServer(renderJson, stop)
-	cs.ServeGPRC()
 
 	// stops the grpc server after timeout
 	if jsonSvr.timeout > 0 {
@@ -48,6 +47,8 @@ func doServerJson(cmd *cobra.Command, args []string) {
 			cs.stopper <- true
 		}()
 	}
+
+	cs.ServeGPRC()
 }
 
 // writeFile takes the spans and events and writes them out to json files in the

@@ -21,6 +21,23 @@ builds:
       - goos: freebsd
         goarch: arm64
 
+nfpms:
+  - package_name: otel-cli
+    homepage: https://github.com/equinix-labs/otel-cli
+    description: OpenTelemetry CLI Application (Server & Client)
+    license: Apache 2.0
+    file_name_template: "{{.ProjectName}}_{{.Version}}_{{.Arch}}"
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+    formats:
+      - apk
+      - deb
+      - rpm
+
 archives:
   - format: tar.gz
     format_overrides:
