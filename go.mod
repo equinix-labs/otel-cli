@@ -1,9 +1,10 @@
-module github.com/packethost/otel-cli
+module github.com/equinix-labs/otel-cli
 
 go 1.14
 
 require (
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/packethost/otel-cli v0.0.3
 	github.com/pterm/pterm v0.12.30
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/viper v1.7.0
