@@ -84,4 +84,4 @@ brews:
     license: "Apache-2.0"
     # If set to auto, the release will not be uploaded to the homebrew tap
     # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
-    skip_upload: "auto"
+    #skip_upload: "auto"
