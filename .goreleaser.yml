@@ -25,20 +25,62 @@ builds:
       - linux
       - windows
       - darwin
-archives:
-  - replacements:
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    goarm:
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: freebsd
+        goarch: arm64
+
+nfpms:
+  - package_name: otel-cli
+    homepage: https://github.com/equinix-labs/otel-cli
+    description: OpenTelemetry CLI Application (Server & Client)
+    license: Apache 2.0
+    file_name_template: "{{.ProjectName}}_{{.Version}}_{{.Arch}}"
+    replacements:
       darwin: Darwin
       linux: Linux
       windows: Windows
       386: i386
       amd64: x86_64
+    formats:
+      - apk
+      - deb
+      - rpm
+
+archives:
+  - name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
-  name_template: "{{ incpatch .Tag }}-next"
+  name_template: 'SNAPSHOT-{{ .Commit }}'
+
 changelog:
   sort: asc
   filters:
     exclude:
       - '^demos:'
       - '^configs:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+

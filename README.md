@@ -15,13 +15,13 @@ program too much and you don't spam outbound connections on each command.
 The easiest way is a go get:
 
 ```shell
-go get github.com/packethost/otel-cli
+go get github.com/equinix-labs/otel-cli
 ```
 
 Alternatively, clone the repo and build it locally:
 
 ```shell
-git clone git@github.com:packethost/otel-cli.git
+git clone git@github.com:equinix-labs/otel-cli.git
 cd otel-cli
 go build
 ```
@@ -110,7 +110,7 @@ README. However, the good news is that it's fairly easy to do! You can follow th
 
 If you're planning on making changes to otel-cli, we recommend building the project locally: `go build`
 
-But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/packethost/otel-cli`. This will place the command in your `GOPATH`. If your `GOPATH` is in your `PATH` you should be all set.
+But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/equinix-labs/otel-cli`. This will place the command in your `GOPATH`. If your `GOPATH` is in your `PATH` you should be all set.
 
 ### 3. A system to receive/inspect the traces you generate
 
@@ -189,7 +189,7 @@ go run . span -n "testing" -s "my first test span"
 
 ## Contributing
 
-Please file issues and PRs on the GitHub project at https://github.com/packethost/otel-cli
+Please file issues and PRs on the GitHub project at https://github.com/equinix-labs/otel-cli
 
 ## Releases
 

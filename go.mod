@@ -1,4 +1,4 @@
-module github.com/packethost/otel-cli
+module github.com/equinix-labs/otel-cli
 
 go 1.14
 
