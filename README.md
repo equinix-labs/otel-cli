@@ -12,11 +12,23 @@ program too much and you don't spam outbound connections on each command.
 
 ## Getting Started
 
-The easiest way is a go get:
+We publish a number of package formats for otel-cli, including tar.gz, zip (windows),
+apk (Alpine), rpm (Red Hat variants), deb (Debian variants), and a brew tap. These
+can be found on the repo's [Releases](https://github.com/equinix-labs/otel-cli/releases) page.
+
+On most platforms the easiest way is a go get:
 
 ```shell
 go get github.com/equinix-labs/otel-cli
 ```
+
+To use the brew tap e.g. on MacOS:
+
+```shell
+brew tap equinix-labs/otel-cli
+brew install otel-cli
+```
+
 
 Alternatively, clone the repo and build it locally:
 
