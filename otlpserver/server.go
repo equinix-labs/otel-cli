@@ -16,7 +16,7 @@ import (
 )
 
 // Callback is a type for the function passed to newServer that is
-// called for each incoming span
+// called for each incoming span.
 type Callback func(CliEvent, CliEventList) bool
 
 // Stopper is the function passed to newServer to be called when the
@@ -114,7 +114,7 @@ type CliEvent struct {
 	Nanos uint64 `json:"nanos"`
 }
 
-// CliEventList implements sort.Interface for []CliEvent sorted by time
+// CliEventList implements sort.Interface for []CliEvent sorted by time.
 type CliEventList []CliEvent
 
 func (cel CliEventList) Len() int           { return len(cel) }
@@ -160,7 +160,7 @@ func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrary
 }
 
 // NewCliEventFromSpanEvent takes a span event, span, and ils and returns an event
-// with all the span event info filled in
+// with all the span event info filled in.
 func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
 	// start with the span, rewrite it for the event
 	e := CliEvent{
