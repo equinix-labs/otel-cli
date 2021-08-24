@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
 )
 
@@ -37,23 +38,23 @@ func init() {
 }
 
 func doServerJson(cmd *cobra.Command, args []string) {
-	stop := func(cs *cliServer) {}
-	cs := newServer(renderJson, stop)
+	stop := func(*otlpserver.Server) {}
+	cs := otlpserver.NewServer(renderJson, stop)
 
 	// stops the grpc server after timeout
 	if jsonSvr.timeout > 0 {
 		go func() {
 			time.Sleep(time.Duration(jsonSvr.timeout) * time.Second)
-			cs.stopper <- true
+			cs.Stop()
 		}()
 	}
 
-	cs.ServeGPRC()
+	cs.ServeGPRC(otlpEndpoint)
 }
 
 // writeFile takes the spans and events and writes them out to json files in the
 // tid/sid/span.json and tid/sid/events.json files.
-func renderJson(span CliEvent, events CliEventList) bool {
+func renderJson(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
 	jsonSvr.spansSeen++ // count spans for exiting on --max-spans
 
 	// TODO: check for existence of outdir and error when it doesn't exist

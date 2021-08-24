@@ -5,12 +5,13 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
 
 var tuiServer struct {
-	events CliEventList
+	events otlpserver.CliEventList
 	area   *pterm.AreaPrinter
 }
 
@@ -37,19 +38,19 @@ func doServerTui(cmd *cobra.Command, args []string) {
 	}
 	tuiServer.area = area
 
-	tuiServer.events = []CliEvent{}
+	tuiServer.events = []otlpserver.CliEvent{}
 
-	stop := func(cs *cliServer) {
+	stop := func(*otlpserver.Server) {
 		tuiServer.area.Stop()
 	}
 
-	cs := newServer(renderTui, stop)
-	cs.ServeGPRC()
+	cs := otlpserver.NewServer(renderTui, stop)
+	cs.ServeGPRC(otlpEndpoint)
 }
 
 // renderTui takes the given span and events, appends them to the in-memory
 // event list, sorts that, then prints it as a pterm table.
-func renderTui(span CliEvent, events CliEventList) bool {
+func renderTui(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
 	tuiServer.events = append(tuiServer.events, span)
 	tuiServer.events = append(tuiServer.events, events...)
 	sort.Sort(tuiServer.events)
@@ -67,7 +68,7 @@ func renderTui(span CliEvent, events CliEventList) bool {
 			// TODO: figure out how events are even getting inserted before a span
 			top = e
 			for _, te := range tuiServer.events {
-				if te.TraceID == top.TraceID && te.nanos < top.nanos {
+				if te.TraceID == top.TraceID && te.Nanos < top.Nanos {
 					top = te
 					break
 				}
