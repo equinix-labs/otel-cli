@@ -1,4 +1,4 @@
-package cmd
+package server
 
 import (
 	"context"
@@ -7,66 +7,55 @@ import (
 	"net"
 	"time"
 
-	"github.com/spf13/cobra"
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"google.golang.org/grpc"
 )
 
-var serverCmd = &cobra.Command{
-	Use:   "server",
-	Short: "run an embedded OTLP server",
-	Long:  "Run otel-cli as an OTLP server. See subcommands.",
-}
-
-func init() {
-	rootCmd.AddCommand(serverCmd)
-}
-
-// serverCallback is a type for the function passed to newServer that is
+// Callback is a type for the function passed to newServer that is
 // called for each incoming span
-type serverCallback func(CliEvent, CliEventList) bool
+type Callback func(CliEvent, CliEventList) bool
 
-// serverStop is the function passed to newServer to be called when the
+// Stop is the function passed to newServer to be called when the
 // server is shut down.
-type serverStop func(*cliServer)
+type Stop func(*Server)
 
-// cliServer is a gRPC/OTLP server handle.
-type cliServer struct {
+// Server is a gRPC/OTLP server handle.
+type Server struct {
 	server   *grpc.Server
-	callback serverCallback
+	callback Callback
 	stopper  chan bool
 	v1.UnimplementedTraceServiceServer
 }
 
-// newServer takes a callback and stop function and returns a cliServer ready
+// newServer takes a callback and stop function and returns a Server ready
 // to run with .ServeGRPC().
-func newServer(cb serverCallback, stop serverStop) *cliServer {
-	cs := cliServer{
+func NewServer(cb Callback, stop Stop) *Server {
+	s := Server{
 		server:   grpc.NewServer(),
 		callback: cb,
 		stopper:  make(chan bool),
 	}
 
-	v1.RegisterTraceServiceServer(cs.server, &cs)
+	v1.RegisterTraceServiceServer(s.server, &s)
 
 	// single place to stop the server, used by timeout and max-spans
 	go func() {
-		<-cs.stopper
-		stop(&cs)
-		cs.server.Stop()
+		<-s.stopper
+		stop(&s)
+		s.server.Stop()
 	}()
 
-	return &cs
+	return &s
 }
 
 // ServeGRPC creates a listener on otlpEndpoint and starts the GRPC server
 // on that listener. Blocks until stopped by sending a value to cs.stopper.
-func (cs *cliServer) ServeGPRC() {
-	listener, err := net.Listen("tcp", otlpEndpoint)
+func (cs *Server) ServeGPRC(endpoint string) {
+	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
-		log.Fatalf("failed to listen: %s", err)
+		log.Fatalf("failed to listen on %q: %s", endpoint, err)
 	}
 
 	if err := cs.server.Serve(listener); err != nil {
@@ -76,22 +65,22 @@ func (cs *cliServer) ServeGPRC() {
 
 // Stop sends a value to the server shutdown goroutine so it stops GRPC
 // and calls the stop function given to newServer.
-func (cs *cliServer) Stop() {
+func (cs *Server) Stop() {
 	cs.stopper <- true
 }
 
 // Export implements the gRPC server interface for exporting messages.
-func (cs *cliServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
+func (cs *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
 		ilSpans := resource.GetInstrumentationLibrarySpans()
 		for _, ils := range ilSpans {
 			for _, span := range ils.GetSpans() {
 				// convert protobuf spans to something easier for humans to consume
-				ces := newCliEventFromSpan(span, ils)
+				ces := NewCliEventFromSpan(span, ils)
 				events := CliEventList{}
 				for _, se := range span.GetEvents() {
-					events = append(events, newCliEventFromSpanEvent(se, span, ils))
+					events = append(events, NewCliEventFromSpanEvent(se, span, ils))
 				}
 
 				f := cs.callback
@@ -128,8 +117,8 @@ func (cel CliEventList) Len() int           { return len(cel) }
 func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
 func (cel CliEventList) Less(i, j int) bool { return cel[i].nanos < cel[j].nanos }
 
-// newCliEventFromSpan converts a raw span into a CliEvent.
-func newCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
+// NewCliEventFromSpan converts a raw span into a CliEvent.
+func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
 	e := CliEvent{
 		TraceID:    hex.EncodeToString(span.GetTraceId()),
 		SpanID:     hex.EncodeToString(span.GetSpanId()),
@@ -166,9 +155,9 @@ func newCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrary
 	return e
 }
 
-// newCliEventFromSpanEvent takes a span event, span, and ils and returns an event
+// NewCliEventFromSpanEvent takes a span event, span, and ils and returns an event
 // with all the span event info filled in
-func newCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
+func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
 	// start with the span, rewrite it for the event
 	e := CliEvent{
 		TraceID:    hex.EncodeToString(span.GetTraceId()),
