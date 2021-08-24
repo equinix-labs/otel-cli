@@ -1,3 +1,5 @@
+// otlpserver is a lightweight OTLP/gRPC server implementation intended for use
+// in otel-cli and end-to-end testing of OpenTelemetry applications.
 package otlpserver
 
 import (
