@@ -17,9 +17,9 @@ import (
 // called for each incoming span
 type Callback func(CliEvent, CliEventList) bool
 
-// Stop is the function passed to newServer to be called when the
+// Stopper is the function passed to newServer to be called when the
 // server is shut down.
-type Stop func(*Server)
+type Stopper func(*Server)
 
 // Server is a gRPC/OTLP server handle.
 type Server struct {
@@ -31,7 +31,7 @@ type Server struct {
 
 // newServer takes a callback and stop function and returns a Server ready
 // to run with .ServeGRPC().
-func NewServer(cb Callback, stop Stop) *Server {
+func NewServer(cb Callback, stop Stopper) *Server {
 	s := Server{
 		server:   grpc.NewServer(),
 		callback: cb,
@@ -107,7 +107,9 @@ type CliEvent struct {
 	End        time.Time         `json:"end"`
 	ElapsedMs  int64             `json:"elapsed_ms"`
 	Attributes map[string]string `json:"attributes"`
-	nanos      uint64            // only used to sort
+	// for a span this is the start nanos, for an event it's just the timestamp
+	// mostly here for sorting CliEventList but could be any uint64
+	Nanos uint64 `json:"nanos"`
 }
 
 // CliEventList implements sort.Interface for []CliEvent sorted by time
@@ -115,7 +117,7 @@ type CliEventList []CliEvent
 
 func (cel CliEventList) Len() int           { return len(cel) }
 func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
-func (cel CliEventList) Less(i, j int) bool { return cel[i].nanos < cel[j].nanos }
+func (cel CliEventList) Less(i, j int) bool { return cel[i].Nanos < cel[j].Nanos }
 
 // NewCliEventFromSpan converts a raw span into a CliEvent.
 func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
@@ -129,7 +131,7 @@ func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrary
 		ElapsedMs:  int64((span.GetEndTimeUnixNano() - span.GetStartTimeUnixNano()) / 1000000),
 		Name:       span.GetName(),
 		Attributes: make(map[string]string),
-		nanos:      span.GetStartTimeUnixNano(),
+		Nanos:      span.GetStartTimeUnixNano(),
 	}
 
 	switch span.GetKind() {
@@ -170,7 +172,7 @@ func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *t
 		ElapsedMs:  int64(se.GetTimeUnixNano()-span.GetStartTimeUnixNano()) / 1000000,
 		Name:       se.GetName(),
 		Attributes: make(map[string]string), // overwrite the one from the span
-		nanos:      se.GetTimeUnixNano(),
+		Nanos:      se.GetTimeUnixNano(),
 	}
 
 	for _, attr := range se.GetAttributes() {
