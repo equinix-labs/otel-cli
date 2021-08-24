@@ -31,7 +31,7 @@ type Server struct {
 	v1.UnimplementedTraceServiceServer
 }
 
-// newServer takes a callback and stop function and returns a Server ready
+// NewServer takes a callback and stop function and returns a Server ready
 // to run with .ServeGRPC().
 func NewServer(cb Callback, stop Stopper) *Server {
 	s := Server{
