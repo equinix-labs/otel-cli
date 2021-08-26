@@ -26,6 +26,13 @@ import (
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
+	// when no endpoint is set, do not set up plumbing. everything will still
+	// run but in non-recording mode, and otel-cli is effectively disabled
+	// and will not time out trying to connect out
+	if otlpEndpoint == "" {
+		return ctx, func() {}
+	}
+
 	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(otlpEndpoint)}
 
 	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,

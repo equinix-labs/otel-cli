@@ -39,7 +39,7 @@ func addCommonParams(cmd *cobra.Command) {
 	// --config / -c a viper configuration file
 	cmd.Flags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.otel-cli.yaml)")
 
-	cmd.Flags().StringVar(&otlpEndpoint, "endpoint", "localhost:4317", "dial address for the desired OTLP/gRPC endpoint")
+	cmd.Flags().StringVar(&otlpEndpoint, "endpoint", "", "dial address for the desired OTLP/gRPC endpoint")
 	viper.BindPFlag("endpoint", rootCmd.Flags().Lookup("endpoint"))
 	viper.BindEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "endpoint")
 }
