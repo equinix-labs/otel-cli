@@ -44,7 +44,7 @@ func addCommonParams(cmd *cobra.Command) {
 	viper.BindPFlag("endpoint", rootCmd.Flags().Lookup("endpoint"))
 	viper.BindEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "endpoint")
 
-	cmd.Flags().StringVar(&cliTimeout, "timeout", "1s", "how long to wait for the OTLP server before timing out")
+	cmd.Flags().StringVar(&cliTimeout, "timeout", "1s", "timeout for otel-cli operations, all timeouts in otel-cli use this value")
 	viper.BindPFlag("timeout", rootCmd.Flags().Lookup("timeout"))
 	viper.BindEnv("OTEL_EXPORTER_OTLP_TIMEOUT", "timeout")
 }
