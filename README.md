@@ -92,6 +92,7 @@ also be configured via file or environment variables.
 | --------------- | ----------------------------- | --------------- | -------------- |
 | --endpoint      | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint        | localhost:4317 |
 | --insecure      | OTEL_EXPORTER_OTLP_INSECURE   | insecure        | false          |
+| --timeout       | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout         | 1s             |
 | --otlp-headers  | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers    | key=value      |
 | --otlp-blocking | OTEL_EXPORTER_OTLP_BLOCKING   | otlp-blocking   | false          |
 | --service       | OTEL_CLI_SERVICE_NAME         | service         | myapp          |
@@ -103,6 +104,8 @@ also be configured via file or environment variables.
 | --tp-print      | OTEL_CLI_PRINT_TRACEPARENT    | tp-print        | false          |
 | --tp-export     | OTEL_CLI_EXPORT_TRACEPARENT   | tp-export       | false          |
 | --no-tls-verify | OTEL_CLI_NO_TLS_VERIFY        | no-tls-verify   | false          |
+
+[Valid timeout units](https://pkg.go.dev/time#ParseDuration) are "ns", "us"/"µs", "ms", "s", "m", "h".
 
 ## Easy local dev
 

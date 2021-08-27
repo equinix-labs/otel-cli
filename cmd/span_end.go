@@ -23,7 +23,6 @@ See: otel-cli span background
 func init() {
 	spanCmd.AddCommand(spanEndCmd)
 	spanEndCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
-	spanEndCmd.Flags().IntVar(&spanBgTimeout, "timeout", 5, "how long to wait for the background server socket to be available")
 	spanEndCmd.MarkFlagRequired("sockdir")
 }
 

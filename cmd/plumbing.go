@@ -35,6 +35,11 @@ func initTracer() (context.Context, func()) {
 
 	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(otlpEndpoint)}
 
+	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
+	if to := parseCliTimeout(); to > 0 {
+		grpcOpts = append(grpcOpts, otlpgrpc.WithTimeout(to))
+	}
+
 	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
 	// but I expect most users of this program to point at a localhost endpoint that might not
 	// have any encryption available, or setting it up raises the bar of entry too high.

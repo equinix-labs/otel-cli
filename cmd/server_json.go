@@ -34,7 +34,6 @@ func init() {
 	serverJsonCmd.Flags().StringVar(&jsonSvr.outDir, "dir", "", "write spans to json in the specified directory")
 	serverJsonCmd.Flags().BoolVar(&jsonSvr.stdout, "stdout", false, "write span jsons to stdout")
 	serverJsonCmd.Flags().IntVar(&jsonSvr.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
-	serverJsonCmd.Flags().IntVar(&jsonSvr.timeout, "timeout", 0, "exit the server after timeout seconds")
 }
 
 func doServerJson(cmd *cobra.Command, args []string) {
@@ -42,13 +41,18 @@ func doServerJson(cmd *cobra.Command, args []string) {
 	cs := otlpserver.NewServer(renderJson, stop)
 
 	// stops the grpc server after timeout
-	if jsonSvr.timeout > 0 {
+	timeout := parseCliTimeout()
+	if timeout > 0 {
 		go func() {
-			time.Sleep(time.Duration(jsonSvr.timeout) * time.Second)
+			time.Sleep(timeout)
 			cs.Stop()
 		}()
 	}
 
+	// unlike the rest of otel-cli, server should default to localhost:4317
+	if otlpEndpoint == "" {
+		otlpEndpoint = defaultOtlpEndpoint
+	}
 	cs.ServeGPRC(otlpEndpoint)
 }
 
