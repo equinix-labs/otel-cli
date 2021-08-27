@@ -6,9 +6,14 @@ otel-cli is a command-line tool for sending OpenTelemetry traces. It is written 
 Go and intended to be used in shell scripts and other places where the best option
 available for sending spans is executing another program.
 
-Since this needs to connect to the OTLP endpoint on each run, it is highly recommended
-to have a localhost opentelemetry collector running so this doesn't slow down your
-program too much and you don't spam outbound connections on each command.
+otel-cli can be added to your scripts with no configuration and it will run as normal
+but in non-recording mode and will emit no traces. This follows the OpenTelemetry community's
+philosophy of "first, do no harm" and makes it so you can add otel-cli to your code and
+later turn it on.
+
+Since otel-cli needs to connect to the OTLP endpoint on each run, it is highly recommended
+to use a localhost opentelemetry collector that can buffer spans so that the connection
+cost does not slow down your program too much.
 
 ## Getting Started
 
@@ -85,8 +90,8 @@ otel-cli server json --dir $dir --timeout 60 --max-spans 5
 
 ## Configuration
 
-Everything is configurable via CLI arguments, and many of those arguments can
-also be configured via file or environment variables.
+Everything is configurable via CLI arguments and environment variables. If no endpoint
+is specified, otel-cli will run in non-recording mode and not attempt to contact any servers.
 
 | CLI argument    | environment variable          | config file key | example value  |
 | --------------- | ----------------------------- | --------------- | -------------- |
