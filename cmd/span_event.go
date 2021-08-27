@@ -35,7 +35,6 @@ func init() {
 
 	spanEventCmd.Flags().StringVarP(&spanEventName, "name", "e", "todo-generate-default-event-names", "set the name of the event")
 	spanEventCmd.Flags().StringVarP(&spanEventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
-	spanEventCmd.Flags().IntVar(&spanBgTimeout, "timeout", 5, "how long to wait for the background server socket to be available")
 	spanEventCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 	spanEventCmd.MarkFlagRequired("sockdir")
 

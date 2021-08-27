@@ -16,7 +16,6 @@ const spanBgSockfilename = "otel-cli-background.sock"
 const spanBgParentPollMs = 10 // check parent pid every 10ms
 
 var spanBgSockdir string
-var spanBgTimeout int
 var spanBgStarted time.Time // for measuring uptime
 
 // spanBgCmd represents the span background command
@@ -54,7 +53,6 @@ func init() {
 	// start a background span at the top of a script then let it fall off
 	// at the end to get an easy span
 	spanBgCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
-	spanBgCmd.Flags().IntVar(&spanBgTimeout, "timeout", 10, "how long the background server should run before timeout")
 
 	addCommonParams(spanBgCmd)
 	addSpanParams(spanBgCmd)
@@ -107,11 +105,13 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 
 	// start the timeout goroutine, this is a little late but the server
 	// has to be up for this to make much sense
-	go func() {
-		time.Sleep(time.Second * time.Duration(spanBgTimeout))
-		spanBgEndEvent("timeout", span)
-		bgs.Shutdown()
-	}()
+	if timeout := parseCliTimeout(); timeout > 0 {
+		go func() {
+			time.Sleep(timeout)
+			spanBgEndEvent("timeout", span)
+			bgs.Shutdown()
+		}()
+	}
 
 	// will block until bgs.Shutdown()
 	bgs.Run()
@@ -125,7 +125,7 @@ func spanBgEndEvent(name string, span trace.Span) {
 	uptime := time.Since(spanBgStarted)
 	attrs := trace.WithAttributes([]attribute.KeyValue{
 		{Key: attribute.Key("uptime.milliseconds"), Value: attribute.Int64Value(uptime.Milliseconds())},
-		{Key: attribute.Key("timeout.seconds"), Value: attribute.IntValue(spanBgTimeout)},
+		{Key: attribute.Key("timeout.duration"), Value: attribute.StringValue(cliTimeout)},
 	}...)
 	span.AddEvent(name, attrs)
 }

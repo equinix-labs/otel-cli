@@ -199,3 +199,44 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 		t.Errorf("got unexpected output, expected '%s', got '%s'", expected, buf.String())
 	}
 }
+
+func TestParseCliTime(t *testing.T) {
+	for _, testcase := range []struct {
+		name     string
+		input    string
+		expected time.Duration
+	}{
+		// otel-cli will still timeout but it will be the default timeouts for
+		// each component
+		{
+			name:     "empty string returns 0 duration",
+			input:    "",
+			expected: time.Duration(0),
+		},
+		{
+			name:     "0 returns 0 duration",
+			input:    "0",
+			expected: time.Duration(0),
+		},
+		{
+			name:     "1s returns 1 second",
+			input:    "1s",
+			expected: time.Second,
+		},
+		{
+			name:     "100ms returns 100 milliseconds",
+			input:    "100ms",
+			expected: time.Millisecond * 100,
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			cliTimeout = testcase.input
+			got := parseCliTimeout()
+			if got != testcase.expected {
+				ed := testcase.expected.String()
+				gd := got.String()
+				t.Errorf("duration string %q was expected to return %s but returned %s", cliTimeout, ed, gd)
+			}
+		})
+	}
+}

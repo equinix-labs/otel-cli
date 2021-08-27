@@ -9,11 +9,12 @@ import (
 // TODO: that's a lot of globals, maybe move this into a struct
 var cfgFile, serviceName, spanName, spanKind, traceparentCarrierFile string
 var spanAttrs, otlpHeaders map[string]string
-var otlpEndpoint string
+var otlpEndpoint, cliTimeout string
 var otlpInsecure, otlpBlocking, noTlsVerify bool
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
 var traceparentRequired, testMode bool
 var exitCode int
+var defaultOtlpEndpoint = "localhost:4317"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -39,9 +40,13 @@ func addCommonParams(cmd *cobra.Command) {
 	// --config / -c a viper configuration file
 	cmd.Flags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.otel-cli.yaml)")
 
-	cmd.Flags().StringVar(&otlpEndpoint, "endpoint", "localhost:4317", "dial address for the desired OTLP/gRPC endpoint")
+	cmd.Flags().StringVar(&otlpEndpoint, "endpoint", "", "dial address for the desired OTLP/gRPC endpoint")
 	viper.BindPFlag("endpoint", rootCmd.Flags().Lookup("endpoint"))
 	viper.BindEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "endpoint")
+
+	cmd.Flags().StringVar(&cliTimeout, "timeout", "1s", "timeout for otel-cli operations, all timeouts in otel-cli use this value")
+	viper.BindPFlag("timeout", rootCmd.Flags().Lookup("timeout"))
+	viper.BindEnv("OTEL_EXPORTER_OTLP_TIMEOUT", "timeout")
 }
 
 // addClientParams adds the common CLI flags for e.g. span and exec to the command.
