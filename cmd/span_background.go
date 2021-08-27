@@ -105,9 +105,9 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 
 	// start the timeout goroutine, this is a little late but the server
 	// has to be up for this to make much sense
-	if to := parseCliTimeout(); to > 0 {
+	if timeout := parseCliTimeout(); timeout > 0 {
 		go func() {
-			time.Sleep(to)
+			time.Sleep(timeout)
 			spanBgEndEvent("timeout", span)
 			bgs.Shutdown()
 		}()
