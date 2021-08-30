@@ -89,13 +89,13 @@ brews:
 dockers:
   - image_templates:
     - "equinix/otel-cli:v{{ .Version }}-amd64"
-    dockerfile: goreleaser_docker/Dockerfile
+    dockerfile: release/Dockerfile
     use: buildx
     build_flag_templates:
       - "--platform=linux/amd64"
   - image_templates:
     - "equinix/otel-cli:v{{ .Version }}-arm64v8"
-    dockerfile: goreleaser_docker/Dockerfile
+    dockerfile: release/Dockerfile
     use: buildx
     build_flag_templates:
       - "--platform=linux/arm64/v8"
