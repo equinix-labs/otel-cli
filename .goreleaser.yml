@@ -88,7 +88,6 @@ brews:
 
 dockers:
   - image_templates:
-    - "equinix-labs/otel-cli:{{ .Tag }}-amd64"
     - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
     dockerfile: release/Dockerfile
     use: buildx
@@ -101,7 +100,6 @@ dockers:
       - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--platform=linux/amd64"
   - image_templates:
-    - "equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
     - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
     dockerfile: release/Dockerfile
     use: buildx
