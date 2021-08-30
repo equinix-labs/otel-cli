@@ -92,14 +92,25 @@ dockers:
     dockerfile: release/Dockerfile
     use: buildx
     build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--platform=linux/amd64"
   - image_templates:
     - "ghcr.io/equinix-labs/otel-cli:v{{ .Version }}-arm64v8"
     dockerfile: release/Dockerfile
     use: buildx
     build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--platform=linux/arm64/v8"
-
 
 docker_manifests:
   - name_template: "equinix/otel-cli:{{ .Version }}"
