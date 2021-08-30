@@ -85,3 +85,25 @@ brews:
     # If set to auto, the release will not be uploaded to the homebrew tap
     # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
     skip_upload: "auto"
+
+dockers:
+  - image_templates:
+    - "equinix/otel-cli:v{{ .Version }}-amd64"
+    dockerfile: goreleaser_docker/Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+  - image_templates:
+    - "equinix/otel-cli:v{{ .Version }}-arm64v8"
+    dockerfile: goreleaser_docker/Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/arm64/v8"
+
+
+docker_manifests:
+  - name_template: "equinix/otel-cli:{{ .Version }}"
+    image_templates:
+    - "equinix/otel-cli:v{{ .Version }}-amd64"
+    - "equinix/otel-cli:v{{ .Version }}-arm64v8"
+    use: docker
