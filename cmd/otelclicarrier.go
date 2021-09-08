@@ -63,7 +63,7 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 	if filename != "" {
 		ctx = loadTraceparentFromFile(ctx, filename)
 	}
-	if traceparentRequired {
+	if config.TraceparentRequired {
 		tp := getTraceparent(ctx) // get the text representation in the context
 		if len(tp) > 0 && checkTracecarrierRe.MatchString(tp) {
 			parts := strings.Split(tp, "-") // e.g. 00-9765b2f71c68b04dc0ad2a4d73027d6f-1881444346b6296e-01
@@ -86,7 +86,7 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 	if err != nil {
 		// only fatal when the tp carrier file is required explicitly, otherwise
 		// just silently return the unmodified context
-		if traceparentRequired {
+		if config.TraceparentRequired {
 			log.Fatalf("could not open file '%s' for read: %s", filename, err)
 		} else {
 			return ctx
@@ -135,7 +135,7 @@ func saveTraceparentToFile(ctx context.Context, filename string) {
 // TRACEPARENT and sets it in the returned Go context.
 func loadTraceparentFromEnv(ctx context.Context) context.Context {
 	// don't load the envvar when --tp-ignore-env is set
-	if traceparentIgnoreEnv {
+	if config.TraceparentIgnoreEnv {
 		return ctx
 	}
 

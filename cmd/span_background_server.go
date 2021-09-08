@@ -162,7 +162,7 @@ func createBgClient() (*rpc.Client, func()) {
 
 		to := parseCliTimeout()
 		if to > 0 && time.Since(started) > to {
-			log.Fatalf("timeout after %s while waiting for span background socket '%s' to appear", cliTimeout, sockfile)
+			log.Fatalf("timeout after %s while waiting for span background socket '%s' to appear", config.Timeout, sockfile)
 		}
 	}
 

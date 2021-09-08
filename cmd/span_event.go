@@ -46,7 +46,7 @@ func doSpanEvent(cmd *cobra.Command, args []string) {
 	rpcArgs := BgSpanEvent{
 		Name:       spanEventName,
 		Timestamp:  timestamp.Format(time.RFC3339Nano),
-		Attributes: spanAttrs,
+		Attributes: config.Attributes,
 	}
 
 	res := BgSpan{}

@@ -50,10 +50,10 @@ func doServerJson(cmd *cobra.Command, args []string) {
 	}
 
 	// unlike the rest of otel-cli, server should default to localhost:4317
-	if otlpEndpoint == "" {
-		otlpEndpoint = defaultOtlpEndpoint
+	if config.Endpoint == "" {
+		config.Endpoint = defaultOtlpEndpoint
 	}
-	cs.ServeGPRC(otlpEndpoint)
+	cs.ServeGPRC(config.Endpoint)
 }
 
 // writeFile takes the spans and events and writes them out to json files in the

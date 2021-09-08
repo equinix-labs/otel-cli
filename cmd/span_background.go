@@ -125,7 +125,7 @@ func spanBgEndEvent(name string, span trace.Span) {
 	uptime := time.Since(spanBgStarted)
 	attrs := trace.WithAttributes([]attribute.KeyValue{
 		{Key: attribute.Key("uptime.milliseconds"), Value: attribute.Int64Value(uptime.Milliseconds())},
-		{Key: attribute.Key("timeout.duration"), Value: attribute.StringValue(cliTimeout)},
+		{Key: attribute.Key("timeout.duration"), Value: attribute.StringValue(config.Timeout)},
 	}...)
 	span.AddEvent(name, attrs)
 }
