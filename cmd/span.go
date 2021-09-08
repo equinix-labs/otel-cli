@@ -62,7 +62,7 @@ func doSpan(cmd *cobra.Command, args []string) {
 // context, the span, and a deferrable function for clean shutdown (it ends the
 // span).
 func startSpan() (context.Context, trace.Span, func()) {
-	startOpts := []trace.SpanStartOption{trace.WithSpanKind(otelSpanKind(spanKind))}
+	startOpts := []trace.SpanStartOption{trace.WithSpanKind(otelSpanKind(config.Kind))}
 
 	if spanStartTime != "" {
 		t := parseTime(spanStartTime, "start")
@@ -70,11 +70,11 @@ func startSpan() (context.Context, trace.Span, func()) {
 	}
 
 	ctx, shutdown := initTracer()
-	ctx = loadTraceparent(ctx, traceparentCarrierFile)
+	ctx = loadTraceparent(ctx, config.TraceparentCarrierFile)
 	tracer := otel.Tracer("otel-cli/span")
 
-	ctx, span := tracer.Start(ctx, spanName, startOpts...)
-	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
+	ctx, span := tracer.Start(ctx, config.SpanName, startOpts...)
+	span.SetAttributes(cliAttrsToOtel(config.Attributes)...) // applies CLI attributes to the span
 
 	return ctx, span, shutdown
 }
