@@ -166,16 +166,21 @@ func printSpanData(target io.Writer, traceId, spanId, tp string) {
 }
 
 // parseCliTimeout parses the cliTimeout global string value to a time.Duration.
+// When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
 // It logs an error and returns time.Duration(0) if the string is empty or unparseable.
 func parseCliTimeout() time.Duration {
 	if cliTimeout == "" {
 		return time.Duration(0)
 	}
 
-	if d, err := time.ParseDuration(cliTimeout); err == nil {
+	var derr error // declare early so it can be printed if both fail
+	var d time.Duration
+	if d, derr = time.ParseDuration(cliTimeout); derr == nil {
 		return d
+	} else if secs, serr := strconv.ParseInt(cliTimeout, 10, 0); serr == nil {
+		return time.Second * time.Duration(secs)
 	} else {
-		log.Printf("unable to parse --timeout %q: %s", cliTimeout, err)
+		log.Printf("unable to parse --timeout %q: %s", cliTimeout, derr)
 		return time.Duration(0)
 	}
 }
