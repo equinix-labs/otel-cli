@@ -17,7 +17,6 @@ var jsonSvr struct {
 	outDir    string
 	stdout    bool
 	maxSpans  int
-	timeout   int
 	spansSeen int
 }
 

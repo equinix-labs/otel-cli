@@ -169,7 +169,7 @@ func createBgClient() (*rpc.Client, func()) {
 	sock := net.UnixAddr{Name: sockfile, Net: "unix"}
 	conn, err := net.DialUnix(sock.Net, nil, &sock)
 	if err != nil {
-		log.Fatalf("unable to connect to span background server at '%s': %s", spanBgSockdir, err)
+		log.Fatalf("unable to connect to span background server at '%s': %s", config.BackgroundSockdir, err)
 	}
 
 	return jsonrpc.NewClient(conn), func() { conn.Close() }

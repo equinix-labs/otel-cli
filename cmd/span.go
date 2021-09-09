@@ -30,7 +30,6 @@ Example:
 	Run: doSpan,
 }
 
-var spanStartTime, spanEndTime string
 var epochNanoTimeRE *regexp.Regexp
 
 func init() {
@@ -38,10 +37,10 @@ func init() {
 	spanCmd.Flags().SortFlags = false
 
 	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
-	spanCmd.Flags().StringVar(&spanStartTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
+	spanCmd.Flags().StringVar(&config.SpanStartTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
 
 	// --end $timestamp
-	spanCmd.Flags().StringVar(&spanEndTime, "end", "", "an Unix epoch or RFC3339 timestamp for the end of the span")
+	spanCmd.Flags().StringVar(&config.SpanEndTime, "end", "", "an Unix epoch or RFC3339 timestamp for the end of the span")
 
 	addCommonParams(spanCmd)
 	addSpanParams(spanCmd)
@@ -64,8 +63,8 @@ func doSpan(cmd *cobra.Command, args []string) {
 func startSpan() (context.Context, trace.Span, func()) {
 	startOpts := []trace.SpanStartOption{trace.WithSpanKind(otelSpanKind(config.Kind))}
 
-	if spanStartTime != "" {
-		t := parseTime(spanStartTime, "start")
+	if config.SpanStartTime != "" {
+		t := parseTime(config.SpanStartTime, "start")
 		startOpts = append(startOpts, trace.WithTimestamp(t))
 	}
 
@@ -83,8 +82,8 @@ func startSpan() (context.Context, trace.Span, func()) {
 func endSpan(span trace.Span) {
 	endOpts := []trace.SpanEndOption{}
 
-	if spanEndTime != "" {
-		t := parseTime(spanEndTime, "end")
+	if config.SpanEndTime != "" {
+		t := parseTime(config.SpanEndTime, "end")
 		endOpts = append(endOpts, trace.WithTimestamp(t))
 	}
 
