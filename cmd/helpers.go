@@ -140,20 +140,22 @@ func GetExitCode() int {
 func propagateOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
 	saveTraceparentToFile(ctx, config.TraceparentCarrierFile)
 
-	tpout := getTraceparent(ctx)
-	tid := span.SpanContext().TraceID().String()
-	sid := span.SpanContext().SpanID().String()
+	// --tp-print / --tp-export
+	if !config.TraceparentPrint && !config.TraceparentPrintExport {
+		return
+	}
 
-	printSpanData(target, tid, sid, tpout)
+	sc := trace.SpanContextFromContext(ctx)
+	traceId := sc.TraceID().String()
+	spanId := sc.SpanID().String()
+
+	tp := getTraceparent(ctx)
+	printSpanData(target, traceId, spanId, tp)
 }
 
 // printSpanData takes the provided strings and prints them in a consitent format,
 // depending on which command line arguments were set.
 func printSpanData(target io.Writer, traceId, spanId, tp string) {
-	// --tp-print / --tp-export
-	if !config.TraceparentPrint && !config.TraceparentPrintExport {
-		return
-	}
 
 	// --tp-export will print "export TRACEPARENT" so it's
 	// one less step to print to a file & source, or eval

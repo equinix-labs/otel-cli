@@ -1,15 +1,15 @@
 package cmd
 
 import (
-	"bytes"
+	"bufio"
 	"context"
-	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
 	"strings"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var envTp string // global state
@@ -92,24 +92,35 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 			return ctx
 		}
 	}
+	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatalf("failure while reading from file '%s': %s", filename, err)
+	// only use the line that contains TRACEPARENT
+	var tp string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// printSpanData emits comments with trace id and span id, ignore those
+		if strings.HasPrefix(line, "#") {
+			continue
+		} else if strings.Contains(strings.ToUpper(line), "TRACEPARENT") {
+			tp = line
+			break
+		}
 	}
 
-	tp := bytes.TrimSpace(data)
-	if len(tp) == 0 {
+	// silently fail if no traceparent was found
+	if tp == "" {
+		log.Printf("no tp found in file")
 		return ctx
 	}
 
-	// also accept 'export TRACEPARENT=' and 'TRACEPARENT='
-	tp = bytes.TrimPrefix(tp, []byte("export "))
-	tp = bytes.TrimPrefix(tp, []byte("TRACEPARENT="))
+	// clean 'export TRACEPARENT=' and 'TRACEPARENT=' off the output
+	tp = strings.TrimPrefix(tp, "export ")
+	tp = strings.TrimPrefix(tp, "TRACEPARENT=")
 
-	if !checkTracecarrierRe.Match(tp) {
-		// I have a doubt: should this be a soft failure?
-		log.Fatalf("file '%s' was read but does not contain a valid traceparent", filename)
+	if !checkTracecarrierRe.MatchString(tp) {
+		log.Printf("file '%s' was read but does not contain a valid traceparent", filename)
+		return ctx
 	}
 
 	carrier := NewOtelCliCarrier()
@@ -124,11 +135,19 @@ func saveTraceparentToFile(ctx context.Context, filename string) {
 	if filename == "" {
 		return
 	}
-	tp := getTraceparent(ctx)
-	err := ioutil.WriteFile(filename, []byte(tp), 0600)
+
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
-		log.Fatalf("failure while writing to file '%s': %s", filename, err)
+		log.Printf("failure opening file '%s' for write: %s", filename, err)
 	}
+	defer file.Close()
+
+	sc := trace.SpanContextFromContext(ctx)
+	traceId := sc.TraceID().String()
+	spanId := sc.SpanID().String()
+	tp := getTraceparent(ctx)
+
+	printSpanData(file, traceId, spanId, tp)
 }
 
 // loadTraceparentFromEnv loads the traceparent from the environment variable
