@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"go.opentelemetry.io/otel"
@@ -140,7 +141,10 @@ func TestWriteTraceparentToFile(t *testing.T) {
 	if len(data) == 0 {
 		t.Errorf("saveTraceparentToFile wrote %d bytes to the tempfile, expected %d", len(data), len(testTp))
 	}
-	if string(data) != testTp {
+
+	// otel is non-recording in tests so the comments in the output will be zeroed
+	// while the traceparent should come through just fine at the end of file
+	if !strings.HasSuffix(strings.TrimSpace(string(data)), testTp) {
 		t.Errorf("invalid data in traceparent file, expected '%s', got '%s'", testTp, data)
 	}
 }
