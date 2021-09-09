@@ -28,11 +28,21 @@ type Config struct {
 	TraceparentPrintExport bool   `json:"traceparent_print_export"`
 	TraceparentRequired    bool   `json:"traceparent_required"`
 
+	BackgroundParentPollMs int    `json:"background_parent_poll_ms"`
+	BackgroundSockdir      string `json:"background_socket_directory"`
+
+	SpanStartTime string `json:"span_start_time"`
+	SpanEndTime   string `json:"span_end_time"`
+	EventName     string `json:"event_name"`
+	EventTime     string `json:"event_time"`
+
 	CfgFile string `json:"config_file"`
 }
 
+const defaultOtlpEndpoint = "localhost:4317"
+const spanBgSockfilename = "otel-cli-background.sock"
+
 var exitCode int
-var defaultOtlpEndpoint = "localhost:4317"
 var config Config
 
 // rootCmd represents the base command when called without any subcommands
@@ -49,6 +59,7 @@ func Execute() {
 }
 
 func init() {
+
 	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
