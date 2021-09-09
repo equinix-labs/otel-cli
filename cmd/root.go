@@ -72,11 +72,11 @@ func addCommonParams(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&config.Endpoint, "endpoint", "", "dial address for the desired OTLP/gRPC endpoint")
 	viper.BindPFlag("endpoint", rootCmd.Flags().Lookup("endpoint"))
-	viper.BindEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "endpoint")
+	viper.BindEnv("endpoint", "OTEL_EXPORTER_OTLP_ENDPOINT")
 
 	cmd.Flags().StringVar(&config.Timeout, "timeout", "1s", "timeout for otel-cli operations, all timeouts in otel-cli use this value")
 	viper.BindPFlag("timeout", rootCmd.Flags().Lookup("timeout"))
-	viper.BindEnv("OTEL_EXPORTER_OTLP_TIMEOUT", "timeout")
+	viper.BindEnv("timeout", "OTEL_EXPORTER_OTLP_TIMEOUT")
 }
 
 // addClientParams adds the common CLI flags for e.g. span and exec to the command.
@@ -88,40 +88,40 @@ func addClientParams(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(&config.Insecure, "insecure", false, "refuse to connect if TLS is unavailable (true by default when endpoint is localhost)")
 	viper.BindPFlag("insecure", cmd.Flags().Lookup("insecure"))
-	viper.BindEnv("OTEL_EXPORTER_OTLP_INSECURE", "insecure")
+	viper.BindEnv("insecure", "OTEL_EXPORTER_OTLP_INSECURE")
 
 	cmd.Flags().StringToStringVar(&config.Headers, "otlp-headers", map[string]string{}, "a comma-sparated list of key=value headers to send on OTLP connection")
 	viper.BindPFlag("otlp-headers", cmd.Flags().Lookup("otlp-headers"))
-	viper.BindEnv("OTEL_EXPORTER_OTLP_HEADERS", "otlp-headers")
+	viper.BindEnv("otlp-headers", "OTEL_EXPORTER_OTLP_HEADERS")
 
 	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", false, "block on connecting to the OTLP server before proceeding")
 	viper.BindPFlag("otlp-blocking", cmd.Flags().Lookup("otlp-blocking"))
-	viper.BindEnv("OTEL_EXPORTER_OTLP_BLOCKING", "otlp-blocking")
+	viper.BindEnv("otlp-blocking", "OTEL_EXPORTER_OTLP_BLOCKING")
 
 	// trace propagation options
 	cmd.Flags().BoolVar(&config.TraceparentRequired, "tp-required", false, "when set to true, fail and log if a traceparent can't be picked up from TRACEPARENT ennvar or a carrier file")
 	viper.BindPFlag("tp-required", cmd.Flags().Lookup("tp-required"))
-	viper.BindEnv("OTEL_CLI_TRACEPARENT_REQUIRED", "tp-required")
+	viper.BindEnv("tp-required", "OTEL_CLI_TRACEPARENT_REQUIRED")
 
 	cmd.Flags().StringVar(&config.TraceparentCarrierFile, "tp-carrier", "", "a file for reading and WRITING traceparent across invocations")
 	viper.BindPFlag("tp-carrier", cmd.Flags().Lookup("tp-carrier"))
-	viper.BindEnv("OTEL_CLI_CARRIER_FILE", "tp-carrier")
+	viper.BindEnv("tp-carrier", "OTEL_CLI_CARRIER_FILE")
 
 	cmd.Flags().BoolVar(&config.TraceparentIgnoreEnv, "tp-ignore-env", false, "ignore the TRACEPARENT envvar even if it's set")
 	viper.BindPFlag("tp-ignore-env", cmd.Flags().Lookup("tp-ignore-env"))
-	viper.BindEnv("OTEL_CLI_IGNORE_ENV", "tp-ignore-env")
+	viper.BindEnv("tp-ignore-env", "OTEL_CLI_IGNORE_ENV")
 
 	cmd.Flags().BoolVar(&config.TraceparentPrint, "tp-print", false, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
 	viper.BindPFlag("tp-print", cmd.Flags().Lookup("tp-print"))
-	viper.BindEnv("OTEL_CLI_PRINT_TRACEPARENT", "tp-print")
+	viper.BindEnv("tp-print", "OTEL_CLI_PRINT_TRACEPARENT")
 
 	cmd.Flags().BoolVarP(&config.TraceparentPrintExport, "tp-export", "p", false, "same as --tp-print but it puts an 'export ' in front so it's more convinenient to source in scripts")
 	viper.BindPFlag("tp-export", cmd.Flags().Lookup("tp-export"))
-	viper.BindEnv("OTEL_CLI_EXPORT_TRACEPARENT", "tp-export")
+	viper.BindEnv("tp-export", "OTEL_CLI_EXPORT_TRACEPARENT")
 
 	cmd.Flags().BoolVar(&config.NoTlsVerify, "no-tls-verify", false, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing and usign self-signed certificates.")
 	viper.BindPFlag("no-tls-verify", cmd.Flags().Lookup("no-tls-verify"))
-	viper.BindEnv("OTEL_CLI_NO_TLS_VERIFY", "no-tls-verify")
+	viper.BindEnv("no-tls-verify", "OTEL_CLI_NO_TLS_VERIFY")
 }
 
 func addSpanParams(cmd *cobra.Command) {
@@ -130,11 +130,11 @@ func addSpanParams(cmd *cobra.Command) {
 
 	cmd.Flags().StringVarP(&config.ServiceName, "service", "n", "otel-cli", "set the name of the application sent on the traces")
 	viper.BindPFlag("service", cmd.Flags().Lookup("service"))
-	viper.BindEnv("OTEL_CLI_SERVICE_NAME", "service")
+	viper.BindEnv("service", "OTEL_CLI_SERVICE_NAME")
 
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", "client", "set the trace kind, e.g. internal, server, client, producer, consumer")
 	viper.BindPFlag("kind", cmd.Flags().Lookup("kind"))
-	viper.BindEnv("OTEL_CLI_TRACE_KIND", "kind")
+	viper.BindEnv("kind", "OTEL_CLI_TRACE_KIND")
 }
 
 func addAttrParams(cmd *cobra.Command) {
@@ -142,7 +142,7 @@ func addAttrParams(cmd *cobra.Command) {
 	config.Attributes = make(map[string]string)
 	cmd.Flags().StringToStringVarP(&config.Attributes, "attrs", "a", map[string]string{}, "a comma-separated list of key=value attributes")
 	viper.BindPFlag("attrs", cmd.Flags().Lookup("attrs"))
-	viper.BindEnv("OTEL_CLI_ATTRIBUTES", "attrs")
+	viper.BindEnv("attrs", "OTEL_CLI_ATTRIBUTES")
 }
 
 func initViperConfig() {
