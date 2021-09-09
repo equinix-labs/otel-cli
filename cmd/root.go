@@ -59,7 +59,6 @@ func Execute() {
 }
 
 func init() {
-
 	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
@@ -80,7 +79,7 @@ func addCommonParams(cmd *cobra.Command) {
 	}
 
 	for config_key, env_value := range common_env_flags {
-		viper.BindPFlag(config_key, rootCmd.Flags().Lookup(config_key))
+		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))
 		viper.BindEnv(config_key, env_value)
 	}
 }
@@ -116,7 +115,7 @@ func addClientParams(cmd *cobra.Command) {
 		"no-tls-verify": "OTEL_CLI_NO_TLS_VERIFY",
 	}
 	for config_key, env_value := range client_env_flags {
-		viper.BindPFlag(config_key, rootCmd.Flags().Lookup(config_key))
+		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))
 		viper.BindEnv(config_key, env_value)
 	}
 }
@@ -133,7 +132,7 @@ func addSpanParams(cmd *cobra.Command) {
 		"kind":    "OTEL_CLI_TRACE_KIND",
 	}
 	for config_key, env_value := range span_env_flags {
-		viper.BindPFlag(config_key, rootCmd.Flags().Lookup(config_key))
+		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))
 		viper.BindEnv(config_key, env_value)
 	}
 }
@@ -165,4 +164,5 @@ func initViperConfig() {
 			cobra.CheckErr(err)
 		}
 	}
+	viper.Unmarshal(&config)
 }
