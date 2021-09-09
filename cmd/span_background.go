@@ -12,12 +12,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const spanBgSockfilename = "otel-cli-background.sock"
-const spanBgParentPollMs = 10 // check parent pid every 10ms
-
-var spanBgSockdir string
-var spanBgStarted time.Time // for measuring uptime
-
 // spanBgCmd represents the span background command
 var spanBgCmd = &cobra.Command{
 	Use:   "background",
@@ -43,8 +37,9 @@ timeout, (catchable) signals, or deliberate exit.
 }
 
 func init() {
-	// mark the time when the process started for putting uptime in attributes
-	spanBgStarted = time.Now()
+	// this used to be a global const but now it's in Config
+	// TODO: does it make sense to make this configurable? 10ms might be too frequent...
+	config.BackgroundParentPollMs = 10
 
 	spanCmd.AddCommand(spanBgCmd)
 	spanBgCmd.Flags().SortFlags = false
@@ -52,7 +47,7 @@ func init() {
 	// only necessary for adding events to the span. it should be fine to
 	// start a background span at the top of a script then let it fall off
 	// at the end to get an easy span
-	spanBgCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanBgCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 
 	addCommonParams(spanBgCmd)
 	addSpanParams(spanBgCmd)
@@ -62,7 +57,7 @@ func init() {
 // spanBgSockfile returns the full filename for the socket file under the
 // provided background socket directory provided by the user.
 func spanBgSockfile() string {
-	return path.Join(spanBgSockdir, spanBgSockfilename)
+	return path.Join(config.BackgroundSockdir, spanBgSockfilename)
 }
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
@@ -92,7 +87,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	ppid := os.Getppid()
 	go func() {
 		for {
-			time.Sleep(time.Duration(spanBgParentPollMs) * time.Millisecond)
+			time.Sleep(time.Duration(config.BackgroundParentPollMs) * time.Millisecond)
 
 			// check if the parent process has changed, exit when it does
 			cppid := os.Getppid()
@@ -122,10 +117,8 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 // spanBgEndEvent adds an event with the provided name, to the provided span
 // with uptime.milliseconds and timeout.seconds attributes.
 func spanBgEndEvent(name string, span trace.Span) {
-	uptime := time.Since(spanBgStarted)
 	attrs := trace.WithAttributes([]attribute.KeyValue{
-		{Key: attribute.Key("uptime.milliseconds"), Value: attribute.Int64Value(uptime.Milliseconds())},
-		{Key: attribute.Key("timeout.duration"), Value: attribute.StringValue(cliTimeout)},
+		{Key: attribute.Key("timeout.duration"), Value: attribute.StringValue(config.Timeout)},
 	}...)
 	span.AddEvent(name, attrs)
 }

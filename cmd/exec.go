@@ -44,16 +44,16 @@ func init() {
 func doExec(cmd *cobra.Command, args []string) {
 	ctx, shutdown := initTracer()
 	defer shutdown()
-	ctx = loadTraceparent(ctx, traceparentCarrierFile)
+	ctx = loadTraceparent(ctx, config.TraceparentCarrierFile)
 	tracer := otel.Tracer("otel-cli/exec")
 
 	// joining the string here is kinda gross... but should be fine
 	// there might be a better way in Cobra, maybe require passing it after a '--'?
 	commandString := strings.Join(args, " ")
 
-	kindOption := trace.WithSpanKind(otelSpanKind(spanKind))
-	ctx, span := tracer.Start(ctx, spanName, kindOption)
-	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
+	kindOption := trace.WithSpanKind(otelSpanKind(config.Kind))
+	ctx, span := tracer.Start(ctx, config.SpanName, kindOption)
+	span.SetAttributes(cliAttrsToOtel(config.Attributes)...) // applies CLI attributes to the span
 
 	// put the command in the attributes
 	span.SetAttributes(attribute.KeyValue{
@@ -71,7 +71,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	// pass the existing env but add the latest TRACEPARENT carrier so e.g.
 	// otel-cli exec 'otel-cli exec sleep 1' will relate the spans automatically
 	child.Env = os.Environ()
-	if !traceparentIgnoreEnv {
+	if !config.TraceparentIgnoreEnv {
 		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", getTraceparent(ctx)))
 	}
 

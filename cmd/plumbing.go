@@ -11,7 +11,6 @@ import (
 
 	"go.opentelemetry.io/otel"
 	otlpgrpc "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	stdout "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -29,11 +28,11 @@ func initTracer() (context.Context, func()) {
 	// when no endpoint is set, do not set up plumbing. everything will still
 	// run but in non-recording mode, and otel-cli is effectively disabled
 	// and will not time out trying to connect out
-	if otlpEndpoint == "" {
+	if config.Endpoint == "" {
 		return ctx, func() {}
 	}
 
-	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(otlpEndpoint)}
+	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(config.Endpoint)}
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
 	if timeout := parseCliTimeout(); timeout > 0 {
@@ -45,29 +44,29 @@ func initTracer() (context.Context, func()) {
 	// have any encryption available, or setting it up raises the bar of entry too high.
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	if otlpInsecure || isLoopbackAddr(otlpEndpoint) {
+	if config.Insecure || isLoopbackAddr(config.Endpoint) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else {
-		var config *tls.Config
-		if noTlsVerify {
-			config = &tls.Config{
+		var tlsConfig *tls.Config
+		if config.NoTlsVerify {
+			tlsConfig = &tls.Config{
 				InsecureSkipVerify: true,
 			}
 		}
-		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(config))))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(otlpHeaders) > 0 {
+	if len(config.Headers) > 0 {
 		// fortunately WithHeaders can accept the string map as-is
-		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(otlpHeaders))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(config.Headers))
 	}
 
 	// OTLP examples usually show this with the grpc.WithBlock() dial option to
 	// make the connection synchronous, but it's not the right default for cli
 	// instead, rely on the shutdown methods to make sure everything is flushed
 	// by the time the program exits.
-	if otlpBlocking {
+	if config.Blocking {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
 	}
 
@@ -77,17 +76,8 @@ func initTracer() (context.Context, func()) {
 		log.Fatalf("failed to configure OTLP exporter: %s", err)
 	}
 
-	// when in test mode, let the otlp exporter setup happen, then overwrite it
-	// with the stdout exporter so spans only go to stdout
-	if testMode {
-		exporter, err = stdout.New()
-		if err != nil {
-			log.Fatalf("failed to configure stdout exporter in --test mode: %s", err)
-		}
-	}
-
 	// set the service name that will show up in tracing UIs
-	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(serviceName))
+	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName))
 	res, err := resource.New(ctx, resAttrs)
 	if err != nil {
 		log.Fatalf("failed to create OpenTelemetry service name resource: %s", err)
