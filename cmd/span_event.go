@@ -8,8 +8,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var spanEventName, spanEventTime string
-
 // spanEventCmd represents the span event command
 var spanEventCmd = &cobra.Command{
 	Use:   "event",
@@ -33,20 +31,20 @@ func init() {
 	spanCmd.AddCommand(spanEventCmd)
 	spanEventCmd.Flags().SortFlags = false
 
-	spanEventCmd.Flags().StringVarP(&spanEventName, "name", "e", "todo-generate-default-event-names", "set the name of the event")
-	spanEventCmd.Flags().StringVarP(&spanEventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
-	spanEventCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanEventCmd.Flags().StringVarP(&config.EventName, "name", "e", "todo-generate-default-event-names", "set the name of the event")
+	spanEventCmd.Flags().StringVarP(&config.EventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
+	spanEventCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 	spanEventCmd.MarkFlagRequired("sockdir")
 
 	addAttrParams(spanEventCmd)
 }
 
 func doSpanEvent(cmd *cobra.Command, args []string) {
-	timestamp := parseTime(spanEventTime, "event")
+	timestamp := parseTime(config.EventTime, "event")
 	rpcArgs := BgSpanEvent{
-		Name:       spanEventName,
+		Name:       config.EventName,
 		Timestamp:  timestamp.Format(time.RFC3339Nano),
-		Attributes: spanAttrs,
+		Attributes: config.Attributes,
 	}
 
 	res := BgSpan{}

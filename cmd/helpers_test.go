@@ -168,9 +168,11 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	// TODO: should this noop the tracing backend?
 
 	// set package globals to a known state
-	traceparentCarrierFile = ""
-	traceparentPrint = false
-	traceparentPrintExport = false
+	config = Config{
+		TraceparentCarrierFile: "",
+		TraceparentPrint:       false,
+		TraceparentPrintExport: false,
+	}
 
 	tp := "00-3433d5ae39bdfee397f44be5146867b3-8a5518f1e5c54d0a-01"
 	tid := "3433d5ae39bdfee397f44be5146867b3"
@@ -187,8 +189,8 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 		t.Errorf("nothing was supposed to be written but %d bytes were", buf.Len())
 	}
 
-	traceparentPrint = true
-	traceparentPrintExport = true
+	config.TraceparentPrint = true
+	config.TraceparentPrintExport = true
 	buf = new(bytes.Buffer)
 	printSpanData(buf, tid, sid, tp)
 	if buf.Len() == 0 {
@@ -230,12 +232,12 @@ func TestParseCliTime(t *testing.T) {
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
-			cliTimeout = testcase.input
+			config = Config{Timeout: testcase.input}
 			got := parseCliTimeout()
 			if got != testcase.expected {
 				ed := testcase.expected.String()
 				gd := got.String()
-				t.Errorf("duration string %q was expected to return %s but returned %s", cliTimeout, ed, gd)
+				t.Errorf("duration string %q was expected to return %s but returned %s", config.Timeout, ed, gd)
 			}
 		})
 	}
