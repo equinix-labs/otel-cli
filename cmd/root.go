@@ -30,6 +30,7 @@ type Config struct {
 
 	BackgroundParentPollMs int    `json:"background_parent_poll_ms"`
 	BackgroundSockdir      string `json:"background_socket_directory"`
+	BackgroundWait         bool   `json:"background_wait"`
 
 	SpanStartTime string `json:"span_start_time"`
 	SpanEndTime   string `json:"span_end_time"`
