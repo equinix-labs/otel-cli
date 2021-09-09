@@ -15,10 +15,9 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "start up otel and dump status, optionally sending a canary span",
-	Long: `
+	Long: `This subcommand is still experimental and the output format is not yet frozen.
 Example:
 	otel-cli status
-	otel-cli status --canary
 `,
 	Run: doStatus,
 }
