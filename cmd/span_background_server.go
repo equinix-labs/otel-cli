@@ -58,6 +58,11 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	return nil
 }
 
+// Wait is a no-op RPC for validating the background server is up and running.
+func (bs BgSpan) Wait(in, reply *struct{}) error {
+	return nil
+}
+
 // End takes a BgEnd (empty) struct, replies with the usual trace info, then
 // ends the span end exits the background process.
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
@@ -148,6 +153,7 @@ func (bgs *bgServer) Shutdown() {
 func createBgClient() (*rpc.Client, func()) {
 	sockfile := spanBgSockfile()
 	started := time.Now()
+	timeout := parseCliTimeout()
 
 	// wait for the socket file to show up, polling every 25ms until it does or timeout
 	for {
@@ -160,8 +166,7 @@ func createBgClient() (*rpc.Client, func()) {
 			break
 		}
 
-		to := parseCliTimeout()
-		if to > 0 && time.Since(started) > to {
+		if timeout > 0 && time.Since(started) > timeout {
 			log.Fatalf("timeout after %s while waiting for span background socket '%s' to appear", config.Timeout, sockfile)
 		}
 	}

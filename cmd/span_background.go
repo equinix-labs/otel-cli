@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"log"
 	"os"
 	"os/signal"
 	"path"
@@ -49,6 +50,8 @@ func init() {
 	// at the end to get an easy span
 	spanBgCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 
+	spanBgCmd.Flags().BoolVar(&config.BackgroundWait, "wait", false, "wait for background to be fully started and then return")
+
 	addCommonParams(spanBgCmd)
 	addSpanParams(spanBgCmd)
 	addClientParams(spanBgCmd)
@@ -61,6 +64,19 @@ func spanBgSockfile() string {
 }
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
+	// special case --wait, createBgClient() will wait for the socket to show up
+	// then connect and send a no-op RPC. by this time e.g. --tp-carrier should
+	// be all done and everything is ready to go without race conditions
+	if config.BackgroundWait {
+		client, shutdown := createBgClient()
+		defer shutdown()
+		err := client.Call("BgSpan.Wait", &struct{}{}, &struct{}{})
+		if err != nil {
+			log.Printf("error while waiting on span background: %s", err)
+		}
+		return
+	}
+
 	ctx, span, shutdown := startSpan() // from span.go
 	defer shutdown()
 
