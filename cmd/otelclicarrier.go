@@ -110,7 +110,6 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 
 	// silently fail if no traceparent was found
 	if tp == "" {
-		log.Printf("no tp found in file")
 		return ctx
 	}
 
