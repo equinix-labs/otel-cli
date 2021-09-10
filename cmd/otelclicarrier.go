@@ -3,7 +3,6 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -72,7 +71,7 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 				return ctx
 			}
 		}
-		log.Fatalf("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
+		softFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
 	}
 	return ctx
 }
@@ -87,7 +86,7 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 		// only fatal when the tp carrier file is required explicitly, otherwise
 		// just silently return the unmodified context
 		if config.TraceparentRequired {
-			log.Fatalf("could not open file '%s' for read: %s", filename, err)
+			softFail("could not open file '%s' for read: %s", filename, err)
 		} else {
 			return ctx
 		}
@@ -118,7 +117,7 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 	tp = strings.TrimPrefix(tp, "TRACEPARENT=")
 
 	if !checkTracecarrierRe.MatchString(tp) {
-		log.Printf("file '%s' was read but does not contain a valid traceparent", filename)
+		softLog("file '%s' was read but does not contain a valid traceparent", filename)
 		return ctx
 	}
 
@@ -137,7 +136,7 @@ func saveTraceparentToFile(ctx context.Context, filename string) {
 
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
-		log.Printf("failure opening file '%s' for write: %s", filename, err)
+		softLog("failure opening file '%s' for write: %s", filename, err)
 	}
 	defer file.Close()
 

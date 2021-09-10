@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
-	"log"
 	"net"
 	"net/url"
 	"regexp"
@@ -21,7 +20,6 @@ import (
 
 // initTracer sets up the OpenTelemetry plumbing so it's ready to use.
 // Returns a context and a func() that encapuslates clean shutdown.
-//
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
@@ -73,14 +71,14 @@ func initTracer() (context.Context, func()) {
 	var exporter sdktrace.SpanExporter // allows overwrite in --test mode
 	exporter, err := otlpgrpc.New(ctx, grpcOpts...)
 	if err != nil {
-		log.Fatalf("failed to configure OTLP exporter: %s", err)
+		softFail("failed to configure OTLP exporter: %s", err)
 	}
 
 	// set the service name that will show up in tracing UIs
 	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName))
 	res, err := resource.New(ctx, resAttrs)
 	if err != nil {
-		log.Fatalf("failed to create OpenTelemetry service name resource: %s", err)
+		softFail("failed to create OpenTelemetry service name resource: %s", err)
 	}
 
 	// SSP sends all completed spans to the exporter immediately and that is
@@ -104,12 +102,12 @@ func initTracer() (context.Context, func()) {
 	return ctx, func() {
 		err = tracerProvider.Shutdown(ctx)
 		if err != nil {
-			log.Fatalf("shutdown of OpenTelemetry tracerProvider failed: %s", err)
+			softFail("shutdown of OpenTelemetry tracerProvider failed: %s", err)
 		}
 
 		err = exporter.Shutdown(ctx)
 		if err != nil {
-			log.Fatalf("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
+			softFail("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
 		}
 	}
 }
@@ -132,16 +130,16 @@ func isLoopbackAddr(endpoint string) bool {
 	} else if uriRe.MatchString(endpoint) {
 		u, err := url.Parse(endpoint)
 		if err != nil {
-			log.Fatalf("error parsing provided URI '%s': %s", endpoint, err)
+			softFail("error parsing provided URI '%s': %s", endpoint, err)
 		}
 		hostname = u.Hostname()
 	} else {
-		log.Fatalf("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
+		softFail("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
 	}
 
 	ips, err := net.LookupIP(hostname)
 	if err != nil {
-		log.Fatalf("unable to look up hostname '%s': %s", hostname, err)
+		softFail("unable to look up hostname '%s': %s", hostname, err)
 	}
 
 	// all ips returned must be loopback to return true

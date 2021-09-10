@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -93,19 +94,19 @@ func parseTime(ts, which string) time.Time {
 
 	// none of the formats worked, print whatever errors are remaining
 	if uterr != nil {
-		log.Fatalf("Could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
+		softFail("Could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
 	}
 	if utnerr != nil || utnnerr != nil {
-		log.Fatalf("Could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
+		softFail("Could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
 	}
 	if rerr != nil {
-		log.Fatalf("Could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
+		softFail("Could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
 	}
 	if rnerr != nil {
-		log.Fatalf("Could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
+		softFail("Could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
 	}
 
-	log.Fatalf("Could not parse span %s time %q as any supported format", which, ts)
+	softFail("Could not parse span %s time %q as any supported format", which, ts)
 	return time.Now() // never happens, just here to make compiler happy
 }
 
@@ -180,7 +181,25 @@ func parseCliTimeout() time.Duration {
 	} else if secs, serr := strconv.ParseInt(config.Timeout, 10, 0); serr == nil {
 		return time.Second * time.Duration(secs)
 	} else {
-		log.Printf("unable to parse --timeout %q: %s", config.Timeout, err)
+		softLog("unable to parse --timeout %q: %s", config.Timeout, err)
 		return time.Duration(0)
 	}
+}
+
+// softLog only calls through to log if otel-cli was run with the --verbose flag.
+func softLog(format string, a ...interface{}) {
+	if !config.Verbose {
+		return
+	}
+	log.Printf(format, a...)
+}
+
+// softFail only calls through to log if otel-cli was run with the --verbose
+// flag, then immediately exits with status 0.
+func softFail(format string, a ...interface{}) {
+	if !config.Verbose {
+		return
+	}
+	log.Printf(format, a...)
+	os.Exit(0)
 }
