@@ -141,17 +141,14 @@ func GetExitCode() int {
 func propagateOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
 	saveTraceparentToFile(ctx, config.TraceparentCarrierFile)
 
-	// --tp-print / --tp-export
-	if !config.TraceparentPrint && !config.TraceparentPrintExport {
-		return
+	if config.TraceparentPrint {
+		sc := trace.SpanContextFromContext(ctx)
+		traceId := sc.TraceID().String()
+		spanId := sc.SpanID().String()
+
+		tp := getTraceparent(ctx)
+		printSpanData(target, traceId, spanId, tp)
 	}
-
-	sc := trace.SpanContextFromContext(ctx)
-	traceId := sc.TraceID().String()
-	spanId := sc.SpanID().String()
-
-	tp := getTraceparent(ctx)
-	printSpanData(target, traceId, spanId, tp)
 }
 
 // printSpanData takes the provided strings and prints them in a consitent format,
