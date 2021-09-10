@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -33,7 +32,7 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 	res := BgSpan{}
 	err := client.Call("BgSpan.End", rpcArgs, &res)
 	if err != nil {
-		log.Fatalf("error while calling background server rpc BgSpan.End: %s", err)
+		softFail("error while calling background server rpc BgSpan.End: %s", err)
 	}
 	shutdown()
 

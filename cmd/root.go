@@ -38,6 +38,7 @@ type Config struct {
 	EventTime     string `json:"event_time"`
 
 	CfgFile string `json:"config_file"`
+	Verbose bool   `json:"verbose"`
 }
 
 const defaultOtlpEndpoint = "localhost:4317"
@@ -73,10 +74,13 @@ func addCommonParams(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&config.Endpoint, "endpoint", "", "dial address for the desired OTLP/gRPC endpoint")
 	// --timeout a default timeout to use in all otel-cli operations (default 1s)
 	cmd.Flags().StringVar(&config.Timeout, "timeout", "1s", "timeout for otel-cli operations, all timeouts in otel-cli use this value")
+	// --verbose tells otel-cli to actually log errors to stderr instead of failing silently
+	cmd.Flags().BoolVar(&config.Verbose, "verbose", false, "print errors on failure instead of always being silent")
 
 	var common_env_flags = map[string]string{
 		"endpoint": "OTEL_EXPORTER_OTLP_ENDPOINT",
 		"timeout":  "OTEL_EXPORTER_OTLP_TIMEOUT",
+		"verbose":  "OTEL_CLI_VERBOSE",
 	}
 
 	for config_key, env_value := range common_env_flags {

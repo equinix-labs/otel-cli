@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -94,7 +93,7 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 
 	// TODO: be safer?
 	if err = os.RemoveAll(sockfile); err != nil {
-		log.Fatalf("failed while cleaning up for socket file '%s': %s", sockfile, err)
+		softFail("failed while cleaning up for socket file '%s': %s", sockfile, err)
 	}
 
 	bgspan := BgSpan{
@@ -108,7 +107,7 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 
 	bgs.listener, err = net.Listen("unix", sockfile)
 	if err != nil {
-		log.Fatalf("unable to listen on unix socket '%s': %s", sockfile, err)
+		softFail("unable to listen on unix socket '%s': %s", sockfile, err)
 	}
 
 	bgs.wg.Add(1) // cleanup will block until this is done
@@ -126,7 +125,7 @@ func (bgs *bgServer) Run() {
 			case <-bgs.quit: // quitting gracefully
 				return
 			default:
-				log.Fatalf("error while accepting connection: %s", err)
+				softFail("error while accepting connection: %s", err)
 			}
 		}
 
@@ -161,20 +160,20 @@ func createBgClient() (*rpc.Client, func()) {
 		if os.IsNotExist(err) {
 			time.Sleep(time.Millisecond * 25) // sleep 25ms between checks
 		} else if err != nil {
-			log.Fatalf("failed to stat file '%s': %s", sockfile, err)
+			softFail("failed to stat file '%s': %s", sockfile, err)
 		} else {
 			break
 		}
 
 		if timeout > 0 && time.Since(started) > timeout {
-			log.Fatalf("timeout after %s while waiting for span background socket '%s' to appear", config.Timeout, sockfile)
+			softFail("timeout after %s while waiting for span background socket '%s' to appear", config.Timeout, sockfile)
 		}
 	}
 
 	sock := net.UnixAddr{Name: sockfile, Net: "unix"}
 	conn, err := net.DialUnix(sock.Net, nil, &sock)
 	if err != nil {
-		log.Fatalf("unable to connect to span background server at '%s': %s", config.BackgroundSockdir, err)
+		softFail("unable to connect to span background server at '%s': %s", config.BackgroundSockdir, err)
 	}
 
 	return jsonrpc.NewClient(conn), func() { conn.Close() }

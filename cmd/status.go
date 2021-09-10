@@ -51,7 +51,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 				env[parts[0]] = parts[1]
 			}
 		} else {
-			log.Fatalf("BUG in otel-cli: this shouldn't happen")
+			softFail("BUG in otel-cli: this shouldn't happen")
 		}
 	}
 

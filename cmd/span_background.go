@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"path"
@@ -72,7 +71,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 		defer shutdown()
 		err := client.Call("BgSpan.Wait", &struct{}{}, &struct{}{})
 		if err != nil {
-			log.Printf("error while waiting on span background: %s", err)
+			softFail("error while waiting on span background: %s", err)
 		}
 		return
 	}
