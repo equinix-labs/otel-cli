@@ -22,6 +22,14 @@ Example:
 	Run: doStatus,
 }
 
+// StatusOutput captures all the data we want to print out for this subcommand
+// and is also is used in ../main_test.go for automated testing.
+type StatusOutput struct {
+	Config   Config            `json:"config"`
+	SpanData map[string]string `json:"span_data"`
+	Env      map[string]string `json:"env"`
+}
+
 func init() {
 	rootCmd.AddCommand(statusCmd)
 	addCommonParams(statusCmd)
@@ -56,11 +64,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	}
 
 	sc := trace.SpanContextFromContext(ctx)
-	outData := struct {
-		Config   Config            `json:"config"`
-		SpanData map[string]string `json:"span_data"`
-		Env      map[string]string `json:"env"`
-	}{
+	outData := StatusOutput{
 		Config: config,
 		SpanData: map[string]string{
 			"trace_id":    sc.TraceID().String(),
