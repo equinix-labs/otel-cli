@@ -49,17 +49,22 @@ func NewServer(cb Callback, stop Stopper) *Server {
 	return &s
 }
 
-// ServeGRPC creates a listener on otlpEndpoint and starts the GRPC server
-// on that listener. Blocks until stopped by sending a value to cs.stopper.
-func (cs *Server) ServeGPRC(endpoint string) {
-	listener, err := net.Listen("tcp", endpoint)
-	if err != nil {
-		log.Fatalf("failed to listen on %q: %s", endpoint, err)
-	}
-
+// ServeGRPC takes a listener and starts the GRPC server on that listener.
+// Blocks until Stop() is called.
+func (cs *Server) ServeGPRC(listener net.Listener) {
 	if err := cs.server.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
+}
+
+// ListenAndServeGRPC starts a TCP listener then starts the GRPC server using
+// ServeGRPC for you.
+func (cs *Server) ListenAndServeGPRC(otlpEndpoint string) {
+	listener, err := net.Listen("tcp", otlpEndpoint)
+	if err != nil {
+		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
+	}
+	cs.ServeGPRC(listener)
 }
 
 // Stop sends a value to the server shutdown goroutine so it stops GRPC
