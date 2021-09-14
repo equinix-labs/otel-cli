@@ -1,8 +1,7 @@
 {
-  "name": "no configuration at all",
-  "_comment": "otel-cli should not do anything when it is not explicitly configured",
+  "description": "otel-cli should not do anything when it is not explicitly configured",
   "spans_expected": 0,
-  "timeout": 0,
+  "timeout_ms": 0,
   "should_timeout": false,
   "config": {
     "env": {},
@@ -15,12 +14,8 @@
       "insecure": false,
       "service_name": "otel-cli"
     },
-    "_comment": "when unconfigured the test code will not receive a span and these will all be default values",
-    "span_data": {
-      "trace_id": "00000000000000000000000000000000",
-      "span_id": "0000000000000000",
-      "trace_flags": "00",
-      "is_sampled": "false"
+    "state": {
+      "is_recording": false
     }
   }
 }
