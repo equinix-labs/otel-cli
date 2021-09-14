@@ -47,12 +47,12 @@ type Config struct {
 // diagnosing issues with otel-cli. The only user-facing feature that should be
 // using these is otel-cli status.
 type Diagnostics struct {
-	IsRecording       bool  `json:"is_recording"`
-	ConfigFileLoaded  bool  `json:"config_file_loaded"`
-	NumArgs           int   `json:"number_of_args"`
-	DetectedLocalhost bool  `json:"detected_localhost"`
-	ParsedTimeoutMs   int64 `json:"parsed_timeout_ms"`
-	ContextErr        error `json:"context_error"`
+	IsRecording       bool   `json:"is_recording"`
+	ConfigFileLoaded  bool   `json:"config_file_loaded"`
+	NumArgs           int    `json:"number_of_args"`
+	DetectedLocalhost bool   `json:"detected_localhost"`
+	ParsedTimeoutMs   int64  `json:"parsed_timeout_ms"`
+	OtelError         string `json:"otel_error"`
 }
 
 const defaultOtlpEndpoint = "localhost:4317"
