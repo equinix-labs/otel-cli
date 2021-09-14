@@ -52,9 +52,9 @@ func init() {
 
 func doSpan(cmd *cobra.Command, args []string) {
 	ctx, span, shutdown := startSpan()
-	defer shutdown()
 	endSpan(span)
 	propagateOtelCliSpan(ctx, span, os.Stdout)
+	shutdown()
 }
 
 // startSpan processes the optional --start option, starts a span, and returns a

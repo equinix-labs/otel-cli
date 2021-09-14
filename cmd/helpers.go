@@ -169,18 +169,20 @@ func printSpanData(target io.Writer, traceId, spanId, tp string) {
 // When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
 // It logs an error and returns time.Duration(0) if the string is empty or unparseable.
 func parseCliTimeout() time.Duration {
+	var out time.Duration
 	if config.Timeout == "" {
-		return time.Duration(0)
-	}
-
-	if d, err := time.ParseDuration(config.Timeout); err == nil {
-		return d
+		out = time.Duration(0)
+	} else if d, err := time.ParseDuration(config.Timeout); err == nil {
+		out = d
 	} else if secs, serr := strconv.ParseInt(config.Timeout, 10, 0); serr == nil {
-		return time.Second * time.Duration(secs)
+		out = time.Second * time.Duration(secs)
 	} else {
 		softLog("unable to parse --timeout %q: %s", config.Timeout, err)
-		return time.Duration(0)
+		out = time.Duration(0)
 	}
+
+	diagnostics.ParsedTimeoutMs = out.Milliseconds()
+	return out
 }
 
 // softLog only calls through to log if otel-cli was run with the --verbose flag.

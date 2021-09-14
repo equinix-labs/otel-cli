@@ -151,5 +151,6 @@ func isLoopbackAddr(endpoint string) bool {
 		}
 	}
 
+	diagnostics.DetectedLocalhost = allAreLoopback
 	return allAreLoopback
 }

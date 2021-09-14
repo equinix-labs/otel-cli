@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,11 +43,24 @@ type Config struct {
 	Verbose bool   `json:"verbose"`
 }
 
+// Diagnostics is a place to put things that are useful for testing and
+// diagnosing issues with otel-cli. The only user-facing feature that should be
+// using these is otel-cli status.
+type Diagnostics struct {
+	IsRecording       bool  `json:"is_recording"`
+	ConfigFileLoaded  bool  `json:"config_file_loaded"`
+	NumArgs           int   `json:"number_of_args"`
+	DetectedLocalhost bool  `json:"detected_localhost"`
+	ParsedTimeoutMs   int64 `json:"parsed_timeout_ms"`
+	ContextErr        error `json:"context_error"`
+}
+
 const defaultOtlpEndpoint = "localhost:4317"
 const spanBgSockfilename = "otel-cli-background.sock"
 
 var exitCode int
 var config Config
+var diagnostics Diagnostics
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -64,6 +79,7 @@ func init() {
 	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
+	diagnostics.NumArgs = len(os.Args) - 1
 }
 
 // addCommonParams adds the --config and --endpoint params to the command.
@@ -168,6 +184,8 @@ func initViperConfig() {
 		if config.CfgFile != "" || !cfgNotFound {
 			cobra.CheckErr(err)
 		}
+	} else {
+		diagnostics.ConfigFileLoaded = true
 	}
 	viper.Unmarshal(&config)
 }
