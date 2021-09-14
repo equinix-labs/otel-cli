@@ -23,6 +23,8 @@ import (
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
+	otel.SetErrorHandler(diagnostics)
+
 	// when no endpoint is set, do not set up plumbing. everything will still
 	// run but in non-recording mode, and otel-cli is effectively disabled
 	// and will not time out trying to connect out
@@ -153,4 +155,15 @@ func isLoopbackAddr(endpoint string) bool {
 
 	diagnostics.DetectedLocalhost = allAreLoopback
 	return allAreLoopback
+}
+
+// Handle is tacked onto the Diagnostics struct to comply with the otel error
+// handler interface to capture errors both for diagnostics and to make sure
+// the error output goes through softLog so it doesn't pollute output of caller
+// scripts.
+// Does not actually use the Diagnostics handle passed to it, but instead
+// writes to the global handle so the error is captured for status output.
+func (Diagnostics) Handle(err error) {
+	diagnostics.OtelError = err.Error() // write to the global
+	softLog("OpenTelemetry error: %s", err)
 }
