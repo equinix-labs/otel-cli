@@ -39,6 +39,7 @@ func init() {
 
 func doStatus(cmd *cobra.Command, args []string) {
 	ctx, shutdown := initTracer()
+	defer shutdown()
 
 	// TODO: this always canaries as it is, gotta find the right flags
 	// to try to stall sending at the end so as much as possible of the otel
@@ -68,7 +69,6 @@ func doStatus(cmd *cobra.Command, args []string) {
 	// otel before moving on to print things
 	sc := trace.SpanContextFromContext(ctx)
 	span.End()
-	shutdown()
 
 	outData := StatusOutput{
 		Config: config,
