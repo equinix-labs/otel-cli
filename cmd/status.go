@@ -44,7 +44,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	// to try to stall sending at the end so as much as possible of the otel
 	// code still executes
 	tracer := otel.Tracer("otel-cli/status")
-	ctx, span := tracer.Start(ctx, "dump state")
+	ctx, span := tracer.Start(ctx, "otel-cli status")
 	diagnostics.IsRecording = span.IsRecording()
 
 	env := make(map[string]string)
