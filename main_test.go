@@ -34,13 +34,13 @@ type FixtureConfig struct {
 
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
-	Description   string           `json:"description"`
-	Filename      string           `json:"-"`
-	Config        FixtureConfig    `json:"config"`
-	Expect        cmd.StatusOutput `json:"expect"`
-	SpansExpected int              `json:"spans_expected"`
-	TimeoutMs     int              `json:"timeout_ms"`
-	ShouldTimeout bool             `json:"should_timeout"` // otel connection stub->cli should fail
+	Description     string           `json:"description"`
+	Filename        string           `json:"-"`
+	Config          FixtureConfig    `json:"config"`
+	Expect          cmd.StatusOutput `json:"expect"`
+	SpansExpected   int              `json:"spans_expected"`
+	ServerTimeoutMs int              `json:"server_timeout_ms"`
+	ShouldTimeout   bool             `json:"should_timeout"` // otel connection stub->cli should fail
 }
 
 func TestMain(m *testing.M) {
@@ -169,12 +169,14 @@ func checkData(t *testing.T, fixture Fixture, status cmd.StatusOutput, span otlp
 // all failures are fatal, no point in testing if this is broken
 func runOtelCli(t *testing.T, fixture Fixture) (cmd.StatusOutput, otlpserver.CliEvent, otlpserver.CliEventList) {
 	// only supports 0 or 1 spans, which is fine for these tests
-	rcvSpan := make(chan otlpserver.CliEvent)
-	rcvEvents := make(chan otlpserver.CliEventList)
+	// these channels need to be buffered or the callback will hang trying to send while
+	// the main goroutine here is still running and waiting on otel-cli
+	rcvSpan := make(chan otlpserver.CliEvent, 1)
+	rcvEvents := make(chan otlpserver.CliEventList, 1)
 	cb := func(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
 		rcvSpan <- span
 		rcvEvents <- events
-		return false
+		return true // tell the server we're done and it can exit its loop
 	}
 
 	// TODO: find a way to do random ports?
@@ -186,6 +188,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (cmd.StatusOutput, otlpserver.Cli
 	t.Logf("starting OTLP server on %q", otlpEndpoint)
 	go func() {
 		cs.ServeGPRC(listener) // TODO: generate this with random port value instead
+		// ^^ or maybe just start at 50000 and iterate port each test to avoid port binding errors
 	}()
 
 	// TODO: figure out the best way to build the binary and detect if the build is stale
@@ -193,10 +196,17 @@ func runOtelCli(t *testing.T, fixture Fixture) (cmd.StatusOutput, otlpserver.Cli
 	// TODO: also be able to pass args to otel-cli
 	// TODO: also need to test other subcommands
 	// TODO: does that imply all otel-cli commands should be able to dump status? e.g. otel-cli span --status
-	statusCmd := exec.Command("./otel-cli", "status")
+	args := []string{"status"}
+	if len(fixture.Config.CliArgs) > 0 {
+		args = append(args, fixture.Config.CliArgs...)
+	}
+	statusCmd := exec.Command("./otel-cli", args...)
 	statusCmd.Env = mkEnviron(fixture.Config.Env)
-	statusOut, err := statusCmd.Output()
+	// grab stderr & stdout comingled so that if otel-cli prints anything to either it's not
+	// supposed to it will cause e.g. status json parsing and other tests to fail
+	statusOut, err := statusCmd.CombinedOutput()
 	if err != nil {
+		t.Log(string(statusOut))
 		wd, _ := os.Getwd()
 		t.Fatalf("Executing 'env -i %s %s/otel-cli failed: %s", strings.Join(statusCmd.Env, " "), wd, err)
 	}

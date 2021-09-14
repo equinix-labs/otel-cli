@@ -1,22 +1,21 @@
 {
   "description": "setting minimum envvars should result in a span being received",
   "spans_expected": 1,
-  "timeout_ms": 1000,
+  "server_timeout_ms": 1000,
   "should_timeout": false,
   "config": {
     "env": {
-      "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
-      "OTEL_EXPORTER_OTLP_INSECURE": "true"
+      "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
     },
-    "args": []
+    "cli_args": []
   },
   "expect": {
     "env": {
-      "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
-      "OTEL_EXPORTER_OTLP_INSECURE": "true"
+      "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
     },
     "config": {
-      "endpoint": "",
+      "endpoint": "{{endpoint}}",
+      "comment": "otel-cli should not set insecure when it auto-detects localhost",
       "insecure": false,
       "service_name": "otel-cli"
     },
@@ -28,6 +27,7 @@
       "is_recording": true,
       "number_of_args": 1,
       "parsed_timeout_ms": 1000,
+      "detected_localhost": true,
       "otel_error": ""
     }
   }
