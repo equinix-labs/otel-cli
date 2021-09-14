@@ -17,7 +17,7 @@ type Diagnostics struct {
 // global diagnostics handle, written to from all over otel-cli
 var diagnostics Diagnostics
 
-// Handle is complies with the otel error handler interface to capture errors
+// Handle complies with the otel error handler interface to capture errors
 // both for diagnostics and to make sure the error output goes through softLog
 // so it doesn't pollute output of caller scripts.
 // hack: ignores the Diagnostics assigned to it and writes to the global
