@@ -2,6 +2,9 @@ package cmd
 
 import "strconv"
 
+// global diagnostics handle, written to from all over otel-cli
+var diagnostics Diagnostics
+
 // Diagnostics is a place to put things that are useful for testing and
 // diagnosing issues with otel-cli. The only user-facing feature that should be
 // using these is otel-cli status.
@@ -12,10 +15,8 @@ type Diagnostics struct {
 	DetectedLocalhost bool   `json:"detected_localhost"`
 	ParsedTimeoutMs   int64  `json:"parsed_timeout_ms"`
 	OtelError         string `json:"otel_error"`
+	ExecExitCode      int    `json:"exec_exit_code"`
 }
-
-// global diagnostics handle, written to from all over otel-cli
-var diagnostics Diagnostics
 
 // Handle complies with the otel error handler interface to capture errors
 // both for diagnostics and to make sure the error output goes through softLog
@@ -36,4 +37,10 @@ func (d *Diagnostics) ToStringMap() map[string]string {
 		"parsed_timeout_ms":  strconv.FormatInt(d.ParsedTimeoutMs, 10),
 		"otel_error":         d.OtelError,
 	}
+}
+
+// GetExitCode() is a helper for Cobra to retrieve the exit code, mainly
+// used by exec to make otel-cli return the child program's exit code.
+func GetExitCode() int {
+	return diagnostics.ExecExitCode
 }
