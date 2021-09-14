@@ -108,6 +108,13 @@ func checkData(t *testing.T, fixture Fixture, status cmd.StatusOutput, span otlp
 		t.Errorf("env data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
 	}
 
+	// check diagnostics, use string maps so the diff output is easy to compare to json
+	wantDiag := fixture.Expect.Diagnostics.ToStringMap()
+	gotDiag := status.Diagnostics.ToStringMap()
+	if diff := cmp.Diff(wantDiag, gotDiag); diff != "" {
+		t.Errorf("diagnostic data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+	}
+
 	// TODO: this needs might need a revamp of config defaults to move them from Cobra
 	// to a version of the Config struct with the defaults so they can be checked
 	//if diff := cmp.Diff(fixture.Expect.Config, status.Config); diff != "" {
@@ -115,7 +122,7 @@ func checkData(t *testing.T, fixture Fixture, status cmd.StatusOutput, span otlp
 	//}
 
 	// check the expected span data against what was received by the OTLP server
-	gotSpan := span.ToMap()
+	gotSpan := span.ToStringMap()
 	// remove keys that aren't supported for comparison (for now)
 	delete(gotSpan, "is_populated")
 	delete(gotSpan, "library")
@@ -174,8 +181,9 @@ func runOtelCli(t *testing.T, fixture Fixture) (cmd.StatusOutput, otlpserver.Cli
 	cs := otlpserver.NewServer(cb, func(*otlpserver.Server) {})
 	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
-		t.Fatalf("failed to listen on OTLP endpoint %q: %s", "localhost:7777", err)
+		t.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
 	}
+	t.Logf("starting OTLP server on %q", otlpEndpoint)
 	go func() {
 		cs.ServeGPRC(listener) // TODO: generate this with random port value instead
 	}()

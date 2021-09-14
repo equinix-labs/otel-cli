@@ -24,8 +24,11 @@
       "trace_id": "*",
       "span_id": "*"
     },
-    "state": {
-      "is_recording": false
+    "diagnostics": {
+      "is_recording": true,
+      "number_of_args": 1,
+      "parsed_timeout_ms": 1000,
+      "otel_error": ""
     }
   }
 }

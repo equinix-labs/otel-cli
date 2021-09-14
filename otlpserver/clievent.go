@@ -30,8 +30,8 @@ type CliEvent struct {
 	IsPopulated bool `json:"has_been_modified"`
 }
 
-// ToMap flattens a CliEvent into a map[string]string. Mainly for passing to cmp.Diff.
-func (ce CliEvent) ToMap() map[string]string {
+// ToStringMap flattens a CliEvent into a string map for testing.
+func (ce CliEvent) ToStringMap() map[string]string {
 	// flatten attributes into "k=v,k=v" style string
 	var attrs string
 	keys := make([]string, len(ce.Attributes)) // for sorting

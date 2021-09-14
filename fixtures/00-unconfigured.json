@@ -14,8 +14,10 @@
       "insecure": false,
       "service_name": "otel-cli"
     },
-    "state": {
-      "is_recording": false
+    "diagnostics": {
+      "is_recording": false,
+      "number_of_args": 1,
+      "otel_error": ""
     }
   }
 }
