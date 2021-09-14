@@ -28,7 +28,7 @@ type StatusOutput struct {
 	Config      Config            `json:"config"`
 	SpanData    map[string]string `json:"span_data"`
 	Env         map[string]string `json:"env"`
-	Diagnostics Diagnostics       `json:"state"`
+	Diagnostics Diagnostics       `json:"diagnostics"`
 }
 
 func init() {
