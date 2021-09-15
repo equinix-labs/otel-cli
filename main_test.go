@@ -111,6 +111,8 @@ func TestOtelCli(t *testing.T) {
 	}
 }
 
+// checkOutput looks that otel-cli output stored in the results and compares against
+// the fixture expectation (with {{endpoint}} replaced).
 func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results) {
 	wantOutput := strings.ReplaceAll(fixture.Expect.CliOutput, "{{endpoint}}", endpoint)
 	if diff := cmp.Diff(wantOutput, results.CliOutput); diff != "" {
@@ -118,6 +120,8 @@ func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results
 	}
 }
 
+// checkStatusData compares the sections of otel-cli status output against
+// fixture data, substituting {{endpoint}} into fixture data as needed.
 func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Results) {
 	// check the env
 	injectEndpoint(endpoint, fixture.Expect.Env)
@@ -147,8 +151,8 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	}
 }
 
-// checkData takes the data returned from otel-cli status and compares it to the
-// fixture data and fails the tests if anything doesn't match.
+// checkSpanData compares the data in spans received from otel-cli against the
+// fixture data.
 func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserver.CliEvent, events otlpserver.CliEventList) {
 	// check the expected span data against what was received by the OTLP server
 	gotSpan := span.ToStringMap()
