@@ -272,7 +272,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	return endpoint, results, retSpan, retEvents
 }
 
-// mkEnviron converts a string map to a list of k=v strings.
+// mkEnviron converts a string map to a list of k=v strings and tacks on PATH.
 func mkEnviron(endpoint string, env map[string]string) []string {
 	mapped := make([]string, len(env)+1)
 	var i int
