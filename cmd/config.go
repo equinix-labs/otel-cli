@@ -1,5 +1,7 @@
 package cmd
 
+import "strconv"
+
 // global config used by all of otel-cli
 var config Config
 
@@ -39,4 +41,35 @@ type Config struct {
 
 	CfgFile string `json:"config_file"`
 	Verbose bool   `json:"verbose"`
+}
+
+// ToStringMap flattens the configuration into a stringmap that is easy to work
+// with in tests especially with cmp.Diff. See test_main.go.
+func (c Config) ToStringMap() map[string]string {
+	return map[string]string{
+		"endpoint":                    c.Endpoint,
+		"timeout":                     c.Timeout,
+		"headers":                     flattenStringMap(c.Headers, "{}"),
+		"insecure":                    strconv.FormatBool(c.Insecure),
+		"blocking":                    strconv.FormatBool(c.Blocking),
+		"no_tls_verify":               strconv.FormatBool(c.NoTlsVerify),
+		"service_name":                c.ServiceName,
+		"span_name":                   c.SpanName,
+		"span_kind":                   c.Kind,
+		"span_attributes":             flattenStringMap(c.Attributes, "{}"),
+		"traceparent_carrier_file":    c.TraceparentCarrierFile,
+		"traceparent_ignore_env":      strconv.FormatBool(c.TraceparentIgnoreEnv),
+		"traceparent_print":           strconv.FormatBool(c.TraceparentPrint),
+		"traceparent_print_export":    strconv.FormatBool(c.TraceparentPrintExport),
+		"traceparent_required":        strconv.FormatBool(c.TraceparentRequired),
+		"background_parent_poll_ms":   strconv.Itoa(c.BackgroundParentPollMs),
+		"background_socket_directory": c.BackgroundSockdir,
+		"background_wait":             strconv.FormatBool(c.BackgroundWait),
+		"span_start_time":             c.SpanStartTime,
+		"span_end_time":               c.SpanEndTime,
+		"event_name":                  c.EventName,
+		"event_time":                  c.EventTime,
+		"config_file":                 c.CfgFile,
+		"verbose":                     strconv.FormatBool(c.Verbose),
+	}
 }
