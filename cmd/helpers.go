@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -195,4 +196,32 @@ func softFail(format string, a ...interface{}) {
 	}
 	log.Printf(format, a...)
 	os.Exit(0)
+}
+
+// flattenStringMap takes a string map and returns it flattened into a string with
+// keys sorted lexically so it should be mostly consistent enough for comparisons
+// and printing. Output is k=v,k=v style like attributes input.
+func flattenStringMap(mp map[string]string, emptyValue string) string {
+	if len(mp) == 0 {
+		return emptyValue
+	}
+
+	var out string
+	keys := make([]string, len(mp)) // for sorting
+	var i int
+	for k := range mp {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+
+	for i, k := range keys {
+		out = out + k + "=" + mp[k]
+		if i == len(keys)-1 {
+			break
+		}
+		out = out + ","
+	}
+
+	return out
 }
