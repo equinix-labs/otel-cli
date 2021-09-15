@@ -201,7 +201,6 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 
 // runOtelCli runs the a server and otel-cli together and captures their
 // output as data to return for further testing.
-// all failures are fatal, no point in testing if this is broken
 func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
 	var results Results
 	var retSpan otlpserver.CliEvent
