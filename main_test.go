@@ -126,16 +126,16 @@ func checkData(t *testing.T, fixture Fixture, endpoint string, status cmd.Status
 	// remove keys that aren't supported for comparison (for now)
 	delete(gotSpan, "is_populated")
 	delete(gotSpan, "library")
-	delete(gotSpan, "attributes")   // TODO: this one is kinda important to add back, eventually
 	wantSpan := map[string]string{} // to be passed to cmp.Diff
 	for what, re := range map[string]*regexp.Regexp{
-		"trace_id": regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
-		"span_id":  regexp.MustCompile(`^[0-9a-fA-F]{16}$`),
-		"name":     regexp.MustCompile(`^\w+$`),
-		"parent":   regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
-		"kind":     regexp.MustCompile(`^\w+$`), // TODO: can validate more here
-		"start":    regexp.MustCompile(`^\d+$`),
-		"end":      regexp.MustCompile(`^\d+$`),
+		"trace_id":   regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
+		"span_id":    regexp.MustCompile(`^[0-9a-fA-F]{16}$`),
+		"name":       regexp.MustCompile(`^\w+$`),
+		"parent":     regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
+		"kind":       regexp.MustCompile(`^\w+$`), // TODO: can validate more here
+		"start":      regexp.MustCompile(`^\d+$`),
+		"end":        regexp.MustCompile(`^\d+$`),
+		"attributes": regexp.MustCompile(`\w+=.+`), // not great but should validate at least one k=v
 	} {
 		// ignore anything not asked for in the fixture by deleting it from the gotSpan
 		if _, ok := fixture.Expect.SpanData[what]; !ok {
