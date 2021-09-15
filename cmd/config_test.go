@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -18,8 +17,8 @@ func TestConfig_ToStringMap(t *testing.T) {
 		t.Fail()
 	}
 
-	if !strings.Contains(fsm["headers"], "123test=deadbeefcafe") {
-		t.Errorf("expected attribute not found in flattened string map: %q", fsm)
+	if fsm["headers"] != "123test=deadbeefcafe" {
+		t.Errorf("expected header value not found in flattened string map: %q", fsm)
 		t.Fail()
 	}
 }
