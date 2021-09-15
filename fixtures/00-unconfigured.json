@@ -5,7 +5,7 @@
   "should_timeout": false,
   "config": {
     "env": {},
-    "cli_args": []
+    "cli_args": ["status"]
   },
   "expect": {
     "env": {},

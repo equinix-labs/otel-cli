@@ -7,7 +7,7 @@
     "env": {
       "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
     },
-    "cli_args": []
+    "cli_args": ["status"]
   },
   "expect": {
     "env": {

@@ -27,15 +27,21 @@ type FixtureConfig struct {
 	Env     map[string]string
 }
 
+// mostly mirrors cmd.StatusOutput but we need more
+type Results struct {
+	cmd.StatusOutput
+	CliOutput string `json:"output"`
+}
+
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
-	Description     string           `json:"description"`
-	Filename        string           `json:"-"`
-	Config          FixtureConfig    `json:"config"`
-	Expect          cmd.StatusOutput `json:"expect"`
-	SpansExpected   int              `json:"spans_expected"`
-	ServerTimeoutMs int              `json:"server_timeout_ms"`
-	ShouldTimeout   bool             `json:"should_timeout"` // otel connection stub->cli should fail
+	Description     string        `json:"description"`
+	Filename        string        `json:"-"`
+	Config          FixtureConfig `json:"config"`
+	Expect          Results       `json:"expect"`
+	SpansExpected   int           `json:"spans_expected"`
+	ServerTimeoutMs int           `json:"server_timeout_ms"`
+	ShouldTimeout   bool          `json:"should_timeout"` // otel connection stub->cli should fail
 }
 
 func TestMain(m *testing.M) {
@@ -90,36 +96,60 @@ func TestOtelCli(t *testing.T) {
 
 	// run all the fixtures, check the results
 	for _, fixture := range fixtures {
-		endpoint, status, span, events := runOtelCli(t, fixture)
-		checkData(t, fixture, endpoint, status, span, events)
+		endpoint, results, span, events := runOtelCli(t, fixture)
+
+		checkSpanData(t, fixture, endpoint, span, events)
+
+		// many of the basic plumbing tests use status so it has its own set of checks
+		// but these shouldn't run for testing the other subcommands
+		if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" {
+			checkStatusData(t, fixture, endpoint, results)
+		} else {
+			// checking the text output only makes sense for non-status paths
+			checkOutput(t, fixture, endpoint, results)
+		}
 	}
 }
 
-// checkData takes the data returned from otel-cli status and compares it to the
-// fixture data and fails the tests if anything doesn't match.
-func checkData(t *testing.T, fixture Fixture, endpoint string, status cmd.StatusOutput, span otlpserver.CliEvent, events otlpserver.CliEventList) {
+func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results) {
+	wantOutput := strings.ReplaceAll(fixture.Expect.CliOutput, "{{endpoint}}", endpoint)
+	if diff := cmp.Diff(wantOutput, results.CliOutput); diff != "" {
+		t.Errorf("otel-cli output did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+	}
+}
+
+func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Results) {
 	// check the env
 	injectEndpoint(endpoint, fixture.Expect.Env)
-	if diff := cmp.Diff(fixture.Expect.Env, status.Env); diff != "" {
+	if diff := cmp.Diff(fixture.Expect.Env, results.Env); diff != "" {
 		t.Errorf("env data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
 	}
 
 	// check diagnostics, use string maps so the diff output is easy to compare to json
 	wantDiag := fixture.Expect.Diagnostics.ToStringMap()
-	gotDiag := status.Diagnostics.ToStringMap()
+	gotDiag := results.Diagnostics.ToStringMap()
 	injectEndpoint(endpoint, wantDiag)
+	// there's almost always going to be cli_args in practice, so if the fixture has
+	// an empty string, just ignore that key
+	if wantDiag["cli_args"] == "" {
+		gotDiag["cli_args"] = ""
+	}
 	if diff := cmp.Diff(wantDiag, gotDiag); diff != "" {
 		t.Errorf("diagnostic data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
 	}
 
 	// check the configuration
 	wantConf := fixture.Expect.Config.ToStringMap()
-	gotConf := status.Config.ToStringMap()
+	gotConf := results.Config.ToStringMap()
 	injectEndpoint(endpoint, wantConf)
 	if diff := cmp.Diff(wantConf, gotConf); diff != "" {
 		t.Errorf("config data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
 	}
+}
 
+// checkData takes the data returned from otel-cli status and compares it to the
+// fixture data and fails the tests if anything doesn't match.
+func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserver.CliEvent, events otlpserver.CliEventList) {
 	// check the expected span data against what was received by the OTLP server
 	gotSpan := span.ToStringMap()
 	injectEndpoint(endpoint, gotSpan)
@@ -168,7 +198,11 @@ func checkData(t *testing.T, fixture Fixture, endpoint string, status cmd.Status
 // runOtelCli runs the a server and otel-cli together and captures their
 // output as data to return for further testing.
 // all failures are fatal, no point in testing if this is broken
-func runOtelCli(t *testing.T, fixture Fixture) (string, cmd.StatusOutput, otlpserver.CliEvent, otlpserver.CliEventList) {
+func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
+	results := Results{}
+	var retSpan otlpserver.CliEvent
+	var retEvents otlpserver.CliEventList
+
 	// only supports 0 or 1 spans, which is fine for these tests
 	// these channels need to be buffered or the callback will hang trying to send while
 	// the main goroutine here is still running and waiting on otel-cli
@@ -193,10 +227,8 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, cmd.StatusOutput, otlpse
 
 	// TODO: figure out the best way to build the binary and detect if the build is stale
 	// ^^ probably doesn't matter much in CI, can auto-build, but for local workflow it matters
-	// TODO: also be able to pass args to otel-cli
-	// TODO: also need to test other subcommands
-	// TODO: does that imply all otel-cli commands should be able to dump status? e.g. otel-cli span --status
-	args := []string{"status"}
+	// TODO: should all otel-cli commands be able to dump status? e.g. otel-cli span --status
+	args := []string{}
 	if len(fixture.Config.CliArgs) > 0 {
 		for _, v := range fixture.Config.CliArgs {
 			args = append(args, strings.ReplaceAll(v, "{{endpoint}}", endpoint))
@@ -207,29 +239,29 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, cmd.StatusOutput, otlpse
 	// grab stderr & stdout comingled so that if otel-cli prints anything to either it's not
 	// supposed to it will cause e.g. status json parsing and other tests to fail
 	t.Logf("going to exec 'env -i %s ./otel-cli", strings.Join(statusCmd.Env, " "))
-	statusOut, err := statusCmd.CombinedOutput()
+	cliOut, err := statusCmd.CombinedOutput()
+	results.CliOutput = string(cliOut)
 	if err != nil {
-		t.Log(string(statusOut))
 		wd, _ := os.Getwd()
 		t.Fatalf("Executing 'env -i %s %s/otel-cli failed: %s", strings.Join(statusCmd.Env, " "), wd, err)
 	}
 
-	status := cmd.StatusOutput{}
-	err = json.Unmarshal(statusOut, &status)
-	if err != nil {
-		t.Fatalf("parsing otel-cli status output failed: %s", err)
-	}
+	// only try to parse status json if it was a status command
+	if len(args) > 0 && args[0] == "status" {
+		err = json.Unmarshal(cliOut, &results)
+		if err != nil {
+			t.Fatalf("parsing otel-cli status output failed: %s", err)
+		}
 
-	// remove PATH from the output but only if it's exactly what we set on exec
-	if path, ok := status.Env["PATH"]; ok {
-		if path == minimumPath {
-			delete(status.Env, "PATH")
+		// remove PATH from the output but only if it's exactly what we set on exec
+		if path, ok := results.Env["PATH"]; ok {
+			if path == minimumPath {
+				delete(results.Env, "PATH")
+			}
 		}
 	}
 
 	// grab the spans & events from the server off the channels it writes to
-	var retSpan otlpserver.CliEvent
-	var retEvents otlpserver.CliEventList
 	if fixture.SpansExpected > 0 {
 		retSpan = <-rcvSpan
 		retEvents = <-rcvEvents
@@ -237,7 +269,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, cmd.StatusOutput, otlpse
 
 	cs.Stop()
 
-	return endpoint, status, retSpan, retEvents
+	return endpoint, results, retSpan, retEvents
 }
 
 // mkEnviron converts a string map to a list of k=v strings.

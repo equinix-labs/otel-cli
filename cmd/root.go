@@ -25,7 +25,12 @@ func init() {
 	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
+
 	diagnostics.NumArgs = len(os.Args) - 1
+	diagnostics.CliArgs = []string{}
+	if len(os.Args) > 1 {
+		diagnostics.CliArgs = os.Args[1:]
+	}
 }
 
 // addCommonParams adds the --config and --endpoint params to the command.

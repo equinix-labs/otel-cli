@@ -1,6 +1,9 @@
 package cmd
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // global diagnostics handle, written to from all over otel-cli
 var diagnostics Diagnostics
@@ -9,13 +12,14 @@ var diagnostics Diagnostics
 // diagnosing issues with otel-cli. The only user-facing feature that should be
 // using these is otel-cli status.
 type Diagnostics struct {
-	IsRecording       bool   `json:"is_recording"`
-	ConfigFileLoaded  bool   `json:"config_file_loaded"`
-	NumArgs           int    `json:"number_of_args"`
-	DetectedLocalhost bool   `json:"detected_localhost"`
-	ParsedTimeoutMs   int64  `json:"parsed_timeout_ms"`
-	OtelError         string `json:"otel_error"`
-	ExecExitCode      int    `json:"exec_exit_code"`
+	CliArgs           []string `json:"cli_args"`
+	IsRecording       bool     `json:"is_recording"`
+	ConfigFileLoaded  bool     `json:"config_file_loaded"`
+	NumArgs           int      `json:"number_of_args"`
+	DetectedLocalhost bool     `json:"detected_localhost"`
+	ParsedTimeoutMs   int64    `json:"parsed_timeout_ms"`
+	OtelError         string   `json:"otel_error"`
+	ExecExitCode      int      `json:"exec_exit_code"`
 }
 
 // Handle complies with the otel error handler interface to capture errors
@@ -30,6 +34,7 @@ func (Diagnostics) Handle(err error) {
 // ToMap returns the Diagnostics struct as a string map for testing.
 func (d *Diagnostics) ToStringMap() map[string]string {
 	return map[string]string{
+		"cli_args":           strings.Join(d.CliArgs, " "),
 		"is_recording":       strconv.FormatBool(d.IsRecording),
 		"config_file_loaded": strconv.FormatBool(d.ConfigFileLoaded),
 		"number_of_args":     strconv.Itoa(d.NumArgs),
