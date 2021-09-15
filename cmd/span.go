@@ -37,10 +37,10 @@ func init() {
 	spanCmd.Flags().SortFlags = false
 
 	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
-	spanCmd.Flags().StringVar(&config.SpanStartTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
+	spanCmd.Flags().StringVar(&config.SpanStartTime, "start", defaults.SpanStartTime, "a Unix epoch or RFC3339 timestamp for the start of the span")
 
 	// --end $timestamp
-	spanCmd.Flags().StringVar(&config.SpanEndTime, "end", "", "an Unix epoch or RFC3339 timestamp for the end of the span")
+	spanCmd.Flags().StringVar(&config.SpanEndTime, "end", defaults.SpanEndTime, "an Unix epoch or RFC3339 timestamp for the end of the span")
 
 	addCommonParams(spanCmd)
 	addSpanParams(spanCmd)
@@ -61,11 +61,10 @@ func doSpan(cmd *cobra.Command, args []string) {
 // context, the span, and a deferrable function for clean shutdown (it ends the
 // span).
 func startSpan() (context.Context, trace.Span, func()) {
-	startOpts := []trace.SpanStartOption{trace.WithSpanKind(otelSpanKind(config.Kind))}
-
-	if config.SpanStartTime != "" {
-		t := parseTime(config.SpanStartTime, "start")
-		startOpts = append(startOpts, trace.WithTimestamp(t))
+	t := parseTime(config.SpanStartTime, "start")
+	startOpts := []trace.SpanStartOption{
+		trace.WithSpanKind(otelSpanKind(config.Kind)),
+		trace.WithTimestamp(t),
 	}
 
 	ctx, shutdown := initTracer()
@@ -80,12 +79,7 @@ func startSpan() (context.Context, trace.Span, func()) {
 
 // endSpan takes a span, checks for a --end command-line option, and ends the span.
 func endSpan(span trace.Span) {
-	endOpts := []trace.SpanEndOption{}
-
-	if config.SpanEndTime != "" {
-		t := parseTime(config.SpanEndTime, "end")
-		endOpts = append(endOpts, trace.WithTimestamp(t))
-	}
-
+	t := parseTime(config.SpanEndTime, "end")
+	endOpts := []trace.SpanEndOption{trace.WithTimestamp(t)}
 	span.End(endOpts...)
 }

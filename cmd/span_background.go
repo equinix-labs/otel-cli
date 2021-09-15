@@ -47,9 +47,9 @@ func init() {
 	// only necessary for adding events to the span. it should be fine to
 	// start a background span at the top of a script then let it fall off
 	// at the end to get an easy span
-	spanBgCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanBgCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
 
-	spanBgCmd.Flags().BoolVar(&config.BackgroundWait, "wait", false, "wait for background to be fully started and then return")
+	spanBgCmd.Flags().BoolVar(&config.BackgroundWait, "wait", defaults.BackgroundWait, "wait for background to be fully started and then return")
 
 	addCommonParams(spanBgCmd)
 	addSpanParams(spanBgCmd)

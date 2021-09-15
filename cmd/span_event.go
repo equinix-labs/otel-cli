@@ -30,8 +30,8 @@ func init() {
 	spanCmd.AddCommand(spanEventCmd)
 	spanEventCmd.Flags().SortFlags = false
 
-	spanEventCmd.Flags().StringVarP(&config.EventName, "name", "e", "todo-generate-default-event-names", "set the name of the event")
-	spanEventCmd.Flags().StringVarP(&config.EventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
+	spanEventCmd.Flags().StringVarP(&config.EventName, "name", "e", defaults.EventName, "set the name of the event")
+	spanEventCmd.Flags().StringVarP(&config.EventTime, "time", "t", defaults.EventTime, "the precise time of the event in RFC3339Nano or Unix.nano format")
 	spanEventCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 	spanEventCmd.MarkFlagRequired("sockdir")
 

@@ -21,7 +21,7 @@ See: otel-cli span background
 
 func init() {
 	spanCmd.AddCommand(spanEndCmd)
-	spanEndCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanEndCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
 	spanEndCmd.MarkFlagRequired("sockdir")
 }
 

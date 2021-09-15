@@ -2,11 +2,45 @@ package cmd
 
 import "strconv"
 
-// global config used by all of otel-cli
+// config is the global configuraiton used by all of otel-cli.
+// It is written to by Cobra and Viper.
 var config Config
+
+// defaults is a Config set to default values used by Cobra
+var defaults = DefaultConfig()
 
 const defaultOtlpEndpoint = "localhost:4317"
 const spanBgSockfilename = "otel-cli-background.sock"
+
+// DefaultConfig returns a Config with all defaults set.
+func DefaultConfig() Config {
+	return Config{
+		Endpoint:               "",
+		Timeout:                "1s",
+		Headers:                map[string]string{},
+		Insecure:               false,
+		Blocking:               false,
+		NoTlsVerify:            false,
+		ServiceName:            "otel-cli",
+		SpanName:               "todo-generate-default-span-names",
+		Kind:                   "client",
+		Attributes:             map[string]string{},
+		TraceparentCarrierFile: "",
+		TraceparentIgnoreEnv:   false,
+		TraceparentPrint:       false,
+		TraceparentPrintExport: false,
+		TraceparentRequired:    false,
+		BackgroundParentPollMs: 10,
+		BackgroundSockdir:      "",
+		BackgroundWait:         false,
+		SpanStartTime:          "now",
+		SpanEndTime:            "now",
+		EventName:              "todo-generate-default-event-names",
+		EventTime:              "now",
+		CfgFile:                "",
+		Verbose:                false,
+	}
+}
 
 // Config stores the runtime configuration for otel-cli.
 // This is used as a singleton as "config" and accessed from many other files.
