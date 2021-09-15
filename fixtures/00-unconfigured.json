@@ -1,8 +1,6 @@
 {
   "description": "otel-cli should not do anything when it is not explicitly configured",
   "spans_expected": 0,
-  "server_timeout_ms": 0,
-  "should_timeout": false,
   "config": {
     "env": {},
     "cli_args": ["status"]

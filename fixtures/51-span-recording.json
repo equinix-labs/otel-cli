@@ -2,7 +2,6 @@
   "description": "otel-cli span sends a span",
   "spans_expected": 1,
   "server_timeout_ms": 1000,
-  "should_timeout": false,
   "config": {
     "env": {
       "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
