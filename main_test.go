@@ -58,6 +58,11 @@ func TestOtelCli(t *testing.T) {
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".json") {
 			fixture := Fixture{}
+			// initialize with a default config before reading the json so when
+			// we compare against the output from otel-cli the defaults don't cause noise
+			// v.s. an empty Config{}
+			fixture.Expect.Config = cmd.DefaultConfig()
+
 			fp := filepath.Join(fixtureDir, file.Name())
 			js, err := os.ReadFile(fp)
 			if err != nil {
@@ -103,16 +108,17 @@ func checkData(t *testing.T, fixture Fixture, endpoint string, status cmd.Status
 	wantDiag := fixture.Expect.Diagnostics.ToStringMap()
 	gotDiag := status.Diagnostics.ToStringMap()
 	injectEndpoint(endpoint, wantDiag)
-	injectEndpoint(endpoint, gotDiag)
 	if diff := cmp.Diff(wantDiag, gotDiag); diff != "" {
 		t.Errorf("diagnostic data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
 	}
 
-	// TODO: this needs might need a revamp of config defaults to move them from Cobra
-	// to a version of the Config struct with the defaults so they can be checked
-	//if diff := cmp.Diff(fixture.Expect.Config, status.Config); diff != "" {
-	//	t.Errorf("config data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
-	//}
+	// check the configuration
+	wantConf := fixture.Expect.Config.ToStringMap()
+	gotConf := status.Config.ToStringMap()
+	injectEndpoint(endpoint, wantConf)
+	if diff := cmp.Diff(wantConf, gotConf); diff != "" {
+		t.Errorf("config data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+	}
 
 	// check the expected span data against what was received by the OTLP server
 	gotSpan := span.ToStringMap()
