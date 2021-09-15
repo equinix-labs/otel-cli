@@ -35,8 +35,10 @@ func (ce CliEvent) ToStringMap() map[string]string {
 	// flatten attributes into "k=v,k=v" style string
 	var attrs string
 	keys := make([]string, len(ce.Attributes)) // for sorting
+	var i int
 	for k := range ce.Attributes {
-		keys = append(keys, k)
+		keys[i] = k
+		i++
 	}
 	sort.Strings(keys)
 	for i, k := range keys {
