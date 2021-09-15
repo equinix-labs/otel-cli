@@ -199,7 +199,7 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 // output as data to return for further testing.
 // all failures are fatal, no point in testing if this is broken
 func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
-	results := Results{}
+	var results Results
 	var retSpan otlpserver.CliEvent
 	var retEvents otlpserver.CliEventList
 
