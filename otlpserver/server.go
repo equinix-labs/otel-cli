@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"sync"
 
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 
@@ -24,7 +25,10 @@ type Stopper func(*Server)
 type Server struct {
 	server   *grpc.Server
 	callback Callback
-	stopper  chan bool
+	stoponce sync.Once
+	stopper  chan struct{}
+	stopdone chan struct{}
+	doneonce sync.Once
 	v1.UnimplementedTraceServiceServer
 }
 
@@ -34,7 +38,8 @@ func NewServer(cb Callback, stop Stopper) *Server {
 	s := Server{
 		server:   grpc.NewServer(),
 		callback: cb,
-		stopper:  make(chan bool),
+		stopper:  make(chan struct{}),
+		stopdone: make(chan struct{}, 1),
 	}
 
 	v1.RegisterTraceServiceServer(s.server, &s)
@@ -51,10 +56,10 @@ func NewServer(cb Callback, stop Stopper) *Server {
 
 // ServeGRPC takes a listener and starts the GRPC server on that listener.
 // Blocks until Stop() is called.
-func (cs *Server) ServeGPRC(listener net.Listener) {
-	if err := cs.server.Serve(listener); err != nil {
-		log.Fatalf("failed to serve: %s", err)
-	}
+func (cs *Server) ServeGPRC(listener net.Listener) error {
+	err := cs.server.Serve(listener)
+	cs.stopdone <- struct{}{}
+	return err
 }
 
 // ListenAndServeGRPC starts a TCP listener then starts the GRPC server using
@@ -64,13 +69,25 @@ func (cs *Server) ListenAndServeGPRC(otlpEndpoint string) {
 	if err != nil {
 		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
 	}
-	cs.ServeGPRC(listener)
+	if err := cs.ServeGPRC(listener); err != nil {
+		log.Fatalf("failed to serve: %s", err)
+	}
 }
 
 // Stop sends a value to the server shutdown goroutine so it stops GRPC
-// and calls the stop function given to newServer.
+// and calls the stop function given to newServer. Safe to call multiple times.
 func (cs *Server) Stop() {
-	cs.stopper <- true
+	cs.stoponce.Do(func() {
+		cs.stopper <- struct{}{}
+	})
+}
+
+// StopWait stops the server and waits for it to affirm shutdown.
+func (cs *Server) StopWait() {
+	cs.Stop()
+	cs.doneonce.Do(func() {
+		<-cs.stopdone
+	})
 }
 
 // Export implements the gRPC server interface for exporting messages.
