@@ -301,6 +301,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 		case <-time.After(serverTimeout):
 			err = statusCmd.Process.Kill()
 			if err != nil {
+				// TODO: this might be a bit fragle, soften this up later if it ends up problematic
 				log.Fatalf("[%s] process kill failed: %s", fixture.Filename, err)
 			}
 		case <-cancelProcessTimeout:
@@ -321,6 +322,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	// send stop signals to the timeouts and OTLP server
 	cancelProcessTimeout <- struct{}{}
 	cancelServerTimeout <- struct{}{}
+	cs.Stop()
 
 	// only try to parse status json if it was a status command
 	// TODO: support variations on otel-cli where status isn't the first arg
