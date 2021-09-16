@@ -41,9 +41,11 @@ type FixtureConfig struct {
 type Results struct {
 	// the same datastructure used to generate otel-cli status output
 	cmd.StatusOutput
-	CliOutput string `json:"output"` // merged stdout and stderr
-	Spans     int    `json:"spans"`  // number of spans received
-	Events    int    `json:"events"` // number of events received
+	CliOutput     string `json:"output"`         // merged stdout and stderr
+	Spans         int    `json:"spans"`          // number of spans received
+	Events        int    `json:"events"`         // number of events received
+	TimedOut      bool   `json:"timed_out"`      // true when test timed out
+	CommandFailed bool   `json:"command_failed"` // otel-cli failed / was killed
 }
 
 // Fixture represents a test fixture for otel-cli.
@@ -116,6 +118,9 @@ func TestOtelCli(t *testing.T) {
 		// sets up an OTLP server, runs otel-cli, packages data up in these return vals
 		endpoint, results, span, events := runOtelCli(t, fixture)
 
+		// check timeout and process status expectations
+		checkProcess(t, fixture, results)
+
 		// compares the spans from the server against expectations in the fixture
 		checkSpanData(t, fixture, endpoint, span, events)
 
@@ -127,6 +132,15 @@ func TestOtelCli(t *testing.T) {
 			// checking the text output only makes sense for non-status paths
 			checkOutput(t, fixture, endpoint, results)
 		}
+	}
+}
+
+func checkProcess(t *testing.T, fixture Fixture, results Results) {
+	if results.TimedOut != fixture.Expect.TimedOut {
+		t.Errorf("[%s] test timeout status is %t but expected %t", fixture.Filename, results.TimedOut, fixture.Expect.TimedOut)
+	}
+	if results.CommandFailed != fixture.Expect.CommandFailed {
+		t.Errorf("[%s] command failed is %t but expected %t", fixture.Filename, results.CommandFailed, fixture.Expect.CommandFailed)
 	}
 }
 
@@ -256,6 +270,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	go func() {
 		select {
 		case <-time.After(serverTimeout):
+			results.TimedOut = true
 			cs.Stop() // supports multiple calls
 		case <-cancelServerTimeout:
 			return
@@ -299,6 +314,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	go func() {
 		select {
 		case <-time.After(serverTimeout):
+			results.TimedOut = true
 			err = statusCmd.Process.Kill()
 			if err != nil {
 				// TODO: this might be a bit fragle, soften this up later if it ends up problematic
@@ -315,7 +331,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	cliOut, err := statusCmd.CombinedOutput()
 	results.CliOutput = string(cliOut)
 	if err != nil {
-		// this was fatal but trying out a regular log and let things fall through...
+		results.CommandFailed = true
 		t.Logf("[%s] executing command failed: %s", fixture.Filename, err)
 	}
 

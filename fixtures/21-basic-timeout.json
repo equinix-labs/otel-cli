@@ -11,6 +11,7 @@
     "cli_args": ["span", "--timeout", "1s"]
   },
   "expect": {
-    "spans": 0
+    "spans": 0,
+    "command_failed": true
   }
 }
