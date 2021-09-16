@@ -22,7 +22,7 @@ import (
 
 // otel-cli will fail with "getent not found" if PATH is empty
 // so set it to the bare minimum and always the same for cleanup
-const minimumPath = `/bin`
+const minimumPath = `/bin:/usr/bin`
 const defaultTestTimeout = time.Second
 
 type FixtureConfig struct {
