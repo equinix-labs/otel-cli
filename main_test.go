@@ -39,16 +39,17 @@ type FixtureConfig struct {
 
 // mostly mirrors cmd.StatusOutput but we need more
 type Results struct {
+	// the same datastructure used to generate otel-cli status output
 	cmd.StatusOutput
-	CliOutput string `json:"output"`
-	Spans     int    `json:"spans"`
-	Events    int    `json:"events"`
+	CliOutput string `json:"output"` // merged stdout and stderr
+	Spans     int    `json:"spans"`  // number of spans received
+	Events    int    `json:"events"` // number of events received
 }
 
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
 	Description string        `json:"description"`
-	Filename    string        `json:"-"`
+	Filename    string        `json:"-"` // populated at runtime
 	Config      FixtureConfig `json:"config"`
 	Expect      Results       `json:"expect"`
 }
