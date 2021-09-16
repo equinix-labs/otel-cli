@@ -1,13 +1,11 @@
 {
   "description": "setting minimum envvars should result in a span being received",
-  "spans_expected": 1,
-  "server_timeout_ms": 1000,
-  "should_timeout": false,
   "config": {
     "env": {
       "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
     },
-    "cli_args": ["status"]
+    "cli_args": ["status"],
+    "test_timeout_ms": 1000
   },
   "expect": {
     "env": {
@@ -19,6 +17,7 @@
       "insecure": false,
       "service_name": "otel-cli"
     },
+    "spans": 1,
     "span_data": {
       "trace_id": "*",
       "span_id": "*"

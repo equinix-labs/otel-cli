@@ -1,11 +1,11 @@
 {
   "description": "otel-cli should not do anything when it is not explicitly configured",
-  "spans_expected": 0,
   "config": {
     "env": {},
     "cli_args": ["status"]
   },
   "expect": {
+    "spans": 0,
     "env": {},
     "config": {
       "endpoint": "",

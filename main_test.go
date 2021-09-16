@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/equinix-labs/otel-cli/cmd"
 	"github.com/equinix-labs/otel-cli/otlpserver"
@@ -21,27 +23,34 @@ import (
 // otel-cli will fail with "getent not found" if PATH is empty
 // so set it to the bare minimum and always the same for cleanup
 const minimumPath = `/bin`
+const defaultTestTimeout = time.Second
 
 type FixtureConfig struct {
 	CliArgs []string `json:"cli_args"`
 	Env     map[string]string
+	// timeout for how long to wait for the whole test in failure cases
+	TestTimeoutMs int `json:"test_timeout_ms"`
+	// when true this test will be excluded under go -test.short mode
+	IsLongTest bool `json:"is_long_test"`
+	// for timeout tests we need to start the server to generate the endpoint
+	// but do not want it to answer when otel-cli calls, this does that
+	StopServerBeforeExec bool `json:"stop_server_before_exec"`
 }
 
 // mostly mirrors cmd.StatusOutput but we need more
 type Results struct {
 	cmd.StatusOutput
 	CliOutput string `json:"output"`
+	Spans     int    `json:"spans"`
+	Events    int    `json:"events"`
 }
 
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
-	Description     string        `json:"description"`
-	Filename        string        `json:"-"`
-	Config          FixtureConfig `json:"config"`
-	Expect          Results       `json:"expect"`
-	SpansExpected   int           `json:"spans_expected"`
-	ServerTimeoutMs int           `json:"server_timeout_ms"`
-	ShouldTimeout   bool          `json:"should_timeout"` // otel connection stub->cli should fail
+	Description string        `json:"description"`
+	Filename    string        `json:"-"`
+	Config      FixtureConfig `json:"config"`
+	Expect      Results       `json:"expect"`
 }
 
 func TestMain(m *testing.M) {
@@ -96,8 +105,17 @@ func TestOtelCli(t *testing.T) {
 
 	// run all the fixtures, check the results
 	for _, fixture := range fixtures {
+		// some tests explicitly spend time sleeping/waiting to validate timeouts are working
+		// and when they are marked as such, they can be skipped with go test -test.short
+		if testing.Short() && fixture.Config.IsLongTest {
+			t.Skip("skipping timeout tests in short mode")
+			continue
+		}
+
+		// sets up an OTLP server, runs otel-cli, packages data up in these return vals
 		endpoint, results, span, events := runOtelCli(t, fixture)
 
+		// compares the spans from the server against expectations in the fixture
 		checkSpanData(t, fixture, endpoint, span, events)
 
 		// many of the basic plumbing tests use status so it has its own set of checks
@@ -139,7 +157,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 		gotDiag["cli_args"] = ""
 	}
 	if diff := cmp.Diff(wantDiag, gotDiag); diff != "" {
-		t.Errorf("diagnostic data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] diagnostic data did not match fixture (-want +got):\n%s", fixture.Filename, diff)
 	}
 
 	// check the configuration
@@ -147,7 +165,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	gotConf := results.Config.ToStringMap()
 	injectEndpoint(endpoint, wantConf)
 	if diff := cmp.Diff(wantConf, gotConf); diff != "" {
-		t.Errorf("config data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] config data did not match fixture (-want +got):\n%s", fixture.Filename, diff)
 	}
 }
 
@@ -185,7 +203,7 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 						delete(gotSpan, what)
 						delete(wantSpan, what)
 					} else {
-						t.Errorf("span value %q for key %s is not valid", gotVal, what)
+						t.Errorf("[%s] span value %q for key %s is not valid", fixture.Filename, gotVal, what)
 					}
 				}
 			}
@@ -195,38 +213,74 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 	// do a diff on a generated map that sets values to * when the * check succeeded
 	injectEndpoint(endpoint, wantSpan)
 	if diff := cmp.Diff(wantSpan, gotSpan); diff != "" {
-		t.Errorf("otel span info did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] otel span info did not match fixture (-want +got):\n%s", fixture.Filename, diff)
 	}
 }
 
 // runOtelCli runs the a server and otel-cli together and captures their
 // output as data to return for further testing.
 func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
+	started := time.Now()
+
 	var results Results
 	var retSpan otlpserver.CliEvent
 	var retEvents otlpserver.CliEventList
 
-	// only supports 0 or 1 spans, which is fine for these tests
-	// these channels need to be buffered or the callback will hang trying to send while
-	// the main goroutine here is still running and waiting on otel-cli
-	rcvSpan := make(chan otlpserver.CliEvent, 1)
-	rcvEvents := make(chan otlpserver.CliEventList, 1)
+	// these channels need to be buffered or the callback will hang trying to send
+	rcvSpan := make(chan otlpserver.CliEvent, 100) // 100 spans is enough for anybody
+	rcvEvents := make(chan otlpserver.CliEventList, 100)
+
+	// otlpserver calls this function for each span received
 	cb := func(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
 		rcvSpan <- span
 		rcvEvents <- events
-		return true // tell the server we're done and it can exit its loop
+
+		results.Spans++
+		results.Events += len(events)
+
+		// true tells the server we're done and it can exit its loop
+		return results.Spans >= fixture.Expect.Spans
 	}
 
 	cs := otlpserver.NewServer(cb, func(*otlpserver.Server) {})
+	defer cs.Stop()
+
+	serverTimeout := time.Duration(fixture.Config.TestTimeoutMs) * time.Millisecond
+	if serverTimeout == time.Duration(0) {
+		serverTimeout = defaultTestTimeout
+	}
+
+	// start a timeout goroutine for the otlp server, cancelable with done<-struct{}{}
+	cancelServerTimeout := make(chan struct{}, 1)
+	go func() {
+		select {
+		case <-time.After(serverTimeout):
+			cs.Stop() // supports multiple calls
+		case <-cancelServerTimeout:
+			return
+		}
+	}()
+
+	// port :0 means randomly assigned port, which we copy into {{endpoint}}
 	listener, err := net.Listen("tcp", "localhost:0")
 	endpoint := listener.Addr().String()
 	if err != nil {
-		t.Fatalf("failed to listen on OTLP endpoint %q: %s", endpoint, err)
+		t.Fatalf("[%s] failed to listen on OTLP endpoint %q: %s", fixture.Filename, endpoint, err)
 	}
-	t.Logf("starting OTLP server on %q", endpoint)
+	t.Logf("[%s] starting OTLP server on %q", fixture.Filename, endpoint)
+
+	// TODO: might be neat to have a mode where we start the listener and do nothing
+	// with it to simulate a hung server or opentelemetry-collector
 	go func() {
 		cs.ServeGPRC(listener)
 	}()
+
+	// let things go this far to generate the endpoint port then stop the server before
+	// calling otel-cli so we can test timeouts
+	if fixture.Config.StopServerBeforeExec {
+		cs.Stop()
+		listener.Close()
+	}
 
 	// TODO: figure out the best way to build the binary and detect if the build is stale
 	// ^^ probably doesn't matter much in CI, can auto-build, but for local workflow it matters
@@ -239,21 +293,40 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	}
 	statusCmd := exec.Command("./otel-cli", args...)
 	statusCmd.Env = mkEnviron(endpoint, fixture.Config.Env)
+
+	cancelProcessTimeout := make(chan struct{}, 1)
+	go func() {
+		select {
+		case <-time.After(serverTimeout):
+			err = statusCmd.Process.Kill()
+			if err != nil {
+				log.Fatalf("[%s] process kill failed: %s", fixture.Filename, err)
+			}
+		case <-cancelProcessTimeout:
+			return
+		}
+	}()
+
 	// grab stderr & stdout comingled so that if otel-cli prints anything to either it's not
 	// supposed to it will cause e.g. status json parsing and other tests to fail
-	t.Logf("going to exec 'env -i %s ./otel-cli", strings.Join(statusCmd.Env, " "))
+	t.Logf("[%s] going to exec 'env -i %s ./otel-cli %s'", fixture.Filename, strings.Join(statusCmd.Env, " "), strings.Join(args, " "))
 	cliOut, err := statusCmd.CombinedOutput()
 	results.CliOutput = string(cliOut)
 	if err != nil {
-		wd, _ := os.Getwd()
-		t.Fatalf("Executing 'env -i %s %s/otel-cli failed: %s", strings.Join(statusCmd.Env, " "), wd, err)
+		// this was fatal but trying out a regular log and let things fall through...
+		t.Logf("[%s] executing command failed: %s", fixture.Filename, err)
 	}
 
+	// send stop signals to the timeouts and OTLP server
+	cancelProcessTimeout <- struct{}{}
+	cancelServerTimeout <- struct{}{}
+
 	// only try to parse status json if it was a status command
-	if len(args) > 0 && args[0] == "status" {
+	// TODO: support variations on otel-cli where status isn't the first arg
+	if len(cliOut) > 0 && len(args) > 0 && args[0] == "status" {
 		err = json.Unmarshal(cliOut, &results)
 		if err != nil {
-			t.Fatalf("parsing otel-cli status output failed: %s", err)
+			t.Fatalf("[%s] parsing otel-cli status output failed: %s", fixture.Filename, err)
 		}
 
 		// remove PATH from the output but only if it's exactly what we set on exec
@@ -264,13 +337,32 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 		}
 	}
 
-	// grab the spans & events from the server off the channels it writes to
-	if fixture.SpansExpected > 0 {
-		retSpan = <-rcvSpan
-		retEvents = <-rcvEvents
+	// when no spans are expected, return without reading from the channels
+	if fixture.Expect.Spans == 0 {
+		return endpoint, results, retSpan, retEvents
 	}
 
-	cs.Stop()
+	// grab the spans & events from the server off the channels it writes to
+	remainingTimeout := serverTimeout - time.Since(started)
+	var gatheredSpans int
+gather:
+	for {
+		select {
+		case <-time.After(remainingTimeout):
+			break gather
+		case retSpan = <-rcvSpan:
+			// events is always populated at the same time as the span is sent
+			// and will always send at least an empty list
+			retEvents = <-rcvEvents
+
+			// with this approach, any mismatch in spans produced and expected results
+			// in a timeout with the above time.After
+			gatheredSpans++
+			if gatheredSpans == results.Spans {
+				break gather
+			}
+		}
+	}
 
 	return endpoint, results, retSpan, retEvents
 }
