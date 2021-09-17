@@ -31,10 +31,17 @@ type FixtureConfig struct {
 	// timeout for how long to wait for the whole test in failure cases
 	TestTimeoutMs int `json:"test_timeout_ms"`
 	// when true this test will be excluded under go -test.short mode
+	// TODO: maybe move this up to the suite?
 	IsLongTest bool `json:"is_long_test"`
 	// for timeout tests we need to start the server to generate the endpoint
 	// but do not want it to answer when otel-cli calls, this does that
 	StopServerBeforeExec bool `json:"stop_server_before_exec"`
+	// run this fixture in the background, starting its server and otel-cli
+	// instance, then let those block in the background and continue running
+	// serial tests until it's "foreground" by a second fixtue with the same
+	// description in the same file
+	Background bool `json:"background"`
+	Foreground bool `json:"foreground"`
 }
 
 // mostly mirrors cmd.StatusOutput but we need more
@@ -56,6 +63,9 @@ type Fixture struct {
 	Expect      Results       `json:"expect"`
 }
 
+// FixtureSet is a list of Fixtures that run serially.
+type FixtureSuite []Fixture
+
 func TestMain(m *testing.M) {
 	// wipe out this process's envvars right away to avoid pollution & leakage
 	os.Clearenv()
@@ -65,6 +75,13 @@ func TestMain(m *testing.M) {
 
 // TestOtelCli loads all the json fixtures and executes the tests.
 func TestOtelCli(t *testing.T) {
+
+	/*
+	 *
+	 * TODO TODO TODO: report a nice error when otel-cli isn't built in ./otel-cli
+	 *
+	 */
+
 	wd, _ := os.Getwd() // go tests execute in the *_test.go's directory
 	fixtureDir := filepath.Join(wd, "fixtures")
 	files, err := ioutil.ReadDir(fixtureDir)
@@ -72,66 +89,122 @@ func TestOtelCli(t *testing.T) {
 		t.Fatalf("Failed to list fixture directory %q to detect json files.", fixtureDir)
 	}
 
-	fixtures := []Fixture{}
+	var fixtureCount int
+	suites := []FixtureSuite{}
 	for _, file := range files {
 		if strings.HasSuffix(file.Name(), ".json") {
-			fixture := Fixture{}
-			// initialize with a default config before reading the json so when
-			// we compare against the output from otel-cli the defaults don't cause noise
-			// v.s. an empty Config{}
-			fixture.Expect.Config = cmd.DefaultConfig()
+			suite := FixtureSuite{}
 
 			fp := filepath.Join(fixtureDir, file.Name())
 			js, err := os.ReadFile(fp)
 			if err != nil {
 				t.Fatalf("Failed to read json fixture file %q: %s", file.Name(), err)
 			}
-			err = json.Unmarshal(js, &fixture)
+			err = json.Unmarshal(js, &suite)
 			if err != nil {
 				t.Fatalf("Failed to parse json fixture file %q: %s", file.Name(), err)
 			}
 
-			// make sure PATH hasn't been set, because doing that in fixtures is naughty
-			if _, ok := fixture.Config.Env["PATH"]; ok {
-				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", file.Name())
+			// run pre-flight checks and populate the Filename field
+			for i, fixture := range suite {
+				fixtureCount++
+				// make sure PATH hasn't been set, because doing that in fixtures is naughty
+				if _, ok := fixture.Config.Env["PATH"]; ok {
+					t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", file.Name())
+				}
+
+				suite[i].Filename = filepath.Base(file.Name()) // for error reporting
 			}
 
-			fixture.Filename = filepath.Base(file.Name()) // for error reporting
-			fixtures = append(fixtures, fixture)
+			suites = append(suites, suite)
 		}
 	}
 
-	t.Logf("Loaded %d fixtures.", len(fixtures))
-	if len(fixtures) == 0 {
+	t.Logf("Loaded %d test suites and %d fixtures.", len(suites), fixtureCount)
+	if len(suites) == 0 || fixtureCount == 0 {
 		t.Fatal("no test fixtures loaded!")
 	}
 
-	// run all the fixtures, check the results
-	for _, fixture := range fixtures {
-		// some tests explicitly spend time sleeping/waiting to validate timeouts are working
-		// and when they are marked as such, they can be skipped with go test -test.short
-		if testing.Short() && fixture.Config.IsLongTest {
-			t.Skip("skipping timeout tests in short mode")
-			continue
+	// run a suite of fixtures.
+	// Within a suite jobs can be backgrounded and foregrounded.
+	// This is not meant for complicated workflows, mainly for testing things
+	// like span background.
+	for _, suite := range suites {
+		// a fixture can be backgrounded after starting it up for e.g. otel-cli span background
+		// a second fixture with the same description later in the list will "foreground" it
+		bgFixtureWaits := make(map[string]chan struct{})
+		bgFixtureDones := make(map[string]chan struct{})
+
+		// run all the fixtures, check the results
+	fixtures:
+		for _, fixture := range suite {
+			// some tests explicitly spend time sleeping/waiting to validate timeouts are working
+			// and when they are marked as such, they can be skipped with go test -test.short
+			if testing.Short() && fixture.Config.IsLongTest {
+				t.Skipf("[%s] skipping timeout tests in short mode", fixture.Filename)
+				continue fixtures
+			}
+
+			if fixture.Config.Foreground {
+				if wait, ok := bgFixtureWaits[fixture.Description]; ok {
+					wait <- struct{}{}
+					delete(bgFixtureWaits, fixture.Description)
+				} else {
+					t.Fatalf("BUG in test or fixture: unexpected foreground fixture wait chan named %q", fixture.Description)
+				}
+				if done, ok := bgFixtureDones[fixture.Description]; ok {
+					<-done
+					delete(bgFixtureDones, fixture.Description)
+				} else {
+					t.Fatalf("BUG in test or fixture: unexpected foreground fixture done chan named %q", fixture.Description)
+				}
+
+				t.Skipf("[%s] fixture %q foregrounded", fixture.Filename, fixture.Description)
+				continue fixtures
+			}
+
+			// flow control for backgrounding fixtures:
+			fixtureWait := make(chan struct{})
+			fixtureDone := make(chan struct{})
+
+			go runFixture(t, fixture, fixtureWait, fixtureDone)
+
+			if fixture.Config.Background {
+				// save off the channels for flow control
+				t.Logf("[%s] fixture %q backgrounded", fixture.Filename, fixture.Description)
+				bgFixtureWaits[fixture.Description] = fixtureWait
+				bgFixtureDones[fixture.Description] = fixtureDone
+			} else {
+				// actually the default case, just block as if the code was ran synchronously
+				fixtureWait <- struct{}{}
+				<-fixtureDone
+			}
 		}
+	}
+}
 
-		// sets up an OTLP server, runs otel-cli, packages data up in these return vals
-		endpoint, results, span, events := runOtelCli(t, fixture)
+func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}) {
+	// sets up an OTLP server, runs otel-cli, packages data up in these return vals
+	endpoint, results, span, events := runOtelCli(t, fixture)
+	<-wait
+	checkAll(t, fixture, endpoint, results, span, events)
+	done <- struct{}{}
+}
 
-		// check timeout and process status expectations
-		checkProcess(t, fixture, results)
+func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, span otlpserver.CliEvent, events otlpserver.CliEventList) {
+	// check timeout and process status expectations
+	checkProcess(t, fixture, results)
 
-		// compares the spans from the server against expectations in the fixture
-		checkSpanData(t, fixture, endpoint, span, events)
+	// compares the spans from the server against expectations in the fixture
+	checkSpanData(t, fixture, endpoint, span, events)
 
-		// many of the basic plumbing tests use status so it has its own set of checks
-		// but these shouldn't run for testing the other subcommands
-		if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" {
-			checkStatusData(t, fixture, endpoint, results)
-		} else {
-			// checking the text output only makes sense for non-status paths
-			checkOutput(t, fixture, endpoint, results)
-		}
+	// many of the basic plumbing tests use status so it has its own set of checks
+	// but these shouldn't run for testing the other subcommands
+	if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" {
+		checkStatusData(t, fixture, endpoint, results)
+	} else {
+		// checking the text output only makes sense for non-status paths
+		checkOutput(t, fixture, endpoint, results)
 	}
 }
 
@@ -149,7 +222,7 @@ func checkProcess(t *testing.T, fixture Fixture, results Results) {
 func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results) {
 	wantOutput := strings.ReplaceAll(fixture.Expect.CliOutput, "{{endpoint}}", endpoint)
 	if diff := cmp.Diff(wantOutput, results.CliOutput); diff != "" {
-		t.Errorf("otel-cli output did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] otel-cli output did not match fixture (-want +got):\n%s", fixture.Filename, diff)
 	}
 }
 
@@ -281,7 +354,9 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	listener, err := net.Listen("tcp", "localhost:0")
 	endpoint := listener.Addr().String()
 	if err != nil {
-		t.Fatalf("[%s] failed to listen on OTLP endpoint %q: %s", fixture.Filename, endpoint, err)
+		// t.Fatalf is not allowed since we run this in a goroutine
+		t.Errorf("[%s] failed to listen on OTLP endpoint %q: %s", fixture.Filename, endpoint, err)
+		return endpoint, results, retSpan, retEvents
 	}
 	t.Logf("[%s] starting OTLP server on %q", fixture.Filename, endpoint)
 
@@ -327,7 +402,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 
 	// grab stderr & stdout comingled so that if otel-cli prints anything to either it's not
 	// supposed to it will cause e.g. status json parsing and other tests to fail
-	t.Logf("[%s] going to exec 'env -i %s ./otel-cli %s'", fixture.Filename, strings.Join(statusCmd.Env, " "), strings.Join(args, " "))
+	t.Logf("[%s] going to exec 'env -i %s %s'", fixture.Filename, strings.Join(statusCmd.Env, " "), strings.Join(statusCmd.Args, " "))
 	cliOut, err := statusCmd.CombinedOutput()
 	results.CliOutput = string(cliOut)
 	if err != nil {
@@ -345,7 +420,8 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	if len(cliOut) > 0 && len(args) > 0 && args[0] == "status" {
 		err = json.Unmarshal(cliOut, &results)
 		if err != nil {
-			t.Fatalf("[%s] parsing otel-cli status output failed: %s", fixture.Filename, err)
+			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Filename, err)
+			return endpoint, results, retSpan, retEvents
 		}
 
 		// remove PATH from the output but only if it's exactly what we set on exec

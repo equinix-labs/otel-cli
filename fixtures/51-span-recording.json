@@ -1,19 +1,29 @@
-{
-  "description": "otel-cli span sends a span",
-  "config": {
-    "env": {
-      "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
+[
+  {
+    "description": "otel-cli span sends a span",
+    "config": {
+      "env": {
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
+      },
+      "cli_args": [
+        "span",
+        "--service",
+        "main_test.go",
+        "--name",
+        "test-span-123",
+        "--kind",
+        "server"
+      ],
+      "test_timeout_ms": 1000
     },
-    "cli_args": ["span", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server"],
-    "test_timeout_ms": 1000
-  },
-  "expect": {
-    "output": "",
-    "spans": 1,
-    "span_data": {
-      "trace_id": "*",
-      "span_id": "*",
-      "is_sampled": "true"
+    "expect": {
+      "output": "",
+      "spans": 1,
+      "span_data": {
+        "trace_id": "*",
+        "span_id": "*",
+        "is_sampled": "true"
+      }
     }
   }
-}
+]

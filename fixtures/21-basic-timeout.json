@@ -1,17 +1,24 @@
-{
-  "description": "otel is configured but there is no server listening so it should time out silently",
-  "config": {
-    "env": {
-      "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
+[
+  {
+    "description": "otel is configured but there is no server listening so it should time out silently",
+    "config": {
+      "env": {
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
+      },
+      "comment": "the server will stop but otel-cli will try to connect and time out and otel-cli will be killed",
+      "stop_server_before_exec": true,
+      "test_timeout_ms": 500,
+      "is_long_test": true,
+      "cli_args": [
+        "span",
+        "--timeout",
+        "1s"
+      ]
     },
-    "comment": "the server will stop but otel-cli will try to connect and time out and otel-cli will be killed",
-    "stop_server_before_exec": true,
-    "test_timeout_ms": 500,
-    "is_long_test": true,
-    "cli_args": ["span", "--timeout", "1s"]
-  },
-  "expect": {
-    "spans": 0,
-    "command_failed": true
+    "expect": {
+      "spans": 0,
+      "command_failed": true,
+      "timed_out": true
+    }
   }
-}
+]

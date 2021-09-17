@@ -1,21 +1,25 @@
-{
-  "description": "otel-cli should not do anything when it is not explicitly configured",
-  "config": {
-    "env": {},
-    "cli_args": ["status"]
-  },
-  "expect": {
-    "spans": 0,
-    "env": {},
+[
+  {
+    "description": "otel-cli should not do anything when it is not explicitly configured",
     "config": {
-      "endpoint": "",
-      "insecure": false,
-      "service_name": "otel-cli"
+      "env": {},
+      "cli_args": [
+        "status"
+      ]
     },
-    "diagnostics": {
-      "is_recording": false,
-      "number_of_args": 1,
-      "otel_error": ""
+    "expect": {
+      "spans": 0,
+      "env": {},
+      "config": {
+        "endpoint": "",
+        "insecure": false,
+        "service_name": "otel-cli"
+      },
+      "diagnostics": {
+        "is_recording": false,
+        "number_of_args": 1,
+        "otel_error": ""
+      }
     }
   }
-}
+]

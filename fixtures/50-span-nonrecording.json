@@ -1,11 +1,21 @@
-{
-  "description": "otel-cli span with no OTLP config should do and print nothing",
-  "config": {
-    "env": {},
-    "cli_args": ["span", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server"]
-  },
-  "expect": {
-    "spans": 0,
-    "output": ""
+[
+  {
+    "description": "otel-cli span with no OTLP config should do and print nothing",
+    "config": {
+      "env": {},
+      "cli_args": [
+        "span",
+        "--service",
+        "main_test.go",
+        "--name",
+        "test-span-123",
+        "--kind",
+        "server"
+      ]
+    },
+    "expect": {
+      "spans": 0,
+      "output": ""
+    }
   }
-}
+]
