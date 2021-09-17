@@ -63,7 +63,7 @@ type Fixture struct {
 	Expect      Results       `json:"expect"`
 }
 
-// FixtureSet is a list of Fixtures that run serially.
+// FixtureSuite is a list of Fixtures that run serially.
 type FixtureSuite []Fixture
 
 func TestMain(m *testing.M) {
@@ -75,12 +75,10 @@ func TestMain(m *testing.M) {
 
 // TestOtelCli loads all the json fixtures and executes the tests.
 func TestOtelCli(t *testing.T) {
-
-	/*
-	 *
-	 * TODO TODO TODO: report a nice error when otel-cli isn't built in ./otel-cli
-	 *
-	 */
+	_, err := os.Stat("./otel-cli")
+	if os.IsNotExist(err) {
+		t.Fatalf("otel-cli must be built and present as ./otel-cli for this test suite to work (try: go build)")
+	}
 
 	wd, _ := os.Getwd() // go tests execute in the *_test.go's directory
 	fixtureDir := filepath.Join(wd, "fixtures")
@@ -125,17 +123,12 @@ func TestOtelCli(t *testing.T) {
 		t.Fatal("no test fixtures loaded!")
 	}
 
-	// run a suite of fixtures.
-	// Within a suite jobs can be backgrounded and foregrounded.
-	// This is not meant for complicated workflows, mainly for testing things
-	// like span background.
 	for _, suite := range suites {
 		// a fixture can be backgrounded after starting it up for e.g. otel-cli span background
 		// a second fixture with the same description later in the list will "foreground" it
 		bgFixtureWaits := make(map[string]chan struct{})
 		bgFixtureDones := make(map[string]chan struct{})
 
-		// run all the fixtures, check the results
 	fixtures:
 		for _, fixture := range suite {
 			// some tests explicitly spend time sleeping/waiting to validate timeouts are working
@@ -145,6 +138,8 @@ func TestOtelCli(t *testing.T) {
 				continue fixtures
 			}
 
+			// when a fixture is foregrounded all it does is signal the background fixture
+			// to finish doing its then, waits for it to finish, then continues on
 			if fixture.Config.Foreground {
 				if wait, ok := bgFixtureWaits[fixture.Description]; ok {
 					wait <- struct{}{}
@@ -183,6 +178,8 @@ func TestOtelCli(t *testing.T) {
 	}
 }
 
+// runFixture runs the OTLP server & command, waits for signal, checks
+// results, then signals it's done.
 func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}) {
 	// sets up an OTLP server, runs otel-cli, packages data up in these return vals
 	endpoint, results, span, events := runOtelCli(t, fixture)
@@ -191,6 +188,7 @@ func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}) {
 	done <- struct{}{}
 }
 
+// checkAll gathers up all the check* funcs below into one function.
 func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, span otlpserver.CliEvent, events otlpserver.CliEventList) {
 	// check timeout and process status expectations
 	checkProcess(t, fixture, results)
@@ -208,6 +206,9 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 	}
 }
 
+// checkProcess validates configured expectations about whether otel-cli failed
+// or the test timed out. These are mostly used for testing that otel-cli fails
+// in the way we want it to.
 func checkProcess(t *testing.T, fixture Fixture, results Results) {
 	if results.TimedOut != fixture.Expect.TimedOut {
 		t.Errorf("[%s] test timeout status is %t but expected %t", fixture.Filename, results.TimedOut, fixture.Expect.TimedOut)
