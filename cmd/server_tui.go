@@ -50,7 +50,7 @@ func doServerTui(cmd *cobra.Command, args []string) {
 	if config.Endpoint == "" {
 		config.Endpoint = defaultOtlpEndpoint
 	}
-	cs.ServeGPRC(config.Endpoint)
+	cs.ListenAndServeGPRC(config.Endpoint)
 }
 
 // renderTui takes the given span and events, appends them to the in-memory

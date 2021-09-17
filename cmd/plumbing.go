@@ -23,6 +23,8 @@ import (
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
+	otel.SetErrorHandler(diagnostics)
+
 	// when no endpoint is set, do not set up plumbing. everything will still
 	// run but in non-recording mode, and otel-cli is effectively disabled
 	// and will not time out trying to connect out
@@ -151,5 +153,6 @@ func isLoopbackAddr(endpoint string) bool {
 		}
 	}
 
+	diagnostics.DetectedLocalhost = allAreLoopback
 	return allAreLoopback
 }

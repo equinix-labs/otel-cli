@@ -22,6 +22,15 @@ Example:
 	Run: doStatus,
 }
 
+// StatusOutput captures all the data we want to print out for this subcommand
+// and is also is used in ../main_test.go for automated testing.
+type StatusOutput struct {
+	Config      Config            `json:"config"`
+	SpanData    map[string]string `json:"span_data"`
+	Env         map[string]string `json:"env"`
+	Diagnostics Diagnostics       `json:"diagnostics"`
+}
+
 func init() {
 	rootCmd.AddCommand(statusCmd)
 	addCommonParams(statusCmd)
@@ -36,7 +45,8 @@ func doStatus(cmd *cobra.Command, args []string) {
 	// to try to stall sending at the end so as much as possible of the otel
 	// code still executes
 	tracer := otel.Tracer("otel-cli/status")
-	ctx, span := tracer.Start(ctx, "dump state")
+	ctx, span := tracer.Start(ctx, "otel-cli status")
+	diagnostics.IsRecording = span.IsRecording()
 
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
@@ -55,20 +65,21 @@ func doStatus(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// grab the SpanContext for printing things, end the span, then shut down
+	// otel before moving on to print things
 	sc := trace.SpanContextFromContext(ctx)
-	outData := struct {
-		Config   Config            `json:"config"`
-		SpanData map[string]string `json:"span_data"`
-		Env      map[string]string `json:"env"`
-	}{
+	span.End()
+
+	outData := StatusOutput{
 		Config: config,
+		Env:    env,
 		SpanData: map[string]string{
 			"trace_id":    sc.TraceID().String(),
 			"span_id":     sc.SpanID().String(),
 			"trace_flags": sc.TraceFlags().String(),
 			"is_sampled":  strconv.FormatBool(sc.IsSampled()),
 		},
-		Env: env,
+		Diagnostics: diagnostics,
 	}
 
 	js, err := json.MarshalIndent(outData, "", "    ")
@@ -78,6 +89,4 @@ func doStatus(cmd *cobra.Command, args []string) {
 
 	os.Stdout.Write(js)
 	os.Stdout.WriteString("\n")
-
-	span.End()
 }

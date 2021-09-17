@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -130,12 +131,6 @@ func otelSpanKind(kind string) trace.SpanKind {
 	}
 }
 
-// GetExitCode() returns the exitCode value which is mainly used in exec.go
-// so that the exit code of otel-cli matches the child program's exit code.
-func GetExitCode() int {
-	return exitCode
-}
-
 // propagateOtelCliSpan saves the traceparent to file if necessary, then prints
 // span info to the console according to command-line args.
 func propagateOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
@@ -169,18 +164,20 @@ func printSpanData(target io.Writer, traceId, spanId, tp string) {
 // When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
 // It logs an error and returns time.Duration(0) if the string is empty or unparseable.
 func parseCliTimeout() time.Duration {
+	var out time.Duration
 	if config.Timeout == "" {
-		return time.Duration(0)
-	}
-
-	if d, err := time.ParseDuration(config.Timeout); err == nil {
-		return d
+		out = time.Duration(0)
+	} else if d, err := time.ParseDuration(config.Timeout); err == nil {
+		out = d
 	} else if secs, serr := strconv.ParseInt(config.Timeout, 10, 0); serr == nil {
-		return time.Second * time.Duration(secs)
+		out = time.Second * time.Duration(secs)
 	} else {
 		softLog("unable to parse --timeout %q: %s", config.Timeout, err)
-		return time.Duration(0)
+		out = time.Duration(0)
 	}
+
+	diagnostics.ParsedTimeoutMs = out.Milliseconds()
+	return out
 }
 
 // softLog only calls through to log if otel-cli was run with the --verbose flag.
@@ -194,9 +191,34 @@ func softLog(format string, a ...interface{}) {
 // softFail only calls through to log if otel-cli was run with the --verbose
 // flag, then immediately exits with status 0.
 func softFail(format string, a ...interface{}) {
-	if !config.Verbose {
-		return
-	}
-	log.Printf(format, a...)
+	softLog(format, a...)
 	os.Exit(0)
+}
+
+// flattenStringMap takes a string map and returns it flattened into a string with
+// keys sorted lexically so it should be mostly consistent enough for comparisons
+// and printing. Output is k=v,k=v style like attributes input.
+func flattenStringMap(mp map[string]string, emptyValue string) string {
+	if len(mp) == 0 {
+		return emptyValue
+	}
+
+	var out string
+	keys := make([]string, len(mp)) // for sorting
+	var i int
+	for k := range mp {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+
+	for i, k := range keys {
+		out = out + k + "=" + mp[k]
+		if i == len(keys)-1 {
+			break
+		}
+		out = out + ","
+	}
+
+	return out
 }

@@ -21,7 +21,10 @@ See: otel-cli span background
 
 func init() {
 	spanCmd.AddCommand(spanEndCmd)
-	spanEndCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanEndCmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
+	// TODO
+	//spanEndCmd.Flags().StringVar(&config.Timeout, "timeout", defaults.Timeout, "timeout for otel-cli operations, all timeouts in otel-cli use this value")
+	spanEndCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
 	spanEndCmd.MarkFlagRequired("sockdir")
 }
 
@@ -36,5 +39,7 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 	}
 	shutdown()
 
-	printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	if config.TraceparentPrint {
+		printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	}
 }

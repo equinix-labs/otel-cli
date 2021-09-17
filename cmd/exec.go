@@ -85,7 +85,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	span.End()
 
 	// set the global exit code so main() can grab it and os.Exit() properly
-	exitCode = child.ProcessState.ExitCode()
+	diagnostics.ExecExitCode = child.ProcessState.ExitCode()
 
 	propagateOtelCliSpan(ctx, span, os.Stdout)
 }

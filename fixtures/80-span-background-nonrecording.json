@@ -1,0 +1,64 @@
+[
+  {
+    "description": "otel-cli span background, non-recording",
+    "config": {
+      "background": true,
+      "test_timeout_ms": 2000,
+      "env": {},
+      "cli_args": [
+        "span",
+        "background",
+        "--timeout",
+        "1s",
+        "--sockdir",
+        "."
+      ]
+    },
+    "expect": {
+      "spans": 0,
+      "output": ""
+    }
+  },
+  {
+    "description": "otel-cli span event",
+    "config": {
+      "env": {},
+      "cli_args": [
+        "span",
+        "event",
+        "--name",
+        "an event happened",
+        "--attrs",
+        "ima=now,mondai=problem",
+        "--sockdir",
+        "."
+      ]
+    },
+    "expect": {
+      "spans": 0,
+      "output": ""
+    }
+  },
+  {
+    "description": "otel-cli span end",
+    "config": {
+      "env": {},
+      "cli_args": [
+        "span",
+        "end",
+        "--sockdir",
+        "."
+      ]
+    },
+    "expect": {
+      "spans": 0,
+      "output": ""
+    }
+  },
+  {
+    "description": "otel-cli span background, non-recording",
+    "config": {
+      "foreground": true
+    }
+  }
+]

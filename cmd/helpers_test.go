@@ -242,3 +242,18 @@ func TestParseCliTime(t *testing.T) {
 		})
 	}
 }
+
+func TestFlattenStringMap(t *testing.T) {
+	in := map[string]string{
+		"sample1": "value1",
+		"more":    "stuff",
+		"getting": "bored",
+		"okay":    "that's enough",
+	}
+
+	out := flattenStringMap(in, "{}")
+
+	if out != "getting=bored,more=stuff,okay=that's enough,sample1=value1" {
+		t.Fail()
+	}
+}
