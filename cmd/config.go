@@ -1,6 +1,9 @@
 package cmd
 
-import "strconv"
+import (
+	"encoding/json"
+	"strconv"
+)
 
 // config is the global configuraiton used by all of otel-cli.
 // It is written to by Cobra and Viper.
@@ -75,6 +78,19 @@ type Config struct {
 
 	CfgFile string `json:"config_file"`
 	Verbose bool   `json:"verbose"`
+}
+
+// UnmarshalJSON makes sure that any Config loaded from JSON has its default
+// values set. This is critical to comparisons in the otel-cli test suite.
+func (c *Config) UnmarshalJSON(js []byte) error {
+	// use a type alias to avoid recursion on Unmarshaler
+	type config Config
+	defaults := config(DefaultConfig())
+	if err := json.Unmarshal(js, &defaults); err != nil {
+		return err
+	}
+	*c = Config(defaults)
+	return nil
 }
 
 // ToStringMap flattens the configuration into a stringmap that is easy to work
