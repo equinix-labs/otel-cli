@@ -191,10 +191,7 @@ func softLog(format string, a ...interface{}) {
 // softFail only calls through to log if otel-cli was run with the --verbose
 // flag, then immediately exits with status 0.
 func softFail(format string, a ...interface{}) {
-	if !config.Verbose {
-		return
-	}
-	log.Printf(format, a...)
+	softLog(format, a...)
 	os.Exit(0)
 }
 
