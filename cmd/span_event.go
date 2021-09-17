@@ -30,6 +30,9 @@ func init() {
 	spanCmd.AddCommand(spanEventCmd)
 	spanEventCmd.Flags().SortFlags = false
 
+	spanEventCmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
+	// TODO
+	//spanEventCmd.Flags().StringVar(&config.Timeout, "timeout", defaults.Timeout, "timeout for otel-cli operations, all timeouts in otel-cli use this value")
 	spanEventCmd.Flags().StringVarP(&config.EventName, "name", "e", defaults.EventName, "set the name of the event")
 	spanEventCmd.Flags().StringVarP(&config.EventTime, "time", "t", defaults.EventTime, "the precise time of the event in RFC3339Nano or Unix.nano format")
 	spanEventCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
@@ -54,5 +57,7 @@ func doSpanEvent(cmd *cobra.Command, args []string) {
 		softFail("error while calling background server rpc BgSpan.AddEvent: %s", err)
 	}
 
-	printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	if config.TraceparentPrint {
+		printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	}
 }
