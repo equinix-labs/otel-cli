@@ -70,7 +70,15 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	// pass the existing env but add the latest TRACEPARENT carrier so e.g.
 	// otel-cli exec 'otel-cli exec sleep 1' will relate the spans automatically
-	child.Env = os.Environ()
+	child.Env = []string{}
+
+	// grab everything BUT the TRACEPARENT envvar
+	for _, env := range os.Environ() {
+		if !strings.HasPrefix(env, "TRACEPARENT=") {
+			child.Env = append(child.Env, env)
+		}
+	}
+
 	if !config.TraceparentIgnoreEnv {
 		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", getTraceparent(ctx)))
 	}
