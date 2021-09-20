@@ -1,0 +1,30 @@
+[
+  {
+    "description": "otel-cli exec basic test and stuff",
+    "config": {
+      "env": {
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+        "TRACEPARENT": "00-edededededededededededededed9000-edededededededed-01"
+      },
+      "cli_args": [
+        "exec",
+        "--service",
+        "main_test.go",
+        "--name",
+        "test-span-123",
+        "--kind",
+        "server",
+        "echo hello world"
+      ]
+    },
+    "expect": {
+      "output": "hello world\n",
+      "spans": 2,
+      "span_data": {
+        "trace_id": "edededededededededededededed9000",
+        "span_id": "*",
+        "is_sampled": "true"
+      }
+    }
+  }
+]
