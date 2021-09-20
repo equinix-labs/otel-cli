@@ -154,7 +154,6 @@ func TestOtelCli(t *testing.T) {
 					t.Fatalf("BUG in test or fixture: unexpected foreground fixture done chan named %q", fixture.Description)
 				}
 
-				t.Skipf("[%s] fixture %q foregrounded", fixture.Filename, fixture.Description)
 				continue fixtures
 			}
 
