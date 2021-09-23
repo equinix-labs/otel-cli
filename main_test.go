@@ -212,7 +212,6 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 // number of expected spans in the fixture, if specified. If no expected
 // span count is specified, this check always passes.
 func checkSpans(t *testing.T, fixture Fixture, results Results) {
-	t.Logf("[%s] checking we recorded %d spans as expected", fixture.Filename, fixture.Expect.Spans)
 	if results.Spans != fixture.Expect.Spans {
 		t.Errorf("[%s] span count was %d but expected %d", fixture.Filename, results.Spans, fixture.Expect.Spans)
 	}
@@ -340,7 +339,6 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 		results.Events += len(events)
 
 		// true tells the server we're done and it can exit its loop
-		t.Logf("returning %t", results.Spans >= fixture.Expect.Spans)
 		return results.Spans >= fixture.Expect.Spans
 	}
 
@@ -468,7 +466,8 @@ gather:
 			// in a timeout with the above time.After
 			gatheredSpans++
 			if gatheredSpans == results.Spans {
-				t.Logf("returning from gather with %d spans", gatheredSpans)
+				// TODO: it would be slightly nicer to use plural.Selectf instead of 'span(s)'
+				t.Logf("[%s] test gathered %d span(s)", fixture.Filename, gatheredSpans)
 				break gather
 			}
 		}
