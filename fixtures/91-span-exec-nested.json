@@ -1,6 +1,6 @@
 [
   {
-    "description": "otel-cli exec basic test and stuff",
+    "description": "otel-cli exec runs otel-cli exec",
     "config": {
       "env": {
         "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
