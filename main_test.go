@@ -192,7 +192,10 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 	// check timeout and process status expectations
 	checkProcess(t, fixture, results)
 
-	// compares the spans from the server against expectations in the fixture
+	// compare the number of recorded spans against expectations in the fixture
+	checkSpans(t, fixture, results)
+
+	// compares the data in each recorded span against expectations in the fixture
 	checkSpanData(t, fixture, endpoint, span, events)
 
 	// many of the basic plumbing tests use status so it has its own set of checks
@@ -202,6 +205,16 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 	} else {
 		// checking the text output only makes sense for non-status paths
 		checkOutput(t, fixture, endpoint, results)
+	}
+}
+
+// compare the number of spans recorded by the test server against the
+// number of expected spans in the fixture, if specified. If no expected
+// span count is specified, this check always passes.
+func checkSpans(t *testing.T, fixture Fixture, results Results) {
+	t.Logf("[%s] checking we recorded %d spans as expected", fixture.Filename, fixture.Expect.Spans)
+	if results.Spans != fixture.Expect.Spans {
+		t.Errorf("[%s] span count was %d but expected %d", fixture.Filename, results.Spans, fixture.Expect.Spans)
 	}
 }
 
@@ -327,6 +340,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 		results.Events += len(events)
 
 		// true tells the server we're done and it can exit its loop
+		t.Logf("returning %t", results.Spans >= fixture.Expect.Spans)
 		return results.Spans >= fixture.Expect.Spans
 	}
 
@@ -454,6 +468,7 @@ gather:
 			// in a timeout with the above time.After
 			gatheredSpans++
 			if gatheredSpans == results.Spans {
+				t.Logf("returning from gather with %d spans", gatheredSpans)
 				break gather
 			}
 		}

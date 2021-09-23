@@ -21,7 +21,7 @@
     },
     "expect": {
       "output": "hello world\n",
-      "spans": 999,
+      "spans": 2,
       "span_data": {
         "trace_id": "*",
         "span_id": "*",
