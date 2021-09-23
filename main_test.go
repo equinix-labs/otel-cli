@@ -193,7 +193,7 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 	checkProcess(t, fixture, results)
 
 	// compare the number of recorded spans against expectations in the fixture
-	checkSpans(t, fixture, results)
+	checkSpanCount(t, fixture, results)
 
 	// compares the data in each recorded span against expectations in the fixture
 	checkSpanData(t, fixture, endpoint, span, events)
@@ -211,7 +211,7 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 // compare the number of spans recorded by the test server against the
 // number of expected spans in the fixture, if specified. If no expected
 // span count is specified, this check always passes.
-func checkSpans(t *testing.T, fixture Fixture, results Results) {
+func checkSpanCount(t *testing.T, fixture Fixture, results Results) {
 	if results.Spans != fixture.Expect.Spans {
 		t.Errorf("[%s] span count was %d but expected %d", fixture.Filename, results.Spans, fixture.Expect.Spans)
 	}
