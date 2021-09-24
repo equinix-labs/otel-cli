@@ -1,10 +1,9 @@
 [
   {
-    "description": "otel-cli exec runs echo",
+    "description": "otel-cli exec runs otel-cli exec",
     "config": {
       "env": {
-        "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
-        "TRACEPARENT": "00-edededededededededededededed9000-edededededededed-01"
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"
       },
       "cli_args": [
         "exec",
@@ -14,14 +13,17 @@
         "test-span-123",
         "--kind",
         "server",
-        "echo hello world"
+        "./otel-cli",
+        "exec",
+        "--tp-ignore-env",
+        "echo hello world $TRACEPARENT"
       ]
     },
     "expect": {
       "output": "hello world\n",
-      "spans": 1,
+      "spans": 2,
       "span_data": {
-        "trace_id": "edededededededededededededed9000",
+        "trace_id": "*",
         "span_id": "*",
         "is_sampled": "true"
       }
