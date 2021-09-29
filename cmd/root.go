@@ -10,7 +10,7 @@ import (
 var cfgFile, serviceName, spanName, spanKind, traceparentCarrierFile string
 var spanAttrs, otlpHeaders map[string]string
 var otlpEndpoint string
-var otlpInsecure, otlpBlocking, noTlsVerify bool
+var otlpInsecure, otlpBlocking, noTlSVerify bool
 var traceparentIgnoreEnv, traceparentPrint, traceparentPrintExport bool
 var traceparentRequired, testMode bool
 var exitCode int
@@ -28,10 +28,12 @@ func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }
 
+//nolint:errcheck
 func init() {
+	cobra.OnInitialize(initViperConfig)
+
 	spanAttrs = make(map[string]string)
 	otlpHeaders = make(map[string]string)
-	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
 
@@ -91,7 +93,7 @@ func init() {
 	viper.BindPFlag("tp-export", rootCmd.PersistentFlags().Lookup("tp-export"))
 	viper.BindEnv("OTEL_CLI_EXPORT_TRACEPARENT", "tp-export")
 
-	rootCmd.PersistentFlags().BoolVar(&noTlsVerify, "no-tls-verify", false, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing and usign self-signed certificates.")
+	rootCmd.PersistentFlags().BoolVar(&noTlSVerify, "no-tls-verify", false, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing and usign self-signed certificates.")
 	viper.BindPFlag("no-tls-verify", rootCmd.PersistentFlags().Lookup("no-tls-verify"))
 	viper.BindEnv("OTEL_CLI_NO_TLS_VERIFY", "no-tls-verify")
 

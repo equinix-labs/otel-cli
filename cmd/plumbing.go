@@ -37,7 +37,7 @@ func initTracer() (context.Context, func()) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else {
 		var config *tls.Config
-		if noTlsVerify {
+		if noTlSVerify {
 			config = &tls.Config{
 				InsecureSkipVerify: true,
 			}
