@@ -66,6 +66,7 @@ func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
 	// running the shutdown as a goroutine prevents the client from getting an
 	// error here when the server gets closed. defer didn't do the trick.
 	go bs.shutdown()
+
 	return nil
 }
 
@@ -99,7 +100,10 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 		shutdown: func() { bgs.Shutdown() },
 	}
 	// makes methods on BgSpan available over RPC
-	rpc.Register(&bgspan)
+	err = rpc.Register(&bgspan)
+	if err != nil {
+		log.Fatal("unable to register BgSpan over RPC")
+	}
 
 	bgs.listener, err = net.Listen("unix", sockfile)
 	if err != nil {
@@ -126,6 +130,7 @@ func (bgs *bgServer) Run() {
 		}
 
 		bgs.wg.Add(1)
+
 		go func() {
 			defer conn.Close()
 			jsonrpc.ServeConn(conn)
@@ -152,7 +157,9 @@ func createBgClient() (*rpc.Client, func()) {
 	// wait for the socket file to show up, polling every 25ms until it does or timeout
 	for {
 		_, err := os.Stat(sockfile)
+		//nolint:gocritic
 		if os.IsNotExist(err) {
+			//nolint:gomnd
 			time.Sleep(time.Millisecond * 25) // sleep 25ms between checks
 		} else if err != nil {
 			log.Fatalf("failed to stat file '%s': %s", sockfile, err)
@@ -166,6 +173,7 @@ func createBgClient() (*rpc.Client, func()) {
 	}
 
 	sock := net.UnixAddr{Name: sockfile, Net: "unix"}
+
 	conn, err := net.DialUnix(sock.Net, nil, &sock)
 	if err != nil {
 		log.Fatalf("unable to connect to span background server at '%s': %s", spanBgSockdir, err)
