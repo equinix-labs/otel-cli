@@ -25,6 +25,7 @@ func init() {
 	checkTracecarrierRe = regexp.MustCompile("^[[:xdigit:]]{2}-[[:xdigit:]]{32}-[[:xdigit:]]{16}-[[:xdigit:]]{2}")
 }
 
+// NewOtelCliCarrier returns a default otel carrier struct
 func NewOtelCliCarrier() OtelCliCarrier {
 	return OtelCliCarrier{}
 }
@@ -33,9 +34,9 @@ func NewOtelCliCarrier() OtelCliCarrier {
 func (ec OtelCliCarrier) Get(key string) string {
 	if key == "traceparent" {
 		return envTp
-	} else {
-		return ""
 	}
+
+	return ""
 }
 
 // Set sets the global traceparent if key is "traceparent" otherwise nothing
@@ -63,6 +64,7 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 	if filename != "" {
 		ctx = loadTraceparentFromFile(ctx, filename)
 	}
+
 	if traceparentRequired {
 		tp := getTraceparent(ctx) // get the text representation in the context
 		if len(tp) > 0 && checkTracecarrierRe.MatchString(tp) {
@@ -72,8 +74,10 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 				return ctx
 			}
 		}
+
 		log.Fatalf("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
 	}
+
 	return ctx
 }
 
@@ -114,7 +118,9 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 
 	carrier := NewOtelCliCarrier()
 	carrier.Set("traceparent", string(tp))
+
 	prop := otel.GetTextMapPropagator()
+
 	return prop.Extract(ctx, carrier)
 }
 
@@ -124,7 +130,9 @@ func saveTraceparentToFile(ctx context.Context, filename string) {
 	if filename == "" {
 		return
 	}
+
 	tp := getTraceparent(ctx)
+
 	err := ioutil.WriteFile(filename, []byte(tp), 0600)
 	if err != nil {
 		log.Fatalf("failure while writing to file '%s': %s", filename, err)
@@ -149,7 +157,9 @@ func loadTraceparentFromEnv(ctx context.Context) context.Context {
 	// is using an internal detail but it's probably fine
 	carrier := NewOtelCliCarrier()
 	carrier.Set("traceparent", tp)
+
 	prop := otel.GetTextMapPropagator()
+
 	return prop.Extract(ctx, carrier)
 }
 
@@ -159,5 +169,6 @@ func getTraceparent(ctx context.Context) string {
 	prop := otel.GetTextMapPropagator()
 	carrier := NewOtelCliCarrier()
 	prop.Inject(ctx, carrier)
+
 	return carrier.Get("traceparent")
 }
