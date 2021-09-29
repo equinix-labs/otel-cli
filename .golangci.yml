@@ -1,0 +1,66 @@
+run:
+  build-tags:
+    - testtools
+
+linters-settings:
+  goimports:
+    local-prefixes: go.metalkube.net/hollow
+  gofumpt:
+    extra-rules: true
+
+linters:
+  enable:
+    # default linters
+    - deadcode
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unused
+    - varcheck
+
+    # additional linters
+    - bodyclose
+    - gocritic
+    - gocyclo
+    - goerr113
+    - gofmt
+    # - gofumpt
+    - goimports
+    - gomnd
+    - govet
+    - misspell
+    - noctx
+    - revive
+    - stylecheck
+    - whitespace
+    - wsl
+
+    # - bod
+issues:
+  exclude:
+    # Default excludes from `golangci-lint run --help` with EXC0002 removed
+    # EXC0001 errcheck: Almost all programs ignore errors on these functions and in most cases it's ok
+    - Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*print(f|ln)?|os\.(Un)?Setenv). is not checked
+    # EXC0002 golint: Annoying issue about not having a comment. The rare codebase has such comments
+    # - (comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form)
+    # EXC0003 golint: False positive when tests are defined in package 'test'
+    - func name will be used as test\.Test.* by other packages, and that stutters; consider calling this
+    # EXC0004 govet: Common false positives
+    - (possible misuse of unsafe.Pointer|should have signature)
+    # EXC0005 staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
+    - ineffective break statement. Did you mean to break out of the outer loop
+    # EXC0006 gosec: Too many false-positives on 'unsafe' usage
+    - Use of unsafe calls should be audited
+    # EXC0007 gosec: Too many false-positives for parametrized shell calls
+    - Subprocess launch(ed with variable|ing should be audited)
+    # EXC0008 gosec: Duplicated errcheck checks
+    - (G104|G307)
+    # EXC0009 gosec: Too many issues in popular repos
+    - (Expect directory permissions to be 0750 or less|Expect file permissions to be 0600 or less)
+    # EXC0010 gosec: False positive is triggered by 'src, err := ioutil.ReadFile(filename)'
+    - Potential file inclusion via variable
+  exclude-use-default: false
