@@ -24,8 +24,8 @@ func init() {
 // and returns them in an []attribute.KeyValue.
 func cliAttrsToOtel(attributes map[string]string) []attribute.KeyValue {
 	otAttrs := []attribute.KeyValue{}
-	for k, v := range attributes {
 
+	for k, v := range attributes {
 		// try to parse as numbers, and fall through to string
 		var av attribute.Value
 		if i, err := strconv.ParseInt(v, 0, 64); err == nil {
@@ -71,9 +71,11 @@ func parseTime(ts, which string) time.Time {
 	// Unix epoch time with nanoseconds
 	if epochNanoTimeRE.MatchString(ts) {
 		parts := strings.Split(ts, ".")
+		//nolint:gomnd
 		if len(parts) == 2 {
 			secs, utnerr := strconv.ParseInt(parts[0], 10, 64)
 			nsecs, utnnerr := strconv.ParseInt(parts[1], 10, 64)
+
 			if utnerr == nil && utnnerr == nil && secs > 0 {
 				return time.Unix(secs, nsecs)
 			}
@@ -95,17 +97,21 @@ func parseTime(ts, which string) time.Time {
 	if uterr != nil {
 		log.Fatalf("Could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
 	}
+
 	if utnerr != nil || utnnerr != nil {
 		log.Fatalf("Could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
 	}
+
 	if rerr != nil {
 		log.Fatalf("Could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
 	}
+
 	if rnerr != nil {
 		log.Fatalf("Could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
 	}
 
 	log.Fatalf("Could not parse span %s time %q as any supported format", which, ts)
+
 	return time.Now() // never happens, just here to make compiler happy
 }
 
@@ -129,7 +135,7 @@ func otelSpanKind(kind string) trace.SpanKind {
 	}
 }
 
-// GetExitCode() returns the exitCode value which is mainly used in exec.go
+// GetExitCode returns the exitCode value which is mainly used in exec.go
 // so that the exit code of otel-cli matches the child program's exit code.
 func GetExitCode() int {
 	return exitCode
@@ -149,7 +155,7 @@ func propagateOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer
 
 // printSpanData takes the provided strings and prints them in a consitent format,
 // depending on which command line arguments were set.
-func printSpanData(target io.Writer, traceId, spanId, tp string) {
+func printSpanData(target io.Writer, traceID, spanID, tp string) {
 	// --tp-print / --tp-export
 	if !traceparentPrint && !traceparentPrintExport {
 		return
@@ -162,5 +168,5 @@ func printSpanData(target io.Writer, traceId, spanId, tp string) {
 		exported = "export "
 	}
 
-	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp)
+	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceID, spanID, exported, tp)
 }
