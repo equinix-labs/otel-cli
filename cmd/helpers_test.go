@@ -67,6 +67,7 @@ func TestParseTime(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to parse time '%s' as format '%s': %s", value, layout, err)
 		}
+
 		return out
 	}
 
