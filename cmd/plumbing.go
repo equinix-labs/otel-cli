@@ -60,6 +60,7 @@ func initTracer() (context.Context, func()) {
 	}
 
 	var exporter sdktrace.SpanExporter // allows overwrite in --test mode
+
 	exporter, err := otlpgrpc.New(ctx, grpcOpts...)
 	if err != nil {
 		log.Fatalf("failed to configure OTLP exporter: %s", err)
@@ -76,6 +77,7 @@ func initTracer() (context.Context, func()) {
 
 	// set the service name that will show up in tracing UIs
 	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(serviceName))
+
 	res, err := resource.New(ctx, resAttrs)
 	if err != nil {
 		log.Fatalf("failed to create OpenTelemetry service name resource: %s", err)
@@ -124,6 +126,7 @@ func isLoopbackAddr(endpoint string) bool {
 	endpoint = strings.TrimSpace(endpoint)
 
 	var hostname string
+	//nolint:gocritic
 	if hpRe.MatchString(endpoint) {
 		parts := strings.SplitN(endpoint, ":", 2)
 		hostname = parts[0]
@@ -145,6 +148,7 @@ func isLoopbackAddr(endpoint string) bool {
 	// all ips returned must be loopback to return true
 	// cases where that isn't true should be super rare, and probably all shenanigans
 	allAreLoopback := true
+
 	for _, ip := range ips {
 		if !ip.IsLoopback() {
 			allAreLoopback = false
