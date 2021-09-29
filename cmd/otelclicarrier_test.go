@@ -50,6 +50,7 @@ func TestOtelCliCarrier(t *testing.T) {
 	// thing is to round-trip our traceparent through it and make sure it comes
 	// back as expected
 	prop := otel.GetTextMapPropagator()
+
 	ctx := prop.Extract(context.Background(), carrier)
 	if ctx == nil {
 		t.Errorf("expected a context but got nil, likely a problem in otel? this shouldn't happen...")
@@ -58,6 +59,7 @@ func TestOtelCliCarrier(t *testing.T) {
 	// try to round trip the traceparent back out of that context ^^
 	rtCarrier := NewOtelCliCarrier()
 	prop.Inject(ctx, rtCarrier)
+
 	got = carrier.Get("traceparent")
 	if got != tp {
 		t.Errorf("round-tripping traceparent through a context failed, expected '%s', got '%s'", tp, got)
@@ -79,6 +81,7 @@ func TestLoadTraceparent(t *testing.T) {
 
 	// load from file only
 	testFileTp := "00-f61fc53f926e07a9c3893b1a722e1b65-7a2d6a804f3de137-01"
+
 	file, err := ioutil.TempFile(t.TempDir(), "go-test-otel-cli")
 	if err != nil {
 		t.Fatalf("unable to create tempfile for testing: %s", err)
@@ -95,6 +98,7 @@ func TestLoadTraceparent(t *testing.T) {
 
 	// actually do the test...
 	fileCtx := loadTraceparent(context.Background(), file.Name())
+
 	got := getTraceparent(fileCtx)
 	if got != testFileTp {
 		t.Errorf("loadTraceparent with file failed, expected '%s', got '%s'", testFileTp, got)
@@ -104,6 +108,7 @@ func TestLoadTraceparent(t *testing.T) {
 	testEnvTp := "00-b122b620341449410b9cd900c96d459d-aa21cda35388b694-01"
 	os.Setenv("TRACEPARENT", testEnvTp)
 	envCtx := loadTraceparent(context.Background(), os.DevNull)
+
 	got = getTraceparent(envCtx)
 	if got != testEnvTp {
 		t.Errorf("loadTraceparent with envvar failed, expected '%s', got '%s'", testEnvTp, got)
@@ -113,6 +118,7 @@ func TestLoadTraceparent(t *testing.T) {
 	// the file is expected to win
 	bothCtx := loadTraceparent(context.Background(), file.Name())
 	got = getTraceparent(bothCtx)
+
 	if got != testFileTp {
 		t.Errorf("loadTraceparent with file and envvar set to different values failed, expected '%s', got '%s'", testFileTp, got)
 	}
