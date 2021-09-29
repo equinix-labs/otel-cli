@@ -72,6 +72,7 @@ func TestLoadTraceparent(t *testing.T) {
 
 	// trace id should not change, because there's no envvar and no file
 	loadTraceparent(context.Background(), os.DevNull)
+
 	if envTp != "" {
 		t.Error("traceparent detected where there should be none")
 	}
@@ -82,11 +83,15 @@ func TestLoadTraceparent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create tempfile for testing: %s", err)
 	}
+
 	defer os.Remove(file.Name())
 	// write in the full shell snippet format so that stripping gets tested
 	// in this pass too
-	file.WriteString("export TRACEPARENT=" + testFileTp)
-	file.Close()
+	_, err = file.WriteString("export TRACEPARENT=" + testFileTp)
+	if err != nil {
+		t.Error("failed to write traceparent file")
+	}
+	defer file.Close()
 
 	// actually do the test...
 	fileCtx := loadTraceparent(context.Background(), file.Name())
@@ -121,8 +126,10 @@ func TestWriteTraceparentToFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create tempfile for testing: %s", err)
 	}
-	file.Close()
+
 	defer os.Remove(file.Name()) // not strictly necessary
+
+	file.Close()
 
 	// set up a carrier and inject the traceparent
 	prop := otel.GetTextMapPropagator()
@@ -137,9 +144,11 @@ func TestWriteTraceparentToFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read tempfile '%s': %s", file.Name(), err)
 	}
+
 	if len(data) == 0 {
 		t.Errorf("saveTraceparentToFile wrote %d bytes to the tempfile, expected %d", len(data), len(testTp))
 	}
+
 	if string(data) != testTp {
 		t.Errorf("invalid data in traceparent file, expected '%s', got '%s'", testTp, data)
 	}
