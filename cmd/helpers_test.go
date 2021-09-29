@@ -13,7 +13,6 @@ import (
 )
 
 func TestCliAttrsToOtel(t *testing.T) {
-
 	testAttrs := map[string]string{
 		"test 1 - string":      "isn't testing fun?",
 		"test 2 - int64":       "111111111",
@@ -100,7 +99,7 @@ func TestParseTime(t *testing.T) {
 		// so parseTime takes care of that automatically
 		{
 			name:  "date(1) RFC3339 output, with timezone",
-			input: "2021-04-06 13:07:54-07:00", //date --rfc-3339=seconds
+			input: "2021-04-06 13:07:54-07:00", // date --rfc-3339=seconds
 			want:  mustParse(time.RFC3339, "2021-04-06T13:07:54-07:00"),
 		},
 		{
@@ -121,7 +120,6 @@ func TestParseTime(t *testing.T) {
 }
 
 func TestOtelSpanKind(t *testing.T) {
-
 	for _, testcase := range []struct {
 		name string
 		want trace.SpanKind
@@ -166,7 +164,6 @@ func TestOtelSpanKind(t *testing.T) {
 
 func TestPropagateOtelCliSpan(t *testing.T) {
 	// TODO: should this noop the tracing backend?
-
 	// set package globals to a known state
 	traceparentCarrierFile = ""
 	traceparentPrint = false
@@ -175,6 +172,7 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	tp := "00-3433d5ae39bdfee397f44be5146867b3-8a5518f1e5c54d0a-01"
 	tid := "3433d5ae39bdfee397f44be5146867b3"
 	sid := "8a5518f1e5c54d0a"
+
 	os.Setenv("TRACEPARENT", tp)
 	tracer := otel.Tracer("testing/propagateOtelCliSpan")
 	ctx, span := tracer.Start(context.Background(), "testing propagateOtelCliSpan")
@@ -183,6 +181,7 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	// mostly smoke testing this, will validate printSpanData output
 	// TODO: maybe validate the file write works, but that's tested elsewhere...
 	propagateOtelCliSpan(ctx, span, buf)
+
 	if buf.Len() != 0 {
 		t.Errorf("nothing was supposed to be written but %d bytes were", buf.Len())
 	}
@@ -191,9 +190,11 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	traceparentPrintExport = true
 	buf = new(bytes.Buffer)
 	printSpanData(buf, tid, sid, tp)
+
 	if buf.Len() == 0 {
 		t.Error("expected more than zero bytes but got none")
 	}
+
 	expected := fmt.Sprintf("# trace id: %s\n#  span id: %s\nexport TRACEPARENT=%s\n", tid, sid, tp)
 	if buf.String() != expected {
 		t.Errorf("got unexpected output, expected '%s', got '%s'", expected, buf.String())
