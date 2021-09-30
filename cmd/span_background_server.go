@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -58,6 +57,11 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	return nil
 }
 
+// Wait is a no-op RPC for validating the background server is up and running.
+func (bs BgSpan) Wait(in, reply *struct{}) error {
+	return nil
+}
+
 // End takes a BgEnd (empty) struct, replies with the usual trace info, then
 // ends the span end exits the background process.
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
@@ -90,7 +94,7 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 
 	// TODO: be safer?
 	if err = os.RemoveAll(sockfile); err != nil {
-		log.Fatalf("failed while cleaning up for socket file '%s': %s", sockfile, err)
+		softFail("failed while cleaning up for socket file '%s': %s", sockfile, err)
 	}
 
 	bgspan := BgSpan{
@@ -107,7 +111,7 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 
 	bgs.listener, err = net.Listen("unix", sockfile)
 	if err != nil {
-		log.Fatalf("unable to listen on unix socket '%s': %s", sockfile, err)
+		softFail("unable to listen on unix socket '%s': %s", sockfile, err)
 	}
 
 	bgs.wg.Add(1) // cleanup will block until this is done
@@ -125,7 +129,7 @@ func (bgs *bgServer) Run() {
 			case <-bgs.quit: // quitting gracefully
 				return
 			default:
-				log.Fatalf("error while accepting connection: %s", err)
+				softFail("error while accepting connection: %s", err)
 			}
 		}
 
@@ -153,6 +157,7 @@ func (bgs *bgServer) Shutdown() {
 func createBgClient() (*rpc.Client, func()) {
 	sockfile := spanBgSockfile()
 	started := time.Now()
+	timeout := parseCliTimeout()
 
 	// wait for the socket file to show up, polling every 25ms until it does or timeout
 	for {
@@ -162,13 +167,13 @@ func createBgClient() (*rpc.Client, func()) {
 			//nolint:gomnd
 			time.Sleep(time.Millisecond * 25) // sleep 25ms between checks
 		} else if err != nil {
-			log.Fatalf("failed to stat file '%s': %s", sockfile, err)
+			softFail("failed to stat file '%s': %s", sockfile, err)
 		} else {
 			break
 		}
 
-		if time.Since(started) > time.Duration(spanBgTimeout)*time.Second {
-			log.Fatalf("timeout while waiting for span background socket '%s' to appear", sockfile)
+		if timeout > 0 && time.Since(started) > timeout {
+			softFail("timeout after %s while waiting for span background socket '%s' to appear", config.Timeout, sockfile)
 		}
 	}
 
@@ -176,7 +181,7 @@ func createBgClient() (*rpc.Client, func()) {
 
 	conn, err := net.DialUnix(sock.Net, nil, &sock)
 	if err != nil {
-		log.Fatalf("unable to connect to span background server at '%s': %s", spanBgSockdir, err)
+		softFail("unable to connect to span background server at '%s': %s", config.BackgroundSockdir, err)
 	}
 
 	return jsonrpc.NewClient(conn), func() { conn.Close() }

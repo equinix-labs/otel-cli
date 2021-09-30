@@ -12,13 +12,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const spanBgSockfilename = "otel-cli-background.sock"
-const spanBgParentPollMs = 10 // check parent pid every 10ms
-
-var spanBgSockdir string
-var spanBgTimeout int
-var spanBgStarted time.Time // for measuring uptime
-
 // spanBgCmd represents the span background command
 var spanBgCmd = &cobra.Command{
 	Use:   "background",
@@ -44,8 +37,9 @@ timeout, (catchable) signals, or deliberate exit.
 }
 
 func init() {
-	// mark the time when the process started for putting uptime in attributes
-	spanBgStarted = time.Now()
+	// this used to be a global const but now it's in Config
+	// TODO: does it make sense to make this configurable? 10ms might be too frequent...
+	config.BackgroundParentPollMs = 10
 
 	spanCmd.AddCommand(spanBgCmd)
 
@@ -55,17 +49,35 @@ func init() {
 	// only necessary for adding events to the span. it should be fine to
 	// start a background span at the top of a script then let it fall off
 	// at the end to get an easy span
-	spanBgCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
-	spanBgCmd.Flags().IntVar(&spanBgTimeout, "timeout", 10, "how long the background server should run before timeout")
+	spanBgCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
+
+	spanBgCmd.Flags().BoolVar(&config.BackgroundWait, "wait", defaults.BackgroundWait, "wait for background to be fully started and then return")
+
+	addCommonParams(spanBgCmd)
+	addSpanParams(spanBgCmd)
+	addClientParams(spanBgCmd)
 }
 
 // spanBgSockfile returns the full filename for the socket file under the
 // provided background socket directory provided by the user.
 func spanBgSockfile() string {
-	return path.Join(spanBgSockdir, spanBgSockfilename)
+	return path.Join(config.BackgroundSockdir, spanBgSockfilename)
 }
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
+	// special case --wait, createBgClient() will wait for the socket to show up
+	// then connect and send a no-op RPC. by this time e.g. --tp-carrier should
+	// be all done and everything is ready to go without race conditions
+	if config.BackgroundWait {
+		client, shutdown := createBgClient()
+		defer shutdown()
+		err := client.Call("BgSpan.Wait", &struct{}{}, &struct{}{})
+		if err != nil {
+			softFail("error while waiting on span background: %s", err)
+		}
+		return
+	}
+
 	ctx, span, shutdown := startSpan() // from span.go
 	defer shutdown()
 
@@ -94,7 +106,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 
 	go func() {
 		for {
-			time.Sleep(time.Duration(spanBgParentPollMs) * time.Millisecond)
+			time.Sleep(time.Duration(config.BackgroundParentPollMs) * time.Millisecond)
 
 			// check if the parent process has changed, exit when it does
 			cppid := os.Getppid()
@@ -107,11 +119,13 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 
 	// start the timeout goroutine, this is a little late but the server
 	// has to be up for this to make much sense
-	go func() {
-		time.Sleep(time.Second * time.Duration(spanBgTimeout))
-		spanBgEndEvent("timeout", span)
-		bgs.Shutdown()
-	}()
+	if timeout := parseCliTimeout(); timeout > 0 {
+		go func() {
+			time.Sleep(timeout)
+			spanBgEndEvent("timeout", span)
+			bgs.Shutdown()
+		}()
+	}
 
 	// will block until bgs.Shutdown()
 	bgs.Run()
@@ -122,10 +136,8 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 // spanBgEndEvent adds an event with the provided name, to the provided span
 // with uptime.milliseconds and timeout.seconds attributes.
 func spanBgEndEvent(name string, span trace.Span) {
-	uptime := time.Since(spanBgStarted)
 	attrs := trace.WithAttributes([]attribute.KeyValue{
-		{Key: attribute.Key("uptime.milliseconds"), Value: attribute.Int64Value(uptime.Milliseconds())},
-		{Key: attribute.Key("timeout.seconds"), Value: attribute.IntValue(spanBgTimeout)},
+		{Key: attribute.Key("timeout.duration"), Value: attribute.StringValue(config.Timeout)},
 	}...)
 	span.AddEvent(name, attrs)
 }

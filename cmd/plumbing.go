@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
-	"log"
 	"net"
 	"net/url"
 	"regexp"
@@ -11,7 +10,6 @@ import (
 
 	"go.opentelemetry.io/otel"
 	otlpgrpc "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	stdout "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -22,40 +20,55 @@ import (
 
 // initTracer sets up the OpenTelemetry plumbing so it's ready to use.
 // Returns a context and a func() that encapuslates clean shutdown.
-//
 func initTracer() (context.Context, func()) {
 	ctx := context.Background()
 
-	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(otlpEndpoint)}
+	otel.SetErrorHandler(diagnostics)
+
+	// when no endpoint is set, do not set up plumbing. everything will still
+	// run but in non-recording mode, and otel-cli is effectively disabled
+	// and will not time out trying to connect out
+	if config.Endpoint == "" {
+		return ctx, func() {}
+	}
+
+	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(config.Endpoint)}
+
+	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
+	if timeout := parseCliTimeout(); timeout > 0 {
+		grpcOpts = append(grpcOpts, otlpgrpc.WithTimeout(timeout))
+	}
 
 	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
 	// but I expect most users of this program to point at a localhost endpoint that might not
 	// have any encryption available, or setting it up raises the bar of entry too high.
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	if otlpInsecure || isLoopbackAddr(otlpEndpoint) {
+	if config.Insecure || isLoopbackAddr(config.Endpoint) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else {
 		var config *tls.Config
+  
 		if noTlSVerify {
 			config = &tls.Config{
+
 				InsecureSkipVerify: true,
 			}
 		}
-		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(config))))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(otlpHeaders) > 0 {
+	if len(config.Headers) > 0 {
 		// fortunately WithHeaders can accept the string map as-is
-		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(otlpHeaders))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(config.Headers))
 	}
 
 	// OTLP examples usually show this with the grpc.WithBlock() dial option to
 	// make the connection synchronous, but it's not the right default for cli
 	// instead, rely on the shutdown methods to make sure everything is flushed
 	// by the time the program exits.
-	if otlpBlocking {
+	if config.Blocking {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
 	}
 
@@ -63,24 +76,15 @@ func initTracer() (context.Context, func()) {
 
 	exporter, err := otlpgrpc.New(ctx, grpcOpts...)
 	if err != nil {
-		log.Fatalf("failed to configure OTLP exporter: %s", err)
-	}
-
-	// when in test mode, let the otlp exporter setup happen, then overwrite it
-	// with the stdout exporter so spans only go to stdout
-	if testMode {
-		exporter, err = stdout.New()
-		if err != nil {
-			log.Fatalf("failed to configure stdout exporter in --test mode: %s", err)
-		}
+		softFail("failed to configure OTLP exporter: %s", err)
 	}
 
 	// set the service name that will show up in tracing UIs
-	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(serviceName))
-
+	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName))
+  
 	res, err := resource.New(ctx, resAttrs)
 	if err != nil {
-		log.Fatalf("failed to create OpenTelemetry service name resource: %s", err)
+		softFail("failed to create OpenTelemetry service name resource: %s", err)
 	}
 
 	// SSP sends all completed spans to the exporter immediately and that is
@@ -104,12 +108,12 @@ func initTracer() (context.Context, func()) {
 	return ctx, func() {
 		err = tracerProvider.Shutdown(ctx)
 		if err != nil {
-			log.Fatalf("shutdown of OpenTelemetry tracerProvider failed: %s", err)
+			softFail("shutdown of OpenTelemetry tracerProvider failed: %s", err)
 		}
 
 		err = exporter.Shutdown(ctx)
 		if err != nil {
-			log.Fatalf("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
+			softFail("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
 		}
 	}
 }
@@ -133,16 +137,16 @@ func isLoopbackAddr(endpoint string) bool {
 	} else if uriRe.MatchString(endpoint) {
 		u, err := url.Parse(endpoint)
 		if err != nil {
-			log.Fatalf("error parsing provided URI '%s': %s", endpoint, err)
+			softFail("error parsing provided URI '%s': %s", endpoint, err)
 		}
 		hostname = u.Hostname()
 	} else {
-		log.Fatalf("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
+		softFail("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
 	}
 
 	ips, err := net.LookupIP(hostname)
 	if err != nil {
-		log.Fatalf("unable to look up hostname '%s': %s", hostname, err)
+		softFail("unable to look up hostname '%s': %s", hostname, err)
 	}
 
 	// all ips returned must be loopback to return true
@@ -155,5 +159,6 @@ func isLoopbackAddr(endpoint string) bool {
 		}
 	}
 
+	diagnostics.DetectedLocalhost = allAreLoopback
 	return allAreLoopback
 }

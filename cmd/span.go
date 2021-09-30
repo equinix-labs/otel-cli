@@ -30,7 +30,6 @@ Example:
 	Run: doSpan,
 }
 
-var spanStartTime, spanEndTime string
 var epochNanoTimeRE *regexp.Regexp
 
 func init() {
@@ -38,14 +37,16 @@ func init() {
 
 	spanCmd.Flags().SortFlags = false
 
-	// --name / -s
-	spanCmd.PersistentFlags().StringVarP(&spanName, "name", "s", "todo-generate-default-span-names", "set the name of the span")
-
 	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
-	spanCmd.Flags().StringVar(&spanStartTime, "start", "", "a Unix epoch or RFC3339 timestamp for the start of the span")
+	spanCmd.Flags().StringVar(&config.SpanStartTime, "start", defaults.SpanStartTime, "a Unix epoch or RFC3339 timestamp for the start of the span")
 
 	// --end $timestamp
-	spanCmd.Flags().StringVar(&spanEndTime, "end", "", "an Unix epoch or RFC3339 timestamp for the end of the span")
+	spanCmd.Flags().StringVar(&config.SpanEndTime, "end", defaults.SpanEndTime, "an Unix epoch or RFC3339 timestamp for the end of the span")
+
+	addCommonParams(spanCmd)
+	addSpanParams(spanCmd)
+	addAttrParams(spanCmd)
+	addClientParams(spanCmd)
 
 	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
 }
@@ -61,31 +62,25 @@ func doSpan(cmd *cobra.Command, args []string) {
 // context, the span, and a deferrable function for clean shutdown (it ends the
 // span).
 func startSpan() (context.Context, trace.Span, func()) {
-	startOpts := []trace.SpanStartOption{trace.WithSpanKind(otelSpanKind(spanKind))}
-
-	if spanStartTime != "" {
-		t := parseTime(spanStartTime, "start")
-		startOpts = append(startOpts, trace.WithTimestamp(t))
+	t := parseTime(config.SpanStartTime, "start")
+	startOpts := []trace.SpanStartOption{
+		trace.WithSpanKind(otelSpanKind(config.Kind)),
+		trace.WithTimestamp(t),
 	}
 
 	ctx, shutdown := initTracer()
-	ctx = loadTraceparent(ctx, traceparentCarrierFile)
+	ctx = loadTraceparent(ctx, config.TraceparentCarrierFile)
 	tracer := otel.Tracer("otel-cli/span")
 
-	ctx, span := tracer.Start(ctx, spanName, startOpts...)
-	span.SetAttributes(cliAttrsToOtel(spanAttrs)...) // applies CLI attributes to the span
+	ctx, span := tracer.Start(ctx, config.SpanName, startOpts...)
+	span.SetAttributes(cliAttrsToOtel(config.Attributes)...) // applies CLI attributes to the span
 
 	return ctx, span, shutdown
 }
 
 // endSpan takes a span, checks for a --end command-line option, and ends the span.
 func endSpan(span trace.Span) {
-	endOpts := []trace.SpanEndOption{}
-
-	if spanEndTime != "" {
-		t := parseTime(spanEndTime, "end")
-		endOpts = append(endOpts, trace.WithTimestamp(t))
-	}
-
+	t := parseTime(config.SpanEndTime, "end")
+	endOpts := []trace.SpanEndOption{trace.WithTimestamp(t)}
 	span.End(endOpts...)
 }

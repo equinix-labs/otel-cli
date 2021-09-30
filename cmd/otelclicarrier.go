@@ -1,15 +1,14 @@
 package cmd
 
 import (
-	"bytes"
+	"bufio"
 	"context"
-	"io/ioutil"
-	"log"
 	"os"
 	"regexp"
 	"strings"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var envTp string // global state
@@ -65,7 +64,7 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 		ctx = loadTraceparentFromFile(ctx, filename)
 	}
 
-	if traceparentRequired {
+	if config.TraceparentRequired {
 		tp := getTraceparent(ctx) // get the text representation in the context
 		if len(tp) > 0 && checkTracecarrierRe.MatchString(tp) {
 			parts := strings.Split(tp, "-") // e.g. 00-9765b2f71c68b04dc0ad2a4d73027d6f-1881444346b6296e-01
@@ -75,7 +74,7 @@ func loadTraceparent(ctx context.Context, filename string) context.Context {
 			}
 		}
 
-		log.Fatalf("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
+    softFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
 	}
 
 	return ctx
@@ -90,30 +89,40 @@ func loadTraceparentFromFile(ctx context.Context, filename string) context.Conte
 	if err != nil {
 		// only fatal when the tp carrier file is required explicitly, otherwise
 		// just silently return the unmodified context
-		if traceparentRequired {
-			log.Fatalf("could not open file '%s' for read: %s", filename, err)
+		if config.TraceparentRequired {
+			softFail("could not open file '%s' for read: %s", filename, err)
 		} else {
 			return ctx
 		}
 	}
+	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		log.Fatalf("failure while reading from file '%s': %s", filename, err)
+	// only use the line that contains TRACEPARENT
+	var tp string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// printSpanData emits comments with trace id and span id, ignore those
+		if strings.HasPrefix(line, "#") {
+			continue
+		} else if strings.Contains(strings.ToUpper(line), "TRACEPARENT") {
+			tp = line
+			break
+		}
 	}
 
-	tp := bytes.TrimSpace(data)
-	if len(tp) == 0 {
+	// silently fail if no traceparent was found
+	if tp == "" {
 		return ctx
 	}
 
-	// also accept 'export TRACEPARENT=' and 'TRACEPARENT='
-	tp = bytes.TrimPrefix(tp, []byte("export "))
-	tp = bytes.TrimPrefix(tp, []byte("TRACEPARENT="))
+	// clean 'export TRACEPARENT=' and 'TRACEPARENT=' off the output
+	tp = strings.TrimPrefix(tp, "export ")
+	tp = strings.TrimPrefix(tp, "TRACEPARENT=")
 
-	if !checkTracecarrierRe.Match(tp) {
-		// I have a doubt: should this be a soft failure?
-		log.Fatalf("file '%s' was read but does not contain a valid traceparent", filename)
+	if !checkTracecarrierRe.MatchString(tp) {
+		softLog("file '%s' was read but does not contain a valid traceparent", filename)
+		return ctx
 	}
 
 	carrier := NewOtelCliCarrier()
@@ -131,19 +140,25 @@ func saveTraceparentToFile(ctx context.Context, filename string) {
 		return
 	}
 
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+	if err != nil {
+		softLog("failure opening file '%s' for write: %s", filename, err)
+	}
+	defer file.Close()
+
+	sc := trace.SpanContextFromContext(ctx)
+	traceId := sc.TraceID().String()
+	spanId := sc.SpanID().String()
 	tp := getTraceparent(ctx)
 
-	err := ioutil.WriteFile(filename, []byte(tp), 0600)
-	if err != nil {
-		log.Fatalf("failure while writing to file '%s': %s", filename, err)
-	}
+	printSpanData(file, traceId, spanId, tp)
 }
 
 // loadTraceparentFromEnv loads the traceparent from the environment variable
 // TRACEPARENT and sets it in the returned Go context.
 func loadTraceparentFromEnv(ctx context.Context) context.Context {
 	// don't load the envvar when --tp-ignore-env is set
-	if traceparentIgnoreEnv {
+	if config.TraceparentIgnoreEnv {
 		return ctx
 	}
 

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -95,24 +97,25 @@ func parseTime(ts, which string) time.Time {
 
 	// none of the formats worked, print whatever errors are remaining
 	if uterr != nil {
-		log.Fatalf("Could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
+		softFail("Could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
 	}
 
 	if utnerr != nil || utnnerr != nil {
-		log.Fatalf("Could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
+		softFail("Could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
 	}
 
 	if rerr != nil {
-		log.Fatalf("Could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
+		softFail("Could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
 	}
 
 	if rnerr != nil {
-		log.Fatalf("Could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
+		softFail("Could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
 	}
 
-	log.Fatalf("Could not parse span %s time %q as any supported format", which, ts)
 
-	return time.Now() // never happens, just here to make compiler happy
+	softFail("Could not parse span %s time %q as any supported format", which, ts)
+
+  return time.Now() // never happens, just here to make compiler happy
 }
 
 // otelSpanKind takes a supported string span kind and returns the otel
@@ -135,22 +138,19 @@ func otelSpanKind(kind string) trace.SpanKind {
 	}
 }
 
-// GetExitCode returns the exitCode value which is mainly used in exec.go
-// so that the exit code of otel-cli matches the child program's exit code.
-func GetExitCode() int {
-	return exitCode
-}
-
 // propagateOtelCliSpan saves the traceparent to file if necessary, then prints
 // span info to the console according to command-line args.
 func propagateOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
-	saveTraceparentToFile(ctx, traceparentCarrierFile)
+	saveTraceparentToFile(ctx, config.TraceparentCarrierFile)
 
-	tpout := getTraceparent(ctx)
-	tid := span.SpanContext().TraceID().String()
-	sid := span.SpanContext().SpanID().String()
+	if config.TraceparentPrint {
+		sc := trace.SpanContextFromContext(ctx)
+		traceId := sc.TraceID().String()
+		spanId := sc.SpanID().String()
 
-	printSpanData(target, tid, sid, tpout)
+		tp := getTraceparent(ctx)
+		printSpanData(target, traceId, spanId, tp)
+	}
 }
 
 // printSpanData takes the provided strings and prints them in a consitent format,
@@ -164,9 +164,72 @@ func printSpanData(target io.Writer, traceID, spanID, tp string) {
 	// --tp-export will print "export TRACEPARENT" so it's
 	// one less step to print to a file & source, or eval
 	var exported string
-	if traceparentPrintExport {
+	if config.TraceparentPrintExport {
 		exported = "export "
 	}
 
 	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceID, spanID, exported, tp)
+}
+
+// parseCliTimeout parses the cliTimeout global string value to a time.Duration.
+// When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
+// It logs an error and returns time.Duration(0) if the string is empty or unparseable.
+func parseCliTimeout() time.Duration {
+	var out time.Duration
+	if config.Timeout == "" {
+		out = time.Duration(0)
+	} else if d, err := time.ParseDuration(config.Timeout); err == nil {
+		out = d
+	} else if secs, serr := strconv.ParseInt(config.Timeout, 10, 0); serr == nil {
+		out = time.Second * time.Duration(secs)
+	} else {
+		softLog("unable to parse --timeout %q: %s", config.Timeout, err)
+		out = time.Duration(0)
+	}
+
+	diagnostics.ParsedTimeoutMs = out.Milliseconds()
+	return out
+}
+
+// softLog only calls through to log if otel-cli was run with the --verbose flag.
+func softLog(format string, a ...interface{}) {
+	if !config.Verbose {
+		return
+	}
+	log.Printf(format, a...)
+}
+
+// softFail only calls through to log if otel-cli was run with the --verbose
+// flag, then immediately exits with status 0.
+func softFail(format string, a ...interface{}) {
+	softLog(format, a...)
+	os.Exit(0)
+}
+
+// flattenStringMap takes a string map and returns it flattened into a string with
+// keys sorted lexically so it should be mostly consistent enough for comparisons
+// and printing. Output is k=v,k=v style like attributes input.
+func flattenStringMap(mp map[string]string, emptyValue string) string {
+	if len(mp) == 0 {
+		return emptyValue
+	}
+
+	var out string
+	keys := make([]string, len(mp)) // for sorting
+	var i int
+	for k := range mp {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+
+	for i, k := range keys {
+		out = out + k + "=" + mp[k]
+		if i == len(keys)-1 {
+			break
+		}
+		out = out + ","
+	}
+
+	return out
 }

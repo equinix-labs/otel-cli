@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -22,9 +21,11 @@ See: otel-cli span background
 
 func init() {
 	spanCmd.AddCommand(spanEndCmd)
-	spanEndCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
-	spanEndCmd.Flags().IntVar(&spanBgTimeout, "timeout", 5, "how long to wait for the background server socket to be available")
 
+	spanEndCmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
+	// TODO
+	//spanEndCmd.Flags().StringVar(&config.Timeout, "timeout", defaults.Timeout, "timeout for otel-cli operations, all timeouts in otel-cli use this value")
+	spanEndCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
 	err := spanEndCmd.MarkFlagRequired("sockdir")
 	if err != nil {
 		log.Fatal("required flag missing, specify --sockdir")
@@ -39,10 +40,12 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 
 	err := client.Call("BgSpan.End", rpcArgs, &res)
 	if err != nil {
-		log.Fatalf("error while calling background server rpc BgSpan.End: %s", err)
+		softFail("error while calling background server rpc BgSpan.End: %s", err)
 	}
 
 	shutdown()
 
-	printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	if config.TraceparentPrint {
+		printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	}
 }

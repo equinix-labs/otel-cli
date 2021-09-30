@@ -6,22 +6,39 @@ otel-cli is a command-line tool for sending OpenTelemetry traces. It is written 
 Go and intended to be used in shell scripts and other places where the best option
 available for sending spans is executing another program.
 
-Since this needs to connect to the OTLP endpoint on each run, it is highly recommended
-to have a localhost opentelemetry collector running so this doesn't slow down your
-program too much and you don't spam outbound connections on each command.
+otel-cli can be added to your scripts with no configuration and it will run as normal
+but in non-recording mode and will emit no traces. This follows the OpenTelemetry community's
+philosophy of "first, do no harm" and makes it so you can add otel-cli to your code and
+later turn it on.
+
+Since otel-cli needs to connect to the OTLP endpoint on each run, it is highly recommended
+to use a localhost opentelemetry collector that can buffer spans so that the connection
+cost does not slow down your program too much.
 
 ## Getting Started
 
-The easiest way is a go get:
+We publish a number of package formats for otel-cli, including tar.gz, zip (windows),
+apk (Alpine), rpm (Red Hat variants), deb (Debian variants), and a brew tap. These
+can be found on the repo's [Releases](https://github.com/equinix-labs/otel-cli/releases) page.
+
+On most platforms the easiest way is a go get:
 
 ```shell
-go get github.com/packethost/otel-cli
+go get github.com/equinix-labs/otel-cli
 ```
+
+To use the brew tap e.g. on MacOS:
+
+```shell
+brew tap equinix-labs/otel-cli
+brew install otel-cli
+```
+
 
 Alternatively, clone the repo and build it locally:
 
 ```shell
-git clone git@github.com:packethost/otel-cli.git
+git clone git@github.com:equinix-labs/otel-cli.git
 cd otel-cli
 go build
 ```
@@ -29,6 +46,10 @@ go build
 ## Examples
 
 ```shell
+# run otel-cli as a local OTLP server and print traces to your console
+# run this in its own terminal and try some of the commands below!
+otel-cli server tui
+
 # run a program inside a span
 otel-cli exec --service my-service --name "curl google" curl https://google.com
 
@@ -61,17 +82,22 @@ otel-cli span event --name "cool thing" --attrs "foo=bar" --sockdir $sockdir
 otel-cli span end --sockdir $sockdir
 # or you can kill the background process and it will end the span cleanly
 kill %1
+
+# server mode can also write traces to the filesystem, e.g. for testing
+dir=$(mktemp -d)
+otel-cli server json --dir $dir --timeout 60 --max-spans 5
 ```
 
 ## Configuration
 
-Everything is configurable via CLI arguments, and many of those arguments can
-also be configured via file or environment variables.
+Everything is configurable via CLI arguments and environment variables. If no endpoint
+is specified, otel-cli will run in non-recording mode and not attempt to contact any servers.
 
 | CLI argument    | environment variable          | config file key | example value  |
 | --------------- | ----------------------------- | --------------- | -------------- |
 | --endpoint      | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint        | localhost:4317 |
 | --insecure      | OTEL_EXPORTER_OTLP_INSECURE   | insecure        | false          |
+| --timeout       | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout         | 1s             |
 | --otlp-headers  | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers    | key=value      |
 | --otlp-blocking | OTEL_EXPORTER_OTLP_BLOCKING   | otlp-blocking   | false          |
 | --service       | OTEL_CLI_SERVICE_NAME         | service         | myapp          |
@@ -84,6 +110,8 @@ also be configured via file or environment variables.
 | --tp-export     | OTEL_CLI_EXPORT_TRACEPARENT   | tp-export       | false          |
 | --no-tls-verify | OTEL_CLI_NO_TLS_VERIFY        | no-tls-verify   | false          |
 
+[Valid timeout units](https://pkg.go.dev/time#ParseDuration) are "ns", "us"/"µs", "ms", "s", "m", "h".
+
 ## Easy local dev
 
 We want working on otel-cli to be easy, so we've provided a few different ways to get
@@ -91,29 +119,39 @@ started. In general, there are three things you need:
 
 - A working Go environment
 - A built (or installed) copy of otel-cli itself
-- A system to receive/inspect the traces you generate
 
-#### 1. A working Go environment
+### 1. A working Go environment
 
 Providing instructions on getting Go up and running on your machine is out of scope for this
 README. However, the good news is that it's fairly easy to do! You can follow the normal
 [Installation instructions](https://golang.org/doc/install) from the Go project itself.
 
-
-#### 2. A built (or installed) copy of otel-cli itself
+### 2. A built (or installed) copy of otel-cli itself
 
 If you're planning on making changes to otel-cli, we recommend building the project locally: `go build`
 
-But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/packethost/otel-cli`
+But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/equinix-labs/otel-cli`. This will place the command in your `GOPATH`. If your `GOPATH` is in your `PATH` you should be all set.
 
-#### 3. A system to receive/inspect the traces you generate
+### 3. A system to receive/inspect the traces you generate
 
-Here you have one more choice: you can either send traces to a SaaS tracing vendor or other
-system that you already have, or you can run our `docker-compose` configuration to launch a local Jaeger system.
+otel-cli can run as a server and accept OTLP connections. It has two modes, one prints to your console
+while the other writes to JSON files.
 
-If you're not sure what to choose, we recommend trying our Jaeger configuration, which requires no configuration.
+```shell
+otel-cli server tui
+otel-cli server json --dir $dir --timeout 60 --max-spans 5
+```
 
-##### Local Jaeger setup
+Many SaaS vendors accept OTLP these days so one option is to send directly to those. This is not
+recommended for production since it will slow your code down on the roundtrips. It is recommended
+to use an opentelemetry-collector locally.
+
+Another option is to run the local docker compose Jaeger setup in the root of this repo with
+`docker-compose up`. This will bring up a stock Jaeger instance that can accept OTLP connections.
+
+If you're not sure what to choose, try `otel-cli server tui` or `docker-compose up`.
+
+### Local Jaeger setup
 
 Just run `docker-compose up` from this repository, and you'll get an OpenTelemetry collector and a local
 Jaeger all-in-one setup ready to go.
@@ -122,15 +160,16 @@ The OpenTelemetry collector is listening on `localhost:4317`, and the Jaeger UI 
 `localhost:16686`. Since these are the expected defaults of `otel-cli`, you can get started with no further configuration:
 
 ```shell
+docker-compose up
 ./otel-cli exec -n my-cool-thing -s interesting-step echo 'hello world'
 ```
 
 This trace will be available in the Jaeger UI at `localhost:16686`.
 
-##### SaaS tracing vendor
+### SaaS tracing vendor
 
-We've provided Honeycomb, LightStep, and Elastic configurations that you could also use, if you're using one of
-those vendors today. It's still pretty easy to get started:
+We've provided Honeycomb, LightStep, and Elastic configurations that you could also use,
+if you're using one of those vendors today. It's still pretty easy to get started:
 
 ```shell
 # optional: to send data to an an OTLP-enabled tracing vendor, pass in your
@@ -170,7 +209,7 @@ go run . span -n "testing" -s "my first test span"
 
 ## Contributing
 
-Please file issues and PRs on the GitHub project at https://github.com/packethost/otel-cli
+Please file issues and PRs on the GitHub project at https://github.com/equinix-labs/otel-cli
 
 ## Releases
 

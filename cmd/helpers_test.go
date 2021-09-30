@@ -166,9 +166,11 @@ func TestOtelSpanKind(t *testing.T) {
 func TestPropagateOtelCliSpan(t *testing.T) {
 	// TODO: should this noop the tracing backend?
 	// set package globals to a known state
-	traceparentCarrierFile = ""
-	traceparentPrint = false
-	traceparentPrintExport = false
+	config = Config{
+		TraceparentCarrierFile: "",
+		TraceparentPrint:       false,
+		TraceparentPrintExport: false,
+	}
 
 	tp := "00-3433d5ae39bdfee397f44be5146867b3-8a5518f1e5c54d0a-01"
 	tid := "3433d5ae39bdfee397f44be5146867b3"
@@ -188,8 +190,8 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 		t.Errorf("nothing was supposed to be written but %d bytes were", buf.Len())
 	}
 
-	traceparentPrint = true
-	traceparentPrintExport = true
+	config.TraceparentPrint = true
+	config.TraceparentPrintExport = true
 	buf = new(bytes.Buffer)
 	printSpanData(buf, tid, sid, tp)
 
@@ -200,5 +202,61 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	expected := fmt.Sprintf("# trace id: %s\n#  span id: %s\nexport TRACEPARENT=%s\n", tid, sid, tp)
 	if buf.String() != expected {
 		t.Errorf("got unexpected output, expected '%s', got '%s'", expected, buf.String())
+	}
+}
+
+func TestParseCliTime(t *testing.T) {
+	for _, testcase := range []struct {
+		name     string
+		input    string
+		expected time.Duration
+	}{
+		// otel-cli will still timeout but it will be the default timeouts for
+		// each component
+		{
+			name:     "empty string returns 0 duration",
+			input:    "",
+			expected: time.Duration(0),
+		},
+		{
+			name:     "0 returns 0 duration",
+			input:    "0",
+			expected: time.Duration(0),
+		},
+		{
+			name:     "1s returns 1 second",
+			input:    "1s",
+			expected: time.Second,
+		},
+		{
+			name:     "100ms returns 100 milliseconds",
+			input:    "100ms",
+			expected: time.Millisecond * 100,
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			config = Config{Timeout: testcase.input}
+			got := parseCliTimeout()
+			if got != testcase.expected {
+				ed := testcase.expected.String()
+				gd := got.String()
+				t.Errorf("duration string %q was expected to return %s but returned %s", config.Timeout, ed, gd)
+			}
+		})
+	}
+}
+
+func TestFlattenStringMap(t *testing.T) {
+	in := map[string]string{
+		"sample1": "value1",
+		"more":    "stuff",
+		"getting": "bored",
+		"okay":    "that's enough",
+	}
+
+	out := flattenStringMap(in, "{}")
+
+	if out != "getting=bored,more=stuff,okay=that's enough,sample1=value1" {
+		t.Fail()
 	}
 }

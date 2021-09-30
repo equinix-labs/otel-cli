@@ -1,14 +1,11 @@
 package cmd
 
 import (
-	"log"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 )
-
-var spanEventName, spanEventTime string
 
 // spanEventCmd represents the span event command
 var spanEventCmd = &cobra.Command{
@@ -34,23 +31,28 @@ func init() {
 
 	spanEventCmd.Flags().SortFlags = false
 
-	spanEventCmd.Flags().StringVarP(&spanEventName, "name", "e", "todo-generate-default-event-names", "set the name of the event")
-	spanEventCmd.Flags().StringVarP(&spanEventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
-	spanEventCmd.Flags().IntVar(&spanBgTimeout, "timeout", 5, "how long to wait for the background server socket to be available")
-	spanEventCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
+	spanEventCmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
+	// TODO
+	//spanEventCmd.Flags().StringVar(&config.Timeout, "timeout", defaults.Timeout, "timeout for otel-cli operations, all timeouts in otel-cli use this value")
+	spanEventCmd.Flags().StringVarP(&config.EventName, "name", "e", defaults.EventName, "set the name of the event")
+	spanEventCmd.Flags().StringVarP(&config.EventTime, "time", "t", defaults.EventTime, "the precise time of the event in RFC3339Nano or Unix.nano format")
+	spanEventCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 
-	err := spanEventCmd.MarkFlagRequired("sockdir")
+  err := spanEndCmd.MarkFlagRequired("sockdir")
 	if err != nil {
 		log.Fatal("required flag missing, specify --sockdir")
 	}
+
+
+	addAttrParams(spanEventCmd)
 }
 
 func doSpanEvent(cmd *cobra.Command, args []string) {
-	timestamp := parseTime(spanEventTime, "event")
+	timestamp := parseTime(config.EventTime, "event")
 	rpcArgs := BgSpanEvent{
-		Name:       spanEventName,
+		Name:       config.EventName,
 		Timestamp:  timestamp.Format(time.RFC3339Nano),
-		Attributes: spanAttrs,
+		Attributes: config.Attributes,
 	}
 
 	res := BgSpan{}
@@ -63,8 +65,10 @@ func doSpanEvent(cmd *cobra.Command, args []string) {
 		// if we find an error, we should go ahead and shutdown()
 		shutdown()
 		//nolint:gocritic
-		log.Fatalf("error while calling background server rpc BgSpan.AddEvent: %s", err)
+		softFail("error while calling background server rpc BgSpan.AddEvent: %s", err)
 	}
 
-	printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	if config.TraceparentPrint {
+		printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+	}
 }

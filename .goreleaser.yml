@@ -1,0 +1,124 @@
+before:
+  hooks:
+    - go mod tidy
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: 'SNAPSHOT-{{ .Commit }}'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^demos:'
+      - '^configs:'
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    goarm:
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: freebsd
+        goarch: arm64
+
+nfpms:
+  - package_name: otel-cli
+    homepage: https://github.com/equinix-labs/otel-cli
+    description: OpenTelemetry CLI Application (Server & Client)
+    license: Apache 2.0
+    file_name_template: "{{.ProjectName}}_{{.Version}}_{{.Arch}}"
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+    formats:
+      - apk
+      - deb
+      - rpm
+
+archives:
+  - name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+
+brews:
+  # This means the repository must be equinix-labs/homebrew-otel-cli
+  - name: "otel-cli"
+    url_template: "https://github.com/equinix-labs/otel-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    tap:
+      owner: "equinix-labs"
+      name: "homebrew-otel-cli"
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    commit_author:
+      name: "tobert"
+      email: "atobey@equinix.com"
+    homepage: "https://github.com/equinix-labs/otel-cli"
+    description: "OpenTelemetry command-line tool for sending events from shell scripts & similar environments"
+    license: "Apache-2.0"
+    # If set to auto, the release will not be uploaded to the homebrew tap
+    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
+    skip_upload: "auto"
+
+dockers:
+  - image_templates:
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
+    dockerfile: release/Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/amd64"
+  - image_templates:
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
+    dockerfile: release/Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/arm64/v8"
+
+docker_manifests:
+  - name_template: "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}"
+    image_templates:
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
+  - name_template: "ghcr.io/equinix-labs/otel-cli:latest"
+    image_templates:
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
+    use: docker
