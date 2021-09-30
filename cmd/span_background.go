@@ -48,7 +48,9 @@ func init() {
 	spanBgStarted = time.Now()
 
 	spanCmd.AddCommand(spanBgCmd)
+
 	spanBgCmd.Flags().SortFlags = false
+
 	// it seems like the socket should be required for background but it's
 	// only necessary for adding events to the span. it should be fine to
 	// start a background span at the top of a script then let it fall off
@@ -89,6 +91,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	// when the parent process pid changes
 	// TODO: make this configurable?
 	ppid := os.Getppid()
+
 	go func() {
 		for {
 			time.Sleep(time.Duration(spanBgParentPollMs) * time.Millisecond)

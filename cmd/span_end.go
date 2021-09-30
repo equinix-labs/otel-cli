@@ -24,7 +24,11 @@ func init() {
 	spanCmd.AddCommand(spanEndCmd)
 	spanEndCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
 	spanEndCmd.Flags().IntVar(&spanBgTimeout, "timeout", 5, "how long to wait for the background server socket to be available")
-	spanEndCmd.MarkFlagRequired("sockdir")
+
+	err := spanEndCmd.MarkFlagRequired("sockdir")
+	if err != nil {
+		log.Fatal("required flag missing, specify --sockdir")
+	}
 }
 
 func doSpanEnd(cmd *cobra.Command, args []string) {
@@ -32,10 +36,12 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 
 	rpcArgs := BgEnd{}
 	res := BgSpan{}
+
 	err := client.Call("BgSpan.End", rpcArgs, &res)
 	if err != nil {
 		log.Fatalf("error while calling background server rpc BgSpan.End: %s", err)
 	}
+
 	shutdown()
 
 	printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)

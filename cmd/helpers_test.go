@@ -175,6 +175,7 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	sid := "8a5518f1e5c54d0a"
 
 	os.Setenv("TRACEPARENT", tp)
+
 	tracer := otel.Tracer("testing/propagateOtelCliSpan")
 	ctx, span := tracer.Start(context.Background(), "testing propagateOtelCliSpan")
 

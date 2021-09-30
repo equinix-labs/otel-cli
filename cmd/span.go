@@ -35,6 +35,7 @@ var epochNanoTimeRE *regexp.Regexp
 
 func init() {
 	rootCmd.AddCommand(spanCmd)
+
 	spanCmd.Flags().SortFlags = false
 
 	// --name / -s

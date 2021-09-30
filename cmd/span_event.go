@@ -31,13 +31,18 @@ See: otel-cli span background
 
 func init() {
 	spanCmd.AddCommand(spanEventCmd)
+
 	spanEventCmd.Flags().SortFlags = false
 
 	spanEventCmd.Flags().StringVarP(&spanEventName, "name", "e", "todo-generate-default-event-names", "set the name of the event")
 	spanEventCmd.Flags().StringVarP(&spanEventTime, "time", "t", "now", "the precise time of the event in RFC3339Nano or Unix.nano format")
 	spanEventCmd.Flags().IntVar(&spanBgTimeout, "timeout", 5, "how long to wait for the background server socket to be available")
 	spanEventCmd.Flags().StringVar(&spanBgSockdir, "sockdir", "", "a directory where a socket can be placed safely")
-	spanEventCmd.MarkFlagRequired("sockdir")
+
+	err := spanEventCmd.MarkFlagRequired("sockdir")
+	if err != nil {
+		log.Fatal("required flag missing, specify --sockdir")
+	}
 }
 
 func doSpanEvent(cmd *cobra.Command, args []string) {
@@ -50,9 +55,14 @@ func doSpanEvent(cmd *cobra.Command, args []string) {
 
 	res := BgSpan{}
 	client, shutdown := createBgClient()
+
 	defer shutdown()
+
 	err := client.Call("BgSpan.AddEvent", rpcArgs, &res)
 	if err != nil {
+		// if we find an error, we should go ahead and shutdown()
+		shutdown()
+		//nolint:gocritic
 		log.Fatalf("error while calling background server rpc BgSpan.AddEvent: %s", err)
 	}
 
