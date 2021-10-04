@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kr/pretty"
+
 	"github.com/equinix-labs/otel-cli/cmd"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/google/go-cmp/cmp"
@@ -117,6 +119,9 @@ func TestOtelCli(t *testing.T) {
 			suites = append(suites, suite)
 		}
 	}
+
+	suiteData := pretty.Sprintf("%# v", suites)
+	ioutil.WriteFile("/tmp/dump.go", []byte(suiteData), 0644)
 
 	t.Logf("Loaded %d test suites and %d fixtures.", len(suites), fixtureCount)
 	if len(suites) == 0 || fixtureCount == 0 {
