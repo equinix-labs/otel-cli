@@ -1,21 +1,18 @@
-package main
+package main_test
 
-// end-to-end tests for otel-cli using json test definitions in ./fixtures
+// implements the data-driven tests of otel-cli using data in data_for_test.go
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/cmd"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/google/go-cmp/cmp"
 )
@@ -24,47 +21,6 @@ import (
 // so set it to the bare minimum and always the same for cleanup
 const minimumPath = `/bin:/usr/bin`
 const defaultTestTimeout = time.Second
-
-type FixtureConfig struct {
-	CliArgs []string `json:"cli_args"`
-	Env     map[string]string
-	// timeout for how long to wait for the whole test in failure cases
-	TestTimeoutMs int `json:"test_timeout_ms"`
-	// when true this test will be excluded under go -test.short mode
-	// TODO: maybe move this up to the suite?
-	IsLongTest bool `json:"is_long_test"`
-	// for timeout tests we need to start the server to generate the endpoint
-	// but do not want it to answer when otel-cli calls, this does that
-	StopServerBeforeExec bool `json:"stop_server_before_exec"`
-	// run this fixture in the background, starting its server and otel-cli
-	// instance, then let those block in the background and continue running
-	// serial tests until it's "foreground" by a second fixtue with the same
-	// description in the same file
-	Background bool `json:"background"`
-	Foreground bool `json:"foreground"`
-}
-
-// mostly mirrors cmd.StatusOutput but we need more
-type Results struct {
-	// the same datastructure used to generate otel-cli status output
-	cmd.StatusOutput
-	CliOutput     string `json:"output"`         // merged stdout and stderr
-	Spans         int    `json:"spans"`          // number of spans received
-	Events        int    `json:"events"`         // number of events received
-	TimedOut      bool   `json:"timed_out"`      // true when test timed out
-	CommandFailed bool   `json:"command_failed"` // otel-cli failed / was killed
-}
-
-// Fixture represents a test fixture for otel-cli.
-type Fixture struct {
-	Description string        `json:"description"`
-	Filename    string        `json:"-"` // populated at runtime
-	Config      FixtureConfig `json:"config"`
-	Expect      Results       `json:"expect"`
-}
-
-// FixtureSuite is a list of Fixtures that run serially.
-type FixtureSuite []Fixture
 
 func TestMain(m *testing.M) {
 	// wipe out this process's envvars right away to avoid pollution & leakage
@@ -80,41 +36,19 @@ func TestOtelCli(t *testing.T) {
 		t.Fatalf("otel-cli must be built and present as ./otel-cli for this test suite to work (try: go build)")
 	}
 
-	wd, _ := os.Getwd() // go tests execute in the *_test.go's directory
-	fixtureDir := filepath.Join(wd, "fixtures")
-	files, err := ioutil.ReadDir(fixtureDir)
-	if err != nil {
-		t.Fatalf("Failed to list fixture directory %q to detect json files.", fixtureDir)
-	}
-
 	var fixtureCount int
-	suites := []FixtureSuite{}
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".json") {
-			suite := FixtureSuite{}
+	for _, suite := range suites {
+		// run pre-flight checks and populate the Filename field
+		for i, fixture := range suite {
+			fixtureCount++
 
-			fp := filepath.Join(fixtureDir, file.Name())
-			js, err := os.ReadFile(fp)
-			if err != nil {
-				t.Fatalf("Failed to read json fixture file %q: %s", file.Name(), err)
+			// TODO: replace this with a new key in data_for_test.go
+			suite[i].Filename = "data_for_test.go"
+
+			// make sure PATH hasn't been set, because doing that in fixtures is naughty
+			if _, ok := fixture.Config.Env["PATH"]; ok {
+				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Filename)
 			}
-			err = json.Unmarshal(js, &suite)
-			if err != nil {
-				t.Fatalf("Failed to parse json fixture file %q: %s", file.Name(), err)
-			}
-
-			// run pre-flight checks and populate the Filename field
-			for i, fixture := range suite {
-				fixtureCount++
-				// make sure PATH hasn't been set, because doing that in fixtures is naughty
-				if _, ok := fixture.Config.Env["PATH"]; ok {
-					t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", file.Name())
-				}
-
-				suite[i].Filename = filepath.Base(file.Name()) // for error reporting
-			}
-
-			suites = append(suites, suite)
 		}
 	}
 
