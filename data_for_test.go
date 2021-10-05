@@ -3,6 +3,7 @@ package main_test
 // Data structures and data for functional testing of otel-cli.
 
 // TODO: strip defaults from the data structures (might mean dumping them again or a bit of manual work...)
+// TODO: rename Fixture.Filename to Fixture.Name or something like that
 // TODO: add instructions for adding more tests
 
 import "github.com/equinix-labs/otel-cli/cmd"

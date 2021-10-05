@@ -38,13 +38,8 @@ func TestOtelCli(t *testing.T) {
 
 	var fixtureCount int
 	for _, suite := range suites {
-		// run pre-flight checks and populate the Filename field
-		for i, fixture := range suite {
-			fixtureCount++
-
-			// TODO: replace this with a new key in data_for_test.go
-			suite[i].Filename = "data_for_test.go"
-
+		fixtureCount += len(suite)
+		for _, fixture := range suite {
 			// make sure PATH hasn't been set, because doing that in fixtures is naughty
 			if _, ok := fixture.Config.Env["PATH"]; ok {
 				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Filename)
