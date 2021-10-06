@@ -123,3 +123,147 @@ func (c Config) ToStringMap() map[string]string {
 		"verbose":                     strconv.FormatBool(c.Verbose),
 	}
 }
+
+// WithEndpoint returns the config with Endpoint set to the provided value.
+func (c Config) WithEndpoint(with string) Config {
+	c.Endpoint = with
+	return c
+}
+
+// WithTimeout returns the config with Timeout set to the provided value.
+func (c Config) WithTimeout(with string) Config {
+	c.Timeout = with
+	return c
+}
+
+// WithHeades returns the config with Heades set to the provided value.
+func (c Config) WithHeaders(with map[string]string) Config {
+	c.Headers = with
+	return c
+}
+
+// WithInsecure returns the config with Insecure set to the provided value.
+func (c Config) WithInsecure(with bool) Config {
+	c.Insecure = with
+	return c
+}
+
+// WithBlocking returns the config with Blocking set to the provided value.
+func (c Config) WithBlocking(with bool) Config {
+	c.Blocking = with
+	return c
+}
+
+// WithNoTlsVerify returns the config with NoTlsVerify set to the provided value.
+func (c Config) WithNoTlsVerify(with bool) Config {
+	c.NoTlsVerify = with
+	return c
+}
+
+// WithServiceName returns the config with ServiceName set to the provided value.
+func (c Config) WithServiceName(with string) Config {
+	c.ServiceName = with
+	return c
+}
+
+// WithSpanName returns the config with SpanName set to the provided value.
+func (c Config) WithSpanName(with string) Config {
+	c.SpanName = with
+	return c
+}
+
+// WithKind returns the config with Kind set to the provided value.
+func (c Config) WithKind(with string) Config {
+	c.Kind = with
+	return c
+}
+
+// WithAttributes returns the config with Attributes set to the provided value.
+func (c Config) WithAttributes(with map[string]string) Config {
+	c.Attributes = with
+	return c
+}
+
+// WithTraceparentCarrierFile returns the config with TraceparentCarrierFile set to the provided value.
+func (c Config) WithTraceparentCarrierFile(with string) Config {
+	c.TraceparentCarrierFile = with
+	return c
+}
+
+// WithTraceparentIgnoreEnv returns the config with TraceparentIgnoreEnv set to the provided value.
+func (c Config) WithTraceparentIgnoreEnv(with bool) Config {
+	c.TraceparentIgnoreEnv = with
+	return c
+}
+
+// WithTraceparentPrint returns the config with TraceparentPrint set to the provided value.
+func (c Config) WithTraceparentPrint(with bool) Config {
+	c.TraceparentPrint = with
+	return c
+}
+
+// WithTraceparentPrintExport returns the config with TraceparentPrintExport set to the provided value.
+func (c Config) WithTraceparentPrintExport(with bool) Config {
+	c.TraceparentPrintExport = with
+	return c
+}
+
+// WithTraceparentRequired returns the config with TraceparentRequired set to the provided value.
+func (c Config) WithTraceparentRequired(with bool) Config {
+	c.TraceparentRequired = with
+	return c
+}
+
+// WithBackgroundParentPollMs returns the config with BackgroundParentPollMs set to the provided value.
+func (c Config) WithBackgroundParentPollMs(with int) Config {
+	c.BackgroundParentPollMs = with
+	return c
+}
+
+// WithBackgroundSockdir returns the config with BackgroundSockdir set to the provided value.
+func (c Config) WithBackgroundSockdir(with string) Config {
+	c.BackgroundSockdir = with
+	return c
+}
+
+// WithBackgroundWait returns the config with BackgroundWait set to the provided value.
+func (c Config) WithBackgroundWait(with bool) Config {
+	c.BackgroundWait = with
+	return c
+}
+
+// WithSpanStartTime returns the config with SpanStartTime set to the provided value.
+func (c Config) WithSpanStartTime(with string) Config {
+	c.SpanStartTime = with
+	return c
+}
+
+// WithSpanEndTime returns the config with SpanEndTime set to the provided value.
+func (c Config) WithSpanEndTime(with string) Config {
+	c.SpanEndTime = with
+	return c
+}
+
+// WithEventName returns the config with EventName set to the provided value.
+func (c Config) WithEventName(with string) Config {
+	c.EventName = with
+	return c
+}
+
+// WithEventTIme returns the config with EventTIme set to the provided value.
+func (c Config) WithEventTime(with string) Config {
+	c.EventTime = with
+	return c
+}
+
+// WithCfgFile returns the config with CfgFile set to the provided value.
+func (c Config) WithCfgFile(with string) Config {
+	c.CfgFile = with
+	return c
+}
+
+// WithVerbose returns the config with Verbose set to the provided value.
+func (c Config) WithVerbose(with bool) Config {
+	c.Verbose = with
+	return c
+}
