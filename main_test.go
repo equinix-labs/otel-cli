@@ -39,7 +39,20 @@ func TestOtelCli(t *testing.T) {
 	var fixtureCount int
 	for _, suite := range suites {
 		fixtureCount += len(suite)
-		for _, fixture := range suite {
+		for i, fixture := range suite {
+			// clean up some nils here so the test data can be a bit more terse
+			if fixture.Config.CliArgs == nil {
+				suite[i].Config.CliArgs = []string{}
+			}
+			if fixture.Config.Env == nil {
+				suite[i].Config.Env = map[string]string{}
+			}
+			if fixture.Expect.Env == nil {
+				suite[i].Expect.Env = map[string]string{}
+			}
+			if fixture.Expect.SpanData == nil {
+				suite[i].Expect.SpanData = map[string]string{}
+			}
 			// make sure PATH hasn't been set, because doing that in fixtures is naughty
 			if _, ok := fixture.Config.Env["PATH"]; ok {
 				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Filename)
@@ -47,7 +60,7 @@ func TestOtelCli(t *testing.T) {
 		}
 	}
 
-	t.Logf("Loaded %d test suites and %d fixtures.", len(suites), fixtureCount)
+	t.Logf("Running %d test suites and %d fixtures.", len(suites), fixtureCount)
 	if len(suites) == 0 || fixtureCount == 0 {
 		t.Fatal("no test fixtures loaded!")
 	}
