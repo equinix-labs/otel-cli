@@ -8,22 +8,22 @@ package main_test
 import "github.com/equinix-labs/otel-cli/cmd"
 
 type FixtureConfig struct {
-	CliArgs []string `json:"cli_args"`
+	CliArgs []string
 	Env     map[string]string
 	// timeout for how long to wait for the whole test in failure cases
-	TestTimeoutMs int `json:"test_timeout_ms"`
+	TestTimeoutMs int
 	// when true this test will be excluded under go -test.short mode
 	// TODO: maybe move this up to the suite?
-	IsLongTest bool `json:"is_long_test"`
+	IsLongTest bool
 	// for timeout tests we need to start the server to generate the endpoint
 	// but do not want it to answer when otel-cli calls, this does that
-	StopServerBeforeExec bool `json:"stop_server_before_exec"`
+	StopServerBeforeExec bool
 	// run this fixture in the background, starting its server and otel-cli
 	// instance, then let those block in the background and continue running
 	// serial tests until it's "foreground" by a second fixtue with the same
 	// description in the same file
-	Background bool `json:"background"`
-	Foreground bool `json:"foreground"`
+	Background bool
+	Foreground bool
 }
 
 // mostly mirrors cmd.StatusOutput but we need more
@@ -34,19 +34,18 @@ type Results struct {
 	Env         map[string]string `json:"env"`
 	Diagnostics cmd.Diagnostics   `json:"diagnostics"`
 	// these are specific to tests...
-	CliOutput     string `json:"output"`         // merged stdout and stderr
-	Spans         int    `json:"spans"`          // number of spans received
-	Events        int    `json:"events"`         // number of events received
-	TimedOut      bool   `json:"timed_out"`      // true when test timed out
-	CommandFailed bool   `json:"command_failed"` // otel-cli failed / was killed
+	CliOutput     string // merged stdout and stderr
+	Spans         int    // number of spans received
+	Events        int    // number of events received
+	TimedOut      bool   // true when test timed out
+	CommandFailed bool   // otel-cli failed / was killed
 }
 
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
-	Description string        `json:"description"`
-	Name        string        `json:"-"` // populated at runtime
-	Config      FixtureConfig `json:"config"`
-	Expect      Results       `json:"expect"`
+	Name   string
+	Config FixtureConfig
+	Expect Results
 }
 
 // FixtureSuite is a list of Fixtures that run serially.
@@ -220,7 +219,9 @@ var suites = []FixtureSuite{
 			Expect: Results{Config: cmd.DefaultConfig()},
 		},
 		{
-			Name: "fg span background",
+			// Name on foreground *must* match the backgrounded job
+			// TODO: ^^ this isn't great, find a better way
+			Name: "otel-cli span background (nonrecording)",
 			Config: FixtureConfig{
 				Foreground: true, // bring it back (fg) and finish up
 			},
@@ -249,8 +250,7 @@ var suites = []FixtureSuite{
 			},
 		},
 		{
-			Description: "otel-cli span event",
-			Name:        "81-span-background.json",
+			Name: "otel-cli span event",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "event", "--name", "an event happened", "--attrs", "ima=now,mondai=problem", "--sockdir", "."},
 			},
@@ -264,7 +264,7 @@ var suites = []FixtureSuite{
 			Expect: Results{Config: cmd.DefaultConfig()},
 		},
 		{
-			Name: "foreground otel-cli and finish the test",
+			Name: "otel-cli span background (recording)",
 			Config: FixtureConfig{
 				Foreground: true, // fg
 			},

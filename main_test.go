@@ -83,17 +83,17 @@ func TestOtelCli(t *testing.T) {
 			// when a fixture is foregrounded all it does is signal the background fixture
 			// to finish doing its then, waits for it to finish, then continues on
 			if fixture.Config.Foreground {
-				if wait, ok := bgFixtureWaits[fixture.Description]; ok {
+				if wait, ok := bgFixtureWaits[fixture.Name]; ok {
 					wait <- struct{}{}
-					delete(bgFixtureWaits, fixture.Description)
+					delete(bgFixtureWaits, fixture.Name)
 				} else {
-					t.Fatalf("BUG in test or fixture: unexpected foreground fixture wait chan named %q", fixture.Description)
+					t.Fatalf("BUG in test or fixture: unexpected foreground fixture wait chan named %q", fixture.Name)
 				}
-				if done, ok := bgFixtureDones[fixture.Description]; ok {
+				if done, ok := bgFixtureDones[fixture.Name]; ok {
 					<-done
-					delete(bgFixtureDones, fixture.Description)
+					delete(bgFixtureDones, fixture.Name)
 				} else {
-					t.Fatalf("BUG in test or fixture: unexpected foreground fixture done chan named %q", fixture.Description)
+					t.Fatalf("BUG in test or fixture: unexpected foreground fixture done chan named %q", fixture.Name)
 				}
 
 				continue fixtures
@@ -107,9 +107,9 @@ func TestOtelCli(t *testing.T) {
 
 			if fixture.Config.Background {
 				// save off the channels for flow control
-				t.Logf("[%s] fixture %q backgrounded", fixture.Name, fixture.Description)
-				bgFixtureWaits[fixture.Description] = fixtureWait
-				bgFixtureDones[fixture.Description] = fixtureDone
+				t.Logf("[%s] fixture %q backgrounded", fixture.Name, fixture.Name)
+				bgFixtureWaits[fixture.Name] = fixtureWait
+				bgFixtureDones[fixture.Name] = fixtureDone
 			} else {
 				// actually the default case, just block as if the code was ran synchronously
 				fixtureWait <- struct{}{}
