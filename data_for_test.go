@@ -2,8 +2,7 @@ package main_test
 
 // Data structures and data for functional testing of otel-cli.
 
-// TODO: strip defaults from the data structures (might mean dumping them again or a bit of manual work...)
-// TODO: rename Fixture.Filename to Fixture.Name or something like that
+// TODO: rename Fixture.Name to Fixture.Name or something like that
 // TODO: add instructions for adding more tests
 
 import "github.com/equinix-labs/otel-cli/cmd"
@@ -45,7 +44,7 @@ type Results struct {
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
 	Description string        `json:"description"`
-	Filename    string        `json:"-"` // populated at runtime
+	Name        string        `json:"-"` // populated at runtime
 	Config      FixtureConfig `json:"config"`
 	Expect      Results       `json:"expect"`
 }
@@ -57,7 +56,7 @@ var suites = []FixtureSuite{
 	// otel-cli should not do anything when it is not explicitly configured"
 	{
 		{
-			Filename: "nothing configured",
+			Name: "nothing configured",
 			Config: FixtureConfig{
 				CliArgs: []string{"status"},
 			},
@@ -74,7 +73,7 @@ var suites = []FixtureSuite{
 	// setting minimum envvars should result in a span being received
 	{
 		{
-			Filename: "minimum configuration (recording)",
+			Name: "minimum configuration (recording)",
 			Config: FixtureConfig{
 				CliArgs:       []string{"status"},
 				Env:           map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"},
@@ -106,7 +105,7 @@ var suites = []FixtureSuite{
 	// otel is configured but there is no server listening so it should time out silently
 	{
 		{
-			Filename: "timeout with no server",
+			Name: "timeout with no server",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--timeout", "1s"},
 				Env: map[string]string{
@@ -128,7 +127,7 @@ var suites = []FixtureSuite{
 	// otel-cli span with no OTLP config should do and print nothing
 	{
 		{
-			Filename: "otel-cli span (unconfigured, non-recording)",
+			Name: "otel-cli span (unconfigured, non-recording)",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server"},
 			},
@@ -138,7 +137,7 @@ var suites = []FixtureSuite{
 	// otel-cli with minimal config span sends a span that looks right
 	{
 		{
-			Filename: "otel-cli span (recording)",
+			Name: "otel-cli span (recording)",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server"},
 				Env: map[string]string{
@@ -160,7 +159,7 @@ var suites = []FixtureSuite{
 	// otel-cli span --print-tp actually prints
 	{
 		{
-			Filename: "otel-cli span --print-tp",
+			Name: "otel-cli span --print-tp",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--tp-print"},
 				Env:     map[string]string{"TRACEPARENT": "00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01"},
@@ -177,7 +176,7 @@ var suites = []FixtureSuite{
 	// otel-cli span --print-tp propagates traceparent even when not recording
 	{
 		{
-			Filename: "otel-cli span --tp-print --tp-export (non-recording)",
+			Name: "otel-cli span --tp-print --tp-export (non-recording)",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--tp-print", "--tp-export"},
 				Env: map[string]string{
@@ -197,7 +196,7 @@ var suites = []FixtureSuite{
 	// and background tasks, which are a little clunky but get the job done
 	{
 		{
-			Filename: "otel-cli span background (nonrecording)",
+			Name: "otel-cli span background (nonrecording)",
 			Config: FixtureConfig{
 				CliArgs:       []string{"span", "background", "--timeout", "1s", "--sockdir", "."},
 				TestTimeoutMs: 2000,
@@ -207,21 +206,21 @@ var suites = []FixtureSuite{
 			Expect: Results{Config: cmd.DefaultConfig()},
 		},
 		{
-			Filename: "otel-cli span event",
+			Name: "otel-cli span event",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "event", "--name", "an event happened", "--attrs", "ima=now,mondai=problem", "--sockdir", "."},
 			},
 			Expect: Results{Config: cmd.DefaultConfig()},
 		},
 		{
-			Filename: "otel-cli span end",
+			Name: "otel-cli span end",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "end", "--sockdir", "."},
 			},
 			Expect: Results{Config: cmd.DefaultConfig()},
 		},
 		{
-			Filename: "fg span background",
+			Name: "fg span background",
 			Config: FixtureConfig{
 				Foreground: true, // bring it back (fg) and finish up
 			},
@@ -231,7 +230,7 @@ var suites = []FixtureSuite{
 	// otel-cli span background, in recording mode
 	{
 		{
-			Filename: "otel-cli span background (recording)",
+			Name: "otel-cli span background (recording)",
 			Config: FixtureConfig{
 				CliArgs:       []string{"span", "background", "--timeout", "1s", "--sockdir", "."},
 				Env:           map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"},
@@ -251,21 +250,21 @@ var suites = []FixtureSuite{
 		},
 		{
 			Description: "otel-cli span event",
-			Filename:    "81-span-background.json",
+			Name:        "81-span-background.json",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "event", "--name", "an event happened", "--attrs", "ima=now,mondai=problem", "--sockdir", "."},
 			},
 			Expect: Results{Config: cmd.DefaultConfig()},
 		},
 		{
-			Filename: "otel-cli span end",
+			Name: "otel-cli span end",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "end", "--sockdir", "."},
 			},
 			Expect: Results{Config: cmd.DefaultConfig()},
 		},
 		{
-			Filename: "foreground otel-cli and finish the test",
+			Name: "foreground otel-cli and finish the test",
 			Config: FixtureConfig{
 				Foreground: true, // fg
 			},
@@ -275,7 +274,7 @@ var suites = []FixtureSuite{
 	// otel-cli exec runs echo
 	{
 		{
-			Filename: "otel-cli span exec echo",
+			Name: "otel-cli span exec echo",
 			Config: FixtureConfig{
 				CliArgs: []string{"exec", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server", "echo hello world"},
 				Env: map[string]string{
@@ -298,7 +297,7 @@ var suites = []FixtureSuite{
 	// otel-cli exec runs otel-cli exec
 	{
 		{
-			Filename: "otel-cli span exec (nested)",
+			Name: "otel-cli span exec (nested)",
 			Config: FixtureConfig{
 				CliArgs: []string{"exec", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server", "./otel-cli", "exec", "--tp-ignore-env", "echo hello world $TRACEPARENT"},
 				Env: map[string]string{

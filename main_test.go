@@ -55,7 +55,7 @@ func TestOtelCli(t *testing.T) {
 			}
 			// make sure PATH hasn't been set, because doing that in fixtures is naughty
 			if _, ok := fixture.Config.Env["PATH"]; ok {
-				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Filename)
+				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Name)
 			}
 		}
 	}
@@ -76,7 +76,7 @@ func TestOtelCli(t *testing.T) {
 			// some tests explicitly spend time sleeping/waiting to validate timeouts are working
 			// and when they are marked as such, they can be skipped with go test -test.short
 			if testing.Short() && fixture.Config.IsLongTest {
-				t.Skipf("[%s] skipping timeout tests in short mode", fixture.Filename)
+				t.Skipf("[%s] skipping timeout tests in short mode", fixture.Name)
 				continue fixtures
 			}
 
@@ -107,7 +107,7 @@ func TestOtelCli(t *testing.T) {
 
 			if fixture.Config.Background {
 				// save off the channels for flow control
-				t.Logf("[%s] fixture %q backgrounded", fixture.Filename, fixture.Description)
+				t.Logf("[%s] fixture %q backgrounded", fixture.Name, fixture.Description)
 				bgFixtureWaits[fixture.Description] = fixtureWait
 				bgFixtureDones[fixture.Description] = fixtureDone
 			} else {
@@ -155,7 +155,7 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 // span count is specified, this check always passes.
 func checkSpanCount(t *testing.T, fixture Fixture, results Results) {
 	if results.Spans != fixture.Expect.Spans {
-		t.Errorf("[%s] span count was %d but expected %d", fixture.Filename, results.Spans, fixture.Expect.Spans)
+		t.Errorf("[%s] span count was %d but expected %d", fixture.Name, results.Spans, fixture.Expect.Spans)
 	}
 }
 
@@ -164,10 +164,10 @@ func checkSpanCount(t *testing.T, fixture Fixture, results Results) {
 // in the way we want it to.
 func checkProcess(t *testing.T, fixture Fixture, results Results) {
 	if results.TimedOut != fixture.Expect.TimedOut {
-		t.Errorf("[%s] test timeout status is %t but expected %t", fixture.Filename, results.TimedOut, fixture.Expect.TimedOut)
+		t.Errorf("[%s] test timeout status is %t but expected %t", fixture.Name, results.TimedOut, fixture.Expect.TimedOut)
 	}
 	if results.CommandFailed != fixture.Expect.CommandFailed {
-		t.Errorf("[%s] command failed is %t but expected %t", fixture.Filename, results.CommandFailed, fixture.Expect.CommandFailed)
+		t.Errorf("[%s] command failed is %t but expected %t", fixture.Name, results.CommandFailed, fixture.Expect.CommandFailed)
 	}
 }
 
@@ -176,7 +176,7 @@ func checkProcess(t *testing.T, fixture Fixture, results Results) {
 func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results) {
 	wantOutput := strings.ReplaceAll(fixture.Expect.CliOutput, "{{endpoint}}", endpoint)
 	if diff := cmp.Diff(wantOutput, results.CliOutput); diff != "" {
-		t.Errorf("[%s] otel-cli output did not match fixture (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] otel-cli output did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
 }
 
@@ -186,7 +186,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	// check the env
 	injectEndpoint(endpoint, fixture.Expect.Env)
 	if diff := cmp.Diff(fixture.Expect.Env, results.Env); diff != "" {
-		t.Errorf("env data did not match fixture in %q (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("env data did not match fixture in %q (-want +got):\n%s", fixture.Name, diff)
 	}
 
 	// check diagnostics, use string maps so the diff output is easy to compare to json
@@ -199,7 +199,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 		gotDiag["cli_args"] = ""
 	}
 	if diff := cmp.Diff(wantDiag, gotDiag); diff != "" {
-		t.Errorf("[%s] diagnostic data did not match fixture (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] diagnostic data did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
 
 	// check the configuration
@@ -207,7 +207,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	gotConf := results.Config.ToStringMap()
 	injectEndpoint(endpoint, wantConf)
 	if diff := cmp.Diff(wantConf, gotConf); diff != "" {
-		t.Errorf("[%s] config data did not match fixture (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] config data did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
 }
 
@@ -245,7 +245,7 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 						delete(gotSpan, what)
 						delete(wantSpan, what)
 					} else {
-						t.Errorf("[%s] span value %q for key %s is not valid", fixture.Filename, gotVal, what)
+						t.Errorf("[%s] span value %q for key %s is not valid", fixture.Name, gotVal, what)
 					}
 				}
 			}
@@ -255,7 +255,7 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 	// do a diff on a generated map that sets values to * when the * check succeeded
 	injectEndpoint(endpoint, wantSpan)
 	if diff := cmp.Diff(wantSpan, gotSpan); diff != "" {
-		t.Errorf("[%s] otel span info did not match fixture (-want +got):\n%s", fixture.Filename, diff)
+		t.Errorf("[%s] otel span info did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
 }
 
@@ -309,10 +309,10 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	endpoint := listener.Addr().String()
 	if err != nil {
 		// t.Fatalf is not allowed since we run this in a goroutine
-		t.Errorf("[%s] failed to listen on OTLP endpoint %q: %s", fixture.Filename, endpoint, err)
+		t.Errorf("[%s] failed to listen on OTLP endpoint %q: %s", fixture.Name, endpoint, err)
 		return endpoint, results, retSpan, retEvents
 	}
-	t.Logf("[%s] starting OTLP server on %q", fixture.Filename, endpoint)
+	t.Logf("[%s] starting OTLP server on %q", fixture.Name, endpoint)
 
 	// TODO: might be neat to have a mode where we start the listener and do nothing
 	// with it to simulate a hung server or opentelemetry-collector
@@ -347,7 +347,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 			err = statusCmd.Process.Kill()
 			if err != nil {
 				// TODO: this might be a bit fragle, soften this up later if it ends up problematic
-				log.Fatalf("[%s] process kill failed: %s", fixture.Filename, err)
+				log.Fatalf("[%s] process kill failed: %s", fixture.Name, err)
 			}
 		case <-cancelProcessTimeout:
 			return
@@ -356,12 +356,12 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 
 	// grab stderr & stdout comingled so that if otel-cli prints anything to either it's not
 	// supposed to it will cause e.g. status json parsing and other tests to fail
-	t.Logf("[%s] going to exec 'env -i %s %s'", fixture.Filename, strings.Join(statusCmd.Env, " "), strings.Join(statusCmd.Args, " "))
+	t.Logf("[%s] going to exec 'env -i %s %s'", fixture.Name, strings.Join(statusCmd.Env, " "), strings.Join(statusCmd.Args, " "))
 	cliOut, err := statusCmd.CombinedOutput()
 	results.CliOutput = string(cliOut)
 	if err != nil {
 		results.CommandFailed = true
-		t.Logf("[%s] executing command failed: %s", fixture.Filename, err)
+		t.Logf("[%s] executing command failed: %s", fixture.Name, err)
 	}
 
 	// send stop signals to the timeouts and OTLP server
@@ -374,7 +374,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	if len(cliOut) > 0 && len(args) > 0 && args[0] == "status" {
 		err = json.Unmarshal(cliOut, &results)
 		if err != nil {
-			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Filename, err)
+			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Name, err)
 			return endpoint, results, retSpan, retEvents
 		}
 
@@ -409,7 +409,7 @@ gather:
 			gatheredSpans++
 			if gatheredSpans == results.Spans {
 				// TODO: it would be slightly nicer to use plural.Selectf instead of 'span(s)'
-				t.Logf("[%s] test gathered %d span(s)", fixture.Filename, gatheredSpans)
+				t.Logf("[%s] test gathered %d span(s)", fixture.Name, gatheredSpans)
 				break gather
 			}
 		}
