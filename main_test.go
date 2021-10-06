@@ -2,6 +2,8 @@ package main_test
 
 // implements the data-driven tests of otel-cli using data in data_for_test.go
 
+// TODO: stop using fixture.Name to track foreground/background
+
 import (
 	"encoding/json"
 	"log"
