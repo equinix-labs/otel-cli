@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	otelcli "github.com/equinix-labs/otel-cli/cmd"
+	"github.com/equinix-labs/otel-cli/otelcli"
 )
 
 func main() {

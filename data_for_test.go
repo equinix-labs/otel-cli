@@ -5,7 +5,7 @@ package main_test
 // TODO: Results.SpanData could become a struct now
 // TODO: add instructions for adding more tests
 
-import otelcli "github.com/equinix-labs/otel-cli/cmd"
+import "github.com/equinix-labs/otel-cli/otelcli"
 
 type FixtureConfig struct {
 	CliArgs []string
