@@ -1,9 +1,10 @@
-package cmd
+package otelcli
 
 import (
-	"github.com/spf13/cobra"
 	"log"
 	"os"
+
+	"github.com/spf13/cobra"
 )
 
 var completionCmd = &cobra.Command{

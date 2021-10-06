@@ -5,7 +5,7 @@ package main_test
 // TODO: Results.SpanData could become a struct now
 // TODO: add instructions for adding more tests
 
-import "github.com/equinix-labs/otel-cli/cmd"
+import otelcli "github.com/equinix-labs/otel-cli/cmd"
 
 type FixtureConfig struct {
 	CliArgs []string
@@ -26,13 +26,13 @@ type FixtureConfig struct {
 	Foreground bool
 }
 
-// mostly mirrors cmd.StatusOutput but we need more
+// mostly mirrors otelcli.StatusOutput but we need more
 type Results struct {
-	// same as cmd.StatusOutput but copied because embedding doesn't work for this
-	Config      cmd.Config        `json:"config"`
-	SpanData    map[string]string `json:"span_data"`
-	Env         map[string]string `json:"env"`
-	Diagnostics cmd.Diagnostics   `json:"diagnostics"`
+	// same as otelcli.StatusOutput but copied because embedding doesn't work for this
+	Config      otelcli.Config      `json:"config"`
+	SpanData    map[string]string   `json:"span_data"`
+	Env         map[string]string   `json:"env"`
+	Diagnostics otelcli.Diagnostics `json:"diagnostics"`
 	// these are specific to tests...
 	CliOutput     string // merged stdout and stderr
 	Spans         int    // number of spans received
@@ -60,8 +60,8 @@ var suites = []FixtureSuite{
 				CliArgs: []string{"status"},
 			},
 			Expect: Results{
-				Config: cmd.DefaultConfig(),
-				Diagnostics: cmd.Diagnostics{
+				Config: otelcli.DefaultConfig(),
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording: false,
 					NumArgs:     1,
 					OtelError:   "",
@@ -80,7 +80,7 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
-				Config: cmd.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("{{endpoint}}").
 					WithInsecure(false),
 				SpanData: map[string]string{
@@ -90,7 +90,7 @@ var suites = []FixtureSuite{
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
 				},
-				Diagnostics: cmd.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           1,
 					DetectedLocalhost: true,
@@ -116,7 +116,7 @@ var suites = []FixtureSuite{
 				StopServerBeforeExec: true, // there will be no server listening
 			},
 			Expect: Results{
-				Config: cmd.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				// we want and expect a timeout and failure
 				TimedOut:      true,
 				CommandFailed: true,
@@ -130,7 +130,7 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server"},
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
 	// otel-cli with minimal config span sends a span that looks right
@@ -145,7 +145,7 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				Config: cmd.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
 					"is_sampled": "true",
 					"span_id":    "*",
@@ -164,7 +164,7 @@ var suites = []FixtureSuite{
 				Env:     map[string]string{"TRACEPARENT": "00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01"},
 			},
 			Expect: Results{
-				Config: cmd.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				CliOutput: "" + // empty so the text below can indent and line up
 					"# trace id: 00000000000000000000000000000000\n" +
 					"#  span id: 0000000000000000\n" +
@@ -183,7 +183,7 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config: cmd.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				CliOutput: "" +
 					"# trace id: 00000000000000000000000000000000\n" +
 					"#  span id: 0000000000000000\n" +
@@ -202,21 +202,21 @@ var suites = []FixtureSuite{
 				Background:    true,  // sorta like & in shell
 				Foreground:    false, // must be true later, like `fg` in shell
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span event",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "event", "--name", "an event happened", "--attrs", "ima=now,mondai=problem", "--sockdir", "."},
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span end",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "end", "--sockdir", "."},
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			// Name on foreground *must* match the backgrounded job
@@ -225,7 +225,7 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				Foreground: true, // bring it back (fg) and finish up
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
 	// otel-cli span background, in recording mode
@@ -240,7 +240,7 @@ var suites = []FixtureSuite{
 				Foreground:    false,
 			},
 			Expect: Results{
-				Config: cmd.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
 					"span_id":  "*",
 					"trace_id": "*",
@@ -254,21 +254,21 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "event", "--name", "an event happened", "--attrs", "ima=now,mondai=problem", "--sockdir", "."},
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span end",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "end", "--sockdir", "."},
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span background (recording)",
 			Config: FixtureConfig{
 				Foreground: true, // fg
 			},
-			Expect: Results{Config: cmd.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
 	// otel-cli exec runs echo
@@ -283,7 +283,7 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config: cmd.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
 					"is_sampled": "true",
 					"span_id":    "*",
@@ -305,11 +305,11 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config:    cmd.DefaultConfig(),
-				SpanData:  map[string]string{
+				Config: otelcli.DefaultConfig(),
+				SpanData: map[string]string{
 					"is_sampled": "true",
-					"span_id": "*",
-					"trace_id": "*"
+					"span_id":    "*",
+					"trace_id":   "*",
 				},
 				CliOutput: "hello world\n",
 				Spans:     2,
