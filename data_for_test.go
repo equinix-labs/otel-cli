@@ -306,7 +306,11 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				Config:    cmd.DefaultConfig(),
-				SpanData:  map[string]string{"is_sampled": "true", "span_id": "*", "trace_id": "*"},
+				SpanData:  map[string]string{
+					"is_sampled": "true",
+					"span_id": "*",
+					"trace_id": "*"
+				},
 				CliOutput: "hello world\n",
 				Spans:     2,
 			},
