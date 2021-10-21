@@ -50,6 +50,9 @@ go build
 # run this in its own terminal and try some of the commands below!
 otel-cli server tui
 
+# configure otel-cli to talk the the local server spawned above
+export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+
 # run a program inside a span
 otel-cli exec --service my-service --name "curl google" curl https://google.com
 
