@@ -122,6 +122,7 @@ started. In general, there are three things you need:
 
 - A working Go environment
 - A built (or installed) copy of otel-cli itself
+- A system to receive/inspect the traces you generate
 
 ### 1. A working Go environment
 
