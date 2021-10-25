@@ -50,6 +50,9 @@ go build
 # run this in its own terminal and try some of the commands below!
 otel-cli server tui
 
+# configure otel-cli to talk the the local server spawned above
+export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
+
 # run a program inside a span
 otel-cli exec --service my-service --name "curl google" curl https://google.com
 
@@ -98,7 +101,7 @@ is specified, otel-cli will run in non-recording mode and not attempt to contact
 | --endpoint      | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint        | localhost:4317 |
 | --insecure      | OTEL_EXPORTER_OTLP_INSECURE   | insecure        | false          |
 | --timeout       | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout         | 1s             |
-| --otlp-headers  | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers    | key=value      |
+| --otlp-headers  | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers    | k=v,a=b        |
 | --otlp-blocking | OTEL_EXPORTER_OTLP_BLOCKING   | otlp-blocking   | false          |
 | --service       | OTEL_CLI_SERVICE_NAME         | service         | myapp          |
 | --kind          | OTEL_CLI_TRACE_KIND           | kind            | server         |
@@ -119,6 +122,7 @@ started. In general, there are three things you need:
 
 - A working Go environment
 - A built (or installed) copy of otel-cli itself
+- A system to receive/inspect the traces you generate
 
 ### 1. A working Go environment
 
