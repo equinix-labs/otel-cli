@@ -25,8 +25,18 @@ func TestConfig_ToStringMap(t *testing.T) {
 	}
 }
 
+func TestWithHTTP(t *testing.T) {
+	if DefaultConfig().WithHTTP(true).HTTP != true {
+		t.Fail()
+	}
+}
 func TestWithEndpoint(t *testing.T) {
 	if DefaultConfig().WithEndpoint("foobar").Endpoint != "foobar" {
+		t.Fail()
+	}
+}
+func TestWithURLPath(t *testing.T) {
+	if DefaultConfig().WithURLPath("foobar").URLPath != "foobar" {
 		t.Fail()
 	}
 }

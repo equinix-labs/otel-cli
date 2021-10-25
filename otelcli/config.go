@@ -2,6 +2,7 @@ package otelcli
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 )
 
@@ -18,6 +19,8 @@ const spanBgSockfilename = "otel-cli-background.sock"
 // DefaultConfig returns a Config with all defaults set.
 func DefaultConfig() Config {
 	return Config{
+		HTTP:                   false,
+		URLPath:                "",
 		Endpoint:               "",
 		Timeout:                "1s",
 		Headers:                map[string]string{},
@@ -49,7 +52,9 @@ func DefaultConfig() Config {
 // This is used as a singleton as "config" and accessed from many other files.
 // Data structure is public so that it can serialize to json easily.
 type Config struct {
+	HTTP        bool              `json:"http"`
 	Endpoint    string            `json:"endpoint"`
+	URLPath     string            `json:"url_path"`
 	Timeout     string            `json:"timeout"`
 	Headers     map[string]string `json:"headers"` // TODO: needs json marshaler hook to mask tokens
 	Insecure    bool              `json:"insecure"`
@@ -97,7 +102,9 @@ func (c *Config) UnmarshalJSON(js []byte) error {
 // with in tests especially with cmp.Diff. See test_main.go.
 func (c Config) ToStringMap() map[string]string {
 	return map[string]string{
+		"http":                        fmt.Sprintf("%v", c.HTTP),
 		"endpoint":                    c.Endpoint,
+		"url_path":                    c.URLPath,
 		"timeout":                     c.Timeout,
 		"headers":                     flattenStringMap(c.Headers, "{}"),
 		"insecure":                    strconv.FormatBool(c.Insecure),
@@ -124,9 +131,21 @@ func (c Config) ToStringMap() map[string]string {
 	}
 }
 
+// WithHTTP returns the config with HTTP set to the provided value.
+func (c Config) WithHTTP(with bool) Config {
+	c.HTTP = with
+	return c
+}
+
 // WithEndpoint returns the config with Endpoint set to the provided value.
 func (c Config) WithEndpoint(with string) Config {
 	c.Endpoint = with
+	return c
+}
+
+// WithURLPath returns the config with URLPath set to the provided value.
+func (c Config) WithURLPath(with string) Config {
+	c.URLPath = with
 	return c
 }
 
