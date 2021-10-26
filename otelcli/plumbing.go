@@ -74,9 +74,7 @@ func httpOptions() []otlphttp.Option {
 	}
 	httpOpts := []otlphttp.Option{otlphttp.WithEndpoint(endpointHostAndPort)}
 
-	if config.URLPath != "" {
-		httpOpts = append(httpOpts, otlphttp.WithURLPath(endpointURL.Path))
-	}
+	httpOpts = append(httpOpts, otlphttp.WithURLPath(endpointURL.Path))
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
 	if timeout := parseCliTimeout(); timeout > 0 {
