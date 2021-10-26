@@ -37,12 +37,8 @@ func init() {
 func addCommonParams(cmd *cobra.Command) {
 	// --config / -c a viper configuration file
 	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "config file (default is $HOME/.otel-cli.yaml)")
-	// --http set this to use otlp/http instead of otlp/grpc
-	cmd.Flags().BoolVar(&config.HTTP, "http", defaults.HTTP, "use http instead of grpc")
 	// --endpoint an endpoint to send otlp output to
-	cmd.Flags().StringVar(&config.Endpoint, "endpoint", defaults.Endpoint, "host and port for the desired OTLP/gRPC or OTLP/HTTP endpoint")
-	// --endpoint-path a path to send otlp output to
-	cmd.Flags().StringVar(&config.URLPath, "url_path", defaults.URLPath, "a url path to use (for OTLP/HTTP only")
+	cmd.Flags().StringVar(&config.Endpoint, "endpoint", defaults.Endpoint, "host and port for the desired OTLP/gRPC or OTLP/HTTP endpoint (use http:// or https:// for OTLP/HTTP)")
 	// --timeout a default timeout to use in all otel-cli operations (default 1s)
 	cmd.Flags().StringVar(&config.Timeout, "timeout", defaults.Timeout, "timeout for otel-cli operations, all timeouts in otel-cli use this value")
 	// --verbose tells otel-cli to actually log errors to stderr instead of failing silently

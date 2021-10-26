@@ -61,15 +61,21 @@ func grpcOptions() []otlpgrpc.Option {
 	return grpcOpts
 }
 
-// unlike grpcOptions, httpOptions:
-// - includes a config.URLPath (eg, `localhost:4317/v1/traces`'s config.URLPath
-//   would be /v1/traces))
-// - ignores config.Blocking
 func httpOptions() []otlphttp.Option {
-	httpOpts := []otlphttp.Option{otlphttp.WithEndpoint(config.Endpoint)}
+	endpointURL, _ := url.Parse(config.Endpoint)
+
+	var endpointHostAndPort = endpointURL.Host
+	if endpointURL.Port() == "" {
+		if endpointURL.Scheme == "https" {
+			endpointHostAndPort += ":443"
+		} else {
+			endpointHostAndPort += ":80"
+		}
+	}
+	httpOpts := []otlphttp.Option{otlphttp.WithEndpoint(endpointHostAndPort)}
 
 	if config.URLPath != "" {
-		httpOpts = append(httpOpts, otlphttp.WithURLPath(config.URLPath))
+		httpOpts = append(httpOpts, otlphttp.WithURLPath(endpointURL.Path))
 	}
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
@@ -121,7 +127,8 @@ func initTracer() (context.Context, func()) {
 	var exporter sdktrace.SpanExporter // allows overwrite in --test mode
 	var err error
 
-	if config.HTTP {
+	if strings.HasPrefix(config.Endpoint, "http://") ||
+		strings.HasPrefix(config.Endpoint, "https://") {
 		exporter, err = otlphttp.New(ctx, httpOptions()...)
 		if err != nil {
 			softFail("failed to configure OTLP/HTTP exporter: %s", err)
