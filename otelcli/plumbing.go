@@ -74,6 +74,12 @@ func httpOptions() []otlphttp.Option {
 	}
 	httpOpts := []otlphttp.Option{otlphttp.WithEndpoint(endpointHostAndPort)}
 
+	if endpointURL.Path == "" {
+		// Per spec, /v1/traces is the default:
+		// (https://github.com/open-telemetry/opentelemetry-specification/blob/c14f5416605cb1bfce6e6e1984cbbeceb1bf35a2/specification/protocol/exporter.md#endpoint-urls-for-otlphttp)
+		endpointURL.Path = "/v1/traces"
+	}
+
 	httpOpts = append(httpOpts, otlphttp.WithURLPath(endpointURL.Path))
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
