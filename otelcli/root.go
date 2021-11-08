@@ -43,6 +43,8 @@ func addCommonParams(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&config.Timeout, "timeout", defaults.Timeout, "timeout for otel-cli operations, all timeouts in otel-cli use this value")
 	// --verbose tells otel-cli to actually log errors to stderr instead of failing silently
 	cmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
+	// --fail causes a non-zero exit status on error
+	cmd.Flags().BoolVar(&config.Fail, "fail", defaults.Fail, "on failure, exit with a non-zero status")
 
 	var common_env_flags = map[string]string{
 		"endpoint": "OTEL_EXPORTER_OTLP_ENDPOINT",
