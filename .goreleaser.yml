@@ -41,6 +41,7 @@ builds:
 nfpms:
   - package_name: otel-cli
     homepage: https://github.com/equinix-labs/otel-cli
+    maintainer: Amy Tobey <atobey@equinix.com>
     description: OpenTelemetry CLI Application (Server & Client)
     license: Apache 2.0
     file_name_template: "{{.ProjectName}}_{{.Version}}_{{.Arch}}"
