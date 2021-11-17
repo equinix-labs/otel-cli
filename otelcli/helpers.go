@@ -188,11 +188,17 @@ func softLog(format string, a ...interface{}) {
 	log.Printf(format, a...)
 }
 
-// softFail only calls through to log if otel-cli was run with the --verbose
-// flag, then immediately exits with status 0.
+// softFail calls through to softLog (which logs only if otel-cli was run with the --verbose
+// flag), then immediately exits - with status 0 by default, or 1 if --fail was
+// set (a la `curl --fail`)
 func softFail(format string, a ...interface{}) {
 	softLog(format, a...)
-	os.Exit(0)
+
+	if !config.Fail {
+		os.Exit(0)
+	} else {
+		os.Exit(1)
+	}
 }
 
 // flattenStringMap takes a string map and returns it flattened into a string with

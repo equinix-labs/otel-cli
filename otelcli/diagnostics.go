@@ -28,7 +28,12 @@ type Diagnostics struct {
 // hack: ignores the Diagnostics assigned to it and writes to the global
 func (Diagnostics) Handle(err error) {
 	diagnostics.OtelError = err.Error() // write to the global
-	softLog("OpenTelemetry error: %s", err)
+
+	if config.Fail {
+		softFail("OpenTelemetry error: %s", err)
+	} else {
+		softLog("OpenTelemetry error: %s", err)
+	}
 }
 
 // ToMap returns the Diagnostics struct as a string map for testing.

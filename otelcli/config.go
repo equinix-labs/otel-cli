@@ -42,6 +42,7 @@ func DefaultConfig() Config {
 		EventTime:              "now",
 		CfgFile:                "",
 		Verbose:                false,
+		Fail:                   false,
 	}
 }
 
@@ -78,6 +79,7 @@ type Config struct {
 
 	CfgFile string `json:"config_file"`
 	Verbose bool   `json:"verbose"`
+	Fail    bool   `json:"fail"`
 }
 
 // UnmarshalJSON makes sure that any Config loaded from JSON has its default
