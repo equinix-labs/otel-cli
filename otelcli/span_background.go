@@ -22,7 +22,7 @@ timeout, (catchable) signals, or deliberate exit.
 
     socket_dir=$(mktemp -d)
 	otel-cli span background \
-		--system "my-long-script.sh" \
+		--service "my-long-script.sh" \
 		--name "run the script" \
 		--attrs "os.kernel=$(uname -r)" \
 		--timeout 60 \
