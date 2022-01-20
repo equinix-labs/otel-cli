@@ -51,6 +51,12 @@ func addCommonParams(cmd *cobra.Command) {
 		"timeout":  "OTEL_EXPORTER_OTLP_TIMEOUT",
 		"verbose":  "OTEL_CLI_VERBOSE",
 	}
+	if _, ok := os.LookupEnv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"); ok {
+		common_env_flags["endpoint"] = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
+	}
+	if _, ok := os.LookupEnv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"); ok {
+		common_env_flags["timeout"] = "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"
+	}
 
 	for config_key, env_value := range common_env_flags {
 		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))
