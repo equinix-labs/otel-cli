@@ -20,7 +20,7 @@ with support for nanoseconds on both.
 
 Example:
 	otel-cli span \
-		--system "my-application" \
+		--service "my-application" \
 		--name "send data to the server" \
 		--start 2021-03-24T07:28:05.12345Z \
 		--end $(date +%s.%N) \
