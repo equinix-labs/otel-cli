@@ -34,7 +34,7 @@ func grpcOptions() []otlpgrpc.Option {
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
 	if config.Insecure || isLoopbackAddr(config.Endpoint) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
-	} else {
+	} else if !isInsecureSchema(config.Endpoint) {
 		var tlsConfig *tls.Config
 		if config.NoTlsVerify {
 			tlsConfig = &tls.Config{
@@ -95,7 +95,7 @@ func httpOptions() []otlphttp.Option {
 	// "127.0.0.x", or "::1" address.
 	if config.Insecure || isLoopbackAddr(config.Endpoint) {
 		httpOpts = append(httpOpts, otlphttp.WithInsecure())
-	} else {
+	} else if !isInsecureSchema(config.Endpoint) {
 		var tlsConfig *tls.Config
 		if config.NoTlsVerify {
 			tlsConfig = &tls.Config{
@@ -203,6 +203,8 @@ func isLoopbackAddr(endpoint string) bool {
 			softFail("error parsing provided URI '%s': %s", endpoint, err)
 		}
 		hostname = u.Hostname()
+	} else if strings.HasPrefix(endpoint, "unix://") {
+		return false
 	} else {
 		softFail("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
 	}
@@ -223,4 +225,10 @@ func isLoopbackAddr(endpoint string) bool {
 
 	diagnostics.DetectedLocalhost = allAreLoopback
 	return allAreLoopback
+}
+
+// isInsecureSchema returns true if the provided endpoint is an unencrypted HTTP URL or unix socket
+func isInsecureSchema(endpoint string) bool {
+	return strings.HasPrefix(endpoint, "http://") ||
+		strings.HasPrefix(endpoint, "unix://")
 }
