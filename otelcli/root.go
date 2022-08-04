@@ -102,9 +102,9 @@ func addClientParams(cmd *cobra.Command) {
 
 func addSpanParams(cmd *cobra.Command) {
 	// --name / -s
-	cmd.Flags().StringVarP(&config.SpanName, "name", "s", defaults.SpanName, "set the name of the span")
+	cmd.Flags().StringVarP(&config.SpanName, "name", "n", defaults.SpanName, "set the name of the span")
 	// --service / -n
-	cmd.Flags().StringVarP(&config.ServiceName, "service", "n", defaults.ServiceName, "set the name of the application sent on the traces")
+	cmd.Flags().StringVarP(&config.ServiceName, "service", "s", defaults.ServiceName, "set the name of the application sent on the traces")
 	// --kind / -k
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", defaults.Kind, "set the trace kind, e.g. internal, server, client, producer, consumer")
 	var span_env_flags = map[string]string{
