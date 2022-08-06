@@ -43,6 +43,8 @@ func DefaultConfig() Config {
 		CfgFile:                "",
 		Verbose:                false,
 		Fail:                   false,
+		StatusCode:				"unset",
+		StatusDescription:		"",
 	}
 }
 
@@ -57,10 +59,12 @@ type Config struct {
 	Blocking    bool              `json:"blocking"`
 	NoTlsVerify bool              `json:"no_tls_verify"`
 
-	ServiceName string            `json:"service_name"`
-	SpanName    string            `json:"span_name"`
-	Kind        string            `json:"span_kind"`
-	Attributes  map[string]string `json:"span_attributes"`
+	ServiceName       string            `json:"service_name"`
+	SpanName          string            `json:"span_name"`
+	Kind              string            `json:"span_kind"`
+	Attributes        map[string]string `json:"span_attributes"`
+	StatusCode        string            `json:"span_status_code"`
+	StatusDescription string            `json:"span_status_description"`
 
 	TraceparentCarrierFile string `json:"traceparent_carrier_file"`
 	TraceparentIgnoreEnv   bool   `json:"traceparent_ignore_env"`
@@ -109,6 +113,8 @@ func (c Config) ToStringMap() map[string]string {
 		"span_name":                   c.SpanName,
 		"span_kind":                   c.Kind,
 		"span_attributes":             flattenStringMap(c.Attributes, "{}"),
+		"span_status_code":            c.StatusCode,
+		"span_status_description":     c.StatusDescription,
 		"traceparent_carrier_file":    c.TraceparentCarrierFile,
 		"traceparent_ignore_env":      strconv.FormatBool(c.TraceparentIgnoreEnv),
 		"traceparent_print":           strconv.FormatBool(c.TraceparentPrint),
@@ -183,6 +189,18 @@ func (c Config) WithKind(with string) Config {
 // WithAttributes returns the config with Attributes set to the provided value.
 func (c Config) WithAttributes(with map[string]string) Config {
 	c.Attributes = with
+	return c
+}
+
+// WithStatusCode returns the config with StatusCode set to the provided value.
+func (c Config) WithStatusCode(with string) Config {
+	c.StatusCode = with
+	return c
+}
+
+// WithStatusDescription returns the config with StatusDescription set to the provided value.
+func (c Config) WithStatusDescription(with string) Config {
+	c.StatusDescription = with
 	return c
 }
 

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -159,6 +160,38 @@ func TestOtelSpanKind(t *testing.T) {
 			out := otelSpanKind(testcase.name)
 			if out != testcase.want {
 				t.Errorf("otelSpanKind returned the wrong value, '%q', for '%s'", out, testcase.name)
+			}
+		})
+	}
+}
+
+func TestOtelSpanStatus(t *testing.T) {
+
+	for _, testcase := range []struct {
+		name string
+		want codes.Code
+	}{
+		{
+			name: "unset",
+			want: codes.Unset,
+		},
+		{
+			name: "ok",
+			want: codes.Ok,
+		},
+		{
+			name: "error",
+			want: codes.Error,
+		},
+		{
+			name: "cromulent",
+			want: codes.Unset,
+		},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			out := otelSpanStatus(testcase.name)
+			if out != testcase.want {
+				t.Errorf("otelSpanStatus returned the wrong value, '%q', for '%s'", out, testcase.name)
 			}
 		})
 	}

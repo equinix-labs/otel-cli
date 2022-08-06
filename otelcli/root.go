@@ -107,9 +107,15 @@ func addSpanParams(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&config.ServiceName, "service", "n", defaults.ServiceName, "set the name of the application sent on the traces")
 	// --kind / -k
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", defaults.Kind, "set the trace kind, e.g. internal, server, client, producer, consumer")
+	// --status-code / -sc
+	cmd.Flags().StringVarP(&config.StatusCode, "status-code", "sc", defaults.StatusCode, "set the span status code, e.g. unset|ok|error")
+	// --status-description / -sd
+	cmd.Flags().StringVarP(&config.StatusDescription, "status-description", "sd", defaults.StatusDescription, "set the span status description when a span status code of error is set, e.g. 'cancelled'")
 	var span_env_flags = map[string]string{
-		"service": "OTEL_CLI_SERVICE_NAME",
-		"kind":    "OTEL_CLI_TRACE_KIND",
+		"service":            "OTEL_CLI_SERVICE_NAME",
+		"kind":               "OTEL_CLI_TRACE_KIND",
+		"status-code":        "OTEL_CLI_STATUS_CODE",
+		"status-description": "OTEL_CLI_STATUS_DESCRIPTION",
 	}
 	for config_key, env_value := range span_env_flags {
 		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))

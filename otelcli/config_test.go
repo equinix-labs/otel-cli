@@ -79,6 +79,27 @@ func TestWithAttributes(t *testing.T) {
 		t.Errorf("Attributes did not match (-want +got):\n%s", diff)
 	}
 }
+
+func TestWithStatusCode(t *testing.T) {
+	if DefaultConfig().WithStatusCode("unset").StatusCode != "unset" {
+		t.Fail()
+	}
+
+	if DefaultConfig().WithStatusCode("ok").StatusCode != "ok" {
+		t.Fail()
+	}
+
+	if DefaultConfig().WithStatusCode("error").StatusCode != "ok" {
+		t.Fail()
+	}
+}
+
+func TestWithStatusDescription(t *testing.T) {
+	if DefaultConfig().WithStatusDescription("Set SCE To AUX").StatusCode != "Set SCE To AUX" {
+		t.Fail()
+	}
+}
+
 func TestWithTraceparentCarrierFile(t *testing.T) {
 	if DefaultConfig().WithTraceparentCarrierFile("foobar").TraceparentCarrierFile != "foobar" {
 		t.Fail()
