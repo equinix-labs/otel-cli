@@ -108,9 +108,9 @@ func addSpanParams(cmd *cobra.Command) {
 	// --kind / -k
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", defaults.Kind, "set the trace kind, e.g. internal, server, client, producer, consumer")
 	// --status-code / -sc
-	cmd.Flags().StringVarP(&config.StatusCode, "status-code", "sc", defaults.StatusCode, "set the span status code, e.g. unset|ok|error")
+	cmd.Flags().StringVar(&config.StatusCode, "status-code", defaults.StatusCode, "set the span status code, e.g. unset|ok|error")
 	// --status-description / -sd
-	cmd.Flags().StringVarP(&config.StatusDescription, "status-description", "sd", defaults.StatusDescription, "set the span status description when a span status code of error is set, e.g. 'cancelled'")
+	cmd.Flags().StringVar(&config.StatusDescription, "status-description", defaults.StatusDescription, "set the span status description when a span status code of error is set, e.g. 'cancelled'")
 	var span_env_flags = map[string]string{
 		"service":            "OTEL_CLI_SERVICE_NAME",
 		"kind":               "OTEL_CLI_TRACE_KIND",
