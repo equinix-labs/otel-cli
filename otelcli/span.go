@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -73,6 +74,16 @@ func startSpan() (context.Context, trace.Span, func()) {
 
 	ctx, span := tracer.Start(ctx, config.SpanName, startOpts...)
 	span.SetAttributes(cliAttrsToOtel(config.Attributes)...) // applies CLI attributes to the span
+
+	spanStatus := otelSpanStatus(config.StatusCode)
+
+	// Only set status description when an error status.
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/480a19d702470563d32a870932be5ddae798079c/specification/trace/api.md#set-status
+	if spanStatus == codes.Error {
+		span.SetStatus(spanStatus, config.StatusDescription)
+	} else {
+		span.SetStatus(spanStatus, "")
+	}
 
 	return ctx, span, shutdown
 }

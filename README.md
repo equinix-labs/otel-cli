@@ -96,22 +96,24 @@ otel-cli server json --dir $dir --timeout 60 --max-spans 5
 Everything is configurable via CLI arguments and environment variables. If no endpoint
 is specified, otel-cli will run in non-recording mode and not attempt to contact any servers.
 
-| CLI argument    | environment variable          | config file key | example value  |
-| --------------- | ----------------------------- | --------------- | -------------- |
-| --endpoint      | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint        | localhost:4317 |
-| --insecure      | OTEL_EXPORTER_OTLP_INSECURE   | insecure        | false          |
-| --timeout       | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout         | 1s             |
-| --otlp-headers  | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers    | k=v,a=b        |
-| --otlp-blocking | OTEL_EXPORTER_OTLP_BLOCKING   | otlp-blocking   | false          |
-| --service       | OTEL_CLI_SERVICE_NAME         | service         | myapp          |
-| --kind          | OTEL_CLI_TRACE_KIND           | kind            | server         |
-| --attrs         | OTEL_CLI_ATTRIBUTES           | attrs           | k=v,a=b        |
-| --tp-required   | OTEL_CLI_TRACEPARENT_REQUIRED | tp-required     | false          |
-| --tp-carrier    | OTEL_CLI_CARRIER_FILE         | tp-carrier      | filename.txt   |
-| --tp-ignore-env | OTEL_CLI_IGNORE_ENV           | tp-ignore-env   | false          |
-| --tp-print      | OTEL_CLI_PRINT_TRACEPARENT    | tp-print        | false          |
-| --tp-export     | OTEL_CLI_EXPORT_TRACEPARENT   | tp-export       | false          |
-| --no-tls-verify | OTEL_CLI_NO_TLS_VERIFY        | no-tls-verify   | false          |
+| CLI argument         | environment variable          | config file key    | example value  |
+| -------------------- | ----------------------------- | ------------------ | -------------- |
+| --endpoint           | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint           | localhost:4317 |
+| --insecure           | OTEL_EXPORTER_OTLP_INSECURE   | insecure           | false          |
+| --timeout            | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout            | 1s             |
+| --otlp-headers       | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers       | k=v,a=b        |
+| --otlp-blocking      | OTEL_EXPORTER_OTLP_BLOCKING   | otlp-blocking      | false          |
+| --service            | OTEL_CLI_SERVICE_NAME         | service            | myapp          |
+| --kind               | OTEL_CLI_TRACE_KIND           | kind               | server         |
+| --status-code        | OTEL_CLI_STATUS_CODE          | status-code        | error          |
+| --status-description | OTEL_CLI_STATUS_DESCRIPTION   | status-description | cancelled      |
+| --attrs              | OTEL_CLI_ATTRIBUTES           | attrs              | k=v,a=b        |
+| --tp-required        | OTEL_CLI_TRACEPARENT_REQUIRED | tp-required        | false          |
+| --tp-carrier         | OTEL_CLI_CARRIER_FILE         | tp-carrier         | filename.txt   |
+| --tp-ignore-env      | OTEL_CLI_IGNORE_ENV           | tp-ignore-env      | false          |
+| --tp-print           | OTEL_CLI_PRINT_TRACEPARENT    | tp-print           | false          |
+| --tp-export          | OTEL_CLI_EXPORT_TRACEPARENT   | tp-export          | false          |
+| --no-tls-verify      | OTEL_CLI_NO_TLS_VERIFY        | no-tls-verify      | false          |
 
 [Valid timeout units](https://pkg.go.dev/time#ParseDuration) are "ns", "us"/"µs", "ms", "s", "m", "h".
 

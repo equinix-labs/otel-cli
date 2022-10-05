@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -128,6 +129,22 @@ func otelSpanKind(kind string) trace.SpanKind {
 		return trace.SpanKindInternal
 	default:
 		return trace.SpanKindUnspecified
+	}
+}
+
+// otelSpanStatus takes a supported string span status and returns the otel
+// constant for it. Returns default of Unset on no match.
+// TODO: figure out the best way to report invalid values
+func otelSpanStatus(status string) codes.Code {
+	switch status {
+	case "unset":
+		return codes.Unset
+	case "ok":
+		return codes.Ok
+	case "error":
+		return codes.Error
+	default:
+		return codes.Unset
 	}
 }
 
