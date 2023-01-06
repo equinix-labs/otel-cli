@@ -233,7 +233,7 @@ var suites = []FixtureSuite{
 		{
 			Name: "otel-cli span background (recording)",
 			Config: FixtureConfig{
-				CliArgs:       []string{"span", "background", "--timeout", "1s", "--sockdir", "."},
+				CliArgs:       []string{"span", "background", "--timeout", "1s", "--sockdir", ".", "--attrs", "abc=def"},
 				Env:           map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"},
 				TestTimeoutMs: 2000,
 				Background:    true,
@@ -242,8 +242,9 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
+					"span_id":    "*",
+					"trace_id":   "*",
+					"attributes": "abc=def",
 				},
 				Spans:  1,
 				Events: 1,
