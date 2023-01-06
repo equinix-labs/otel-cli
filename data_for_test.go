@@ -165,11 +165,12 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				Config: otelcli.DefaultConfig().WithServiceName("test-service-abc123"),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"span_id":    "*",
-					"trace_id":   "*",
-					"attributes": "cafe=deadbeef",
+					"span_id":            "*",
+					"trace_id":           "*",
+					"attributes":         "cafe=deadbeef",
+					"service_attributes": "service.name=test-service-abc123",
 				},
 				Spans: 1,
 			},
