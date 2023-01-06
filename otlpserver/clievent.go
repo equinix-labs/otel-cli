@@ -7,21 +7,23 @@ import (
 	"time"
 
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // CliEvent is a span or event decoded & copied for human consumption. It's roughly
 // an OpenTelemetry trace unwrapped just enough to be usable in tools like otel-cli.
 type CliEvent struct {
-	TraceID    string            `json:"trace_id"`
-	SpanID     string            `json:"span_id"`
-	Parent     string            `json:"parent_span_id"`
-	Library    string            `json:"library"`
-	Name       string            `json:"name"`
-	Kind       string            `json:"kind"`
-	Start      time.Time         `json:"start"`
-	End        time.Time         `json:"end"`
-	ElapsedMs  int64             `json:"elapsed_ms"`
-	Attributes map[string]string `json:"attributes"`
+	TraceID           string            `json:"trace_id"`
+	SpanID            string            `json:"span_id"`
+	Parent            string            `json:"parent_span_id"`
+	Library           string            `json:"library"`
+	Name              string            `json:"name"`
+	Kind              string            `json:"kind"`
+	Start             time.Time         `json:"start"`
+	End               time.Time         `json:"end"`
+	ElapsedMs         int64             `json:"elapsed_ms"`
+	Attributes        map[string]string `json:"attributes"`
+	ServiceAttributes map[string]string `json:"service_attributes"`
 	// for a span this is the start nanos, for an event it's just the timestamp
 	// mostly here for sorting CliEventList but could be any uint64
 	Nanos uint64 `json:"nanos"`
@@ -32,22 +34,6 @@ type CliEvent struct {
 
 // ToStringMap flattens a CliEvent into a string map for testing.
 func (ce CliEvent) ToStringMap() map[string]string {
-	// flatten attributes into "k=v,k=v" style string
-	var attrs string
-	keys := make([]string, len(ce.Attributes)) // for sorting
-	var i int
-	for k := range ce.Attributes {
-		keys[i] = k
-		i++
-	}
-	sort.Strings(keys)
-	for i, k := range keys {
-		attrs = attrs + k + "=" + ce.Attributes[k]
-		if i < (len(keys) - 1) {
-			attrs = attrs + ","
-		}
-	}
-
 	// time.UnixNano() is undefined for zero value so we have to check
 	var stime, etime string
 	if ce.Start.IsZero() {
@@ -62,16 +48,17 @@ func (ce CliEvent) ToStringMap() map[string]string {
 	}
 
 	return map[string]string{
-		"trace_id":     ce.TraceID,
-		"span_id":      ce.SpanID,
-		"parent":       ce.Parent,
-		"library":      ce.Library,
-		"name":         ce.Name,
-		"kind":         ce.Kind,
-		"start":        stime,
-		"end":          etime,
-		"attributes":   attrs,
-		"is_populated": strconv.FormatBool(ce.IsPopulated),
+		"trace_id":           ce.TraceID,
+		"span_id":            ce.SpanID,
+		"parent":             ce.Parent,
+		"library":            ce.Library,
+		"name":               ce.Name,
+		"kind":               ce.Kind,
+		"start":              stime,
+		"end":                etime,
+		"attributes":         mapToKVString(ce.Attributes),
+		"service_attributes": mapToKVString(ce.ServiceAttributes),
+		"is_populated":       strconv.FormatBool(ce.IsPopulated),
 	}
 }
 
@@ -83,19 +70,25 @@ func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
 func (cel CliEventList) Less(i, j int) bool { return cel[i].Nanos < cel[j].Nanos }
 
 // NewCliEventFromSpan converts a raw grpc span into a CliEvent.
-func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
+func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans, rss *v1.ResourceSpans) CliEvent {
 	e := CliEvent{
-		TraceID:     hex.EncodeToString(span.GetTraceId()),
-		SpanID:      hex.EncodeToString(span.GetSpanId()),
-		Parent:      hex.EncodeToString(span.GetParentSpanId()),
-		Library:     ils.InstrumentationLibrary.Name,
-		Start:       time.Unix(0, int64(span.GetStartTimeUnixNano())),
-		End:         time.Unix(0, int64(span.GetEndTimeUnixNano())),
-		ElapsedMs:   int64((span.GetEndTimeUnixNano() - span.GetStartTimeUnixNano()) / 1000000),
-		Name:        span.GetName(),
-		Attributes:  make(map[string]string),
-		Nanos:       span.GetStartTimeUnixNano(),
-		IsPopulated: true,
+		TraceID:           hex.EncodeToString(span.GetTraceId()),
+		SpanID:            hex.EncodeToString(span.GetSpanId()),
+		Parent:            hex.EncodeToString(span.GetParentSpanId()),
+		Library:           ils.InstrumentationLibrary.Name,
+		Start:             time.Unix(0, int64(span.GetStartTimeUnixNano())),
+		End:               time.Unix(0, int64(span.GetEndTimeUnixNano())),
+		ElapsedMs:         int64((span.GetEndTimeUnixNano() - span.GetStartTimeUnixNano()) / 1000000),
+		Name:              span.GetName(),
+		Attributes:        make(map[string]string),
+		ServiceAttributes: make(map[string]string),
+		Nanos:             span.GetStartTimeUnixNano(),
+		IsPopulated:       true,
+	}
+
+	// copy service attributes over by string, which includes service.name
+	for _, rattr := range rss.GetResource().GetAttributes() {
+		e.ServiceAttributes[rattr.GetKey()] = rattr.Value.GetStringValue()
 	}
 
 	switch span.GetKind() {
@@ -145,4 +138,22 @@ func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *t
 	}
 
 	return e
+}
+
+// mapToKVString flattens attribute string maps into "k=v,k=v" strings.
+func mapToKVString(in map[string]string) (out string) {
+	keys := make([]string, len(in)) // for sorting
+	var i int
+	for k := range in {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys) // make output relatively consistent
+	for i, k := range keys {
+		out = out + k + "=" + in[k]
+		if i < (len(keys) - 1) {
+			out = out + ","
+		}
+	}
+	return out
 }
