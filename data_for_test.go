@@ -153,6 +153,27 @@ var suites = []FixtureSuite{
 				Spans: 1,
 			},
 		},
+		{
+			Name: "otel-cli span with envvar service name and attributes (recording)",
+			Config: FixtureConfig{
+				CliArgs: []string{"span", "--name", "test-span-service-name-and-attrs", "--kind", "server"},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+					"OTEL_CLI_SERVICE_NAME":       "test-service-abc123",
+					"OTEL_CLI_ATTRIBUTES":         "cafe=deadbeef",
+				},
+				TestTimeoutMs: 1000,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().WithServiceName("test-service-abc123"),
+				SpanData: map[string]string{
+					"span_id":    "*",
+					"trace_id":   "*",
+					"attributes": "cafe=deadbeef",
+				},
+				Spans: 1,
+			},
+		},
 	},
 	// otel-cli span --print-tp actually prints
 	{
