@@ -160,7 +160,8 @@ var suites = []FixtureSuite{
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
 					"OTEL_CLI_SERVICE_NAME":       "test-service-abc123",
-					"OTEL_CLI_ATTRIBUTES":         "cafe=deadbeef",
+					"OTEL_CLI_ATTRIBUTES":         "cafe=deadbeef,abc=123",
+					"OTEL_RESOURCE_ATTRIBUTES":    "foo.bar=baz",
 				},
 				TestTimeoutMs: 1000,
 			},
@@ -169,8 +170,8 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"span_id":            "*",
 					"trace_id":           "*",
-					"attributes":         "cafe=deadbeef",
-					"service_attributes": "service.name=test-service-abc123",
+					"attributes":         "abc=123,cafe=deadbeef",
+					"service_attributes": "foo.bar=baz,service.name=test-service-abc123",
 				},
 				Spans: 1,
 			},
