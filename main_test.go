@@ -213,19 +213,6 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	}
 }
 
-// spanRegexChecks is a map of field names and regexes for basic presence
-// and validity checking of span data fields with expected set to "*"
-var spanRegexChecks = map[string]*regexp.Regexp{
-	"trace_id":   regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
-	"span_id":    regexp.MustCompile(`^[0-9a-fA-F]{16}$`),
-	"name":       regexp.MustCompile(`^\w+$`),
-	"parent":     regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
-	"kind":       regexp.MustCompile(`^\w+$`), // TODO: can validate more here
-	"start":      regexp.MustCompile(`^\d+$`),
-	"end":        regexp.MustCompile(`^\d+$`),
-	"attributes": regexp.MustCompile(`\w+=.+`), // not great but should validate at least one k=v
-}
-
 // checkSpanData compares the data in spans received from otel-cli against the
 // fixture data.
 func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserver.CliEvent, events otlpserver.CliEventList) {
@@ -236,34 +223,32 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 	delete(gotSpan, "is_populated")
 	delete(gotSpan, "library")
 	wantSpan := map[string]string{} // to be passed to cmp.Diff
-
-	// verify all fields that were expected were present in output span
-	for what := range fixture.Expect.SpanData {
-		if _, ok := gotSpan[what]; !ok {
-			t.Errorf("[%s] expected span to have key %q but it is not present", fixture.Name, what)
-		}
-	}
-
-	// go over all the keys in the received span and check against expected values
-	// in the fixture, and the spanRegexChecks
-	// modifies the gotSpan/wantSpan maps so cmp.Diff can do its thing
-	for what, gotVal := range gotSpan {
-		var wantVal string
-		var ok bool
-		if wantVal, ok = fixture.Expect.SpanData[what]; ok {
-			wantSpan[what] = wantVal
-		} else {
-			wantSpan[what] = gotVal // make a straight copy to make cmp.Diff happy
+	for what, re := range map[string]*regexp.Regexp{
+		"trace_id":   regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
+		"span_id":    regexp.MustCompile(`^[0-9a-fA-F]{16}$`),
+		"name":       regexp.MustCompile(`^\w+$`),
+		"parent":     regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
+		"kind":       regexp.MustCompile(`^\w+$`), // TODO: can validate more here
+		"start":      regexp.MustCompile(`^\d+$`),
+		"end":        regexp.MustCompile(`^\d+$`),
+		"attributes": regexp.MustCompile(`\w+=.+`), // not great but should validate at least one k=v
+	} {
+		// ignore anything not asked for in the fixture by deleting it from the gotSpan
+		if _, ok := fixture.Expect.SpanData[what]; !ok {
+			delete(gotSpan, what)
 		}
 
-		if re, ok := spanRegexChecks[what]; ok {
-			// * means if the above RE returns cleanly then pass the test
-			if wantVal == "*" {
-				if re.MatchString(gotVal) {
-					delete(gotSpan, what)
-					delete(wantSpan, what)
-				} else {
-					t.Errorf("[%s] span value %q for key %s is not valid", fixture.Name, gotVal, what)
+		if wantVal, ok := fixture.Expect.SpanData[what]; ok {
+			wantSpan[what] = wantVal // make a straight copy to make cmp.Diff happy
+			if gotVal, ok := gotSpan[what]; ok {
+				// * means if the above RE returns cleanly then pass the test
+				if wantVal == "*" {
+					if re.MatchString(gotVal) {
+						delete(gotSpan, what)
+						delete(wantSpan, what)
+					} else {
+						t.Errorf("[%s] span value %q for key %s is not valid", fixture.Name, gotVal, what)
+					}
 				}
 			}
 		}
