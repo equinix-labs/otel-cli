@@ -109,8 +109,13 @@ func renderJson(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
 func writeJson(path, filename string, js []byte) {
 	if path != "" {
 		spanfile := filepath.Join(path, filename)
-		err := os.WriteFile(spanfile, js, 0644)
+
+		f, err := os.OpenFile(spanfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
+			log.Fatalf("could not open file %q for write: %s", spanfile, err)
+		}
+
+		if _, err = f.Write(js); err != nil {
 			log.Fatalf("could not write to file %q: %s", spanfile, err)
 		}
 	}
