@@ -81,22 +81,22 @@ func TestWithAttributes(t *testing.T) {
 }
 
 func TestWithStatusCode(t *testing.T) {
-	if DefaultConfig().WithStatusCode("unset").StatusCode != "unset" {
-		t.Fail()
+	if diff := cmp.Diff(DefaultConfig().WithStatusCode("unset").StatusCode, "unset"); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
-	if DefaultConfig().WithStatusCode("ok").StatusCode != "ok" {
-		t.Fail()
+	if diff := cmp.Diff(DefaultConfig().WithStatusCode("ok").StatusCode, "ok"); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 
-	if DefaultConfig().WithStatusCode("error").StatusCode != "ok" {
-		t.Fail()
+	if diff := cmp.Diff(DefaultConfig().WithStatusCode("error").StatusCode, "error"); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 }
 
 func TestWithStatusDescription(t *testing.T) {
-	if DefaultConfig().WithStatusDescription("Set SCE To AUX").StatusCode != "Set SCE To AUX" {
-		t.Fail()
+	if diff := cmp.Diff(DefaultConfig().WithStatusDescription("Set SCE To AUX").StatusDescription, "Set SCE To AUX"); diff != "" {
+		t.Fatalf("mismatch (-want +got):\n%s", diff)
 	}
 }
 
