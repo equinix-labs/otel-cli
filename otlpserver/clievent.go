@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -141,19 +142,20 @@ func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *t
 }
 
 // mapToKVString flattens attribute string maps into "k=v,k=v" strings.
-func mapToKVString(in map[string]string) (out string) {
+func mapToKVString(in map[string]string) string {
 	keys := make([]string, len(in)) // for sorting
 	var i int
 	for k := range in {
 		keys[i] = k
 		i++
 	}
+
 	sort.Strings(keys) // make output relatively consistent
+
+	outs := make([]string, len(in))
 	for i, k := range keys {
-		out = out + k + "=" + in[k]
-		if i < (len(keys) - 1) {
-			out = out + ","
-		}
+		outs[i] = k + "=" + in[k]
 	}
-	return out
+
+	return strings.Join(outs, ",")
 }
