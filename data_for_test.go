@@ -147,8 +147,9 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
+					"is_sampled": "true",
+					"span_id":    "*",
+					"trace_id":   "*",
 				},
 				Spans: 1,
 			},
@@ -285,8 +286,9 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "edededededededededededededed9000",
+					"is_sampled": "true",
+					"span_id":    "*",
+					"trace_id":   "edededededededededededededed9000",
 				},
 				CliOutput: "hello world\n",
 				Spans:     1,
@@ -306,8 +308,9 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
+					"is_sampled": "true",
+					"span_id":    "*",
+					"trace_id":   "*",
 				},
 				CliOutput: "hello world\n",
 				Spans:     2,
