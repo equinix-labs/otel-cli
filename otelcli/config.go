@@ -43,47 +43,48 @@ func DefaultConfig() Config {
 		CfgFile:                "",
 		Verbose:                false,
 		Fail:                   false,
-		StatusCode:				"unset",
-		StatusDescription:		"",
+		StatusCode:             "unset",
+		StatusDescription:      "",
 	}
 }
 
 // Config stores the runtime configuration for otel-cli.
 // This is used as a singleton as "config" and accessed from many other files.
 // Data structure is public so that it can serialize to json easily.
+// mapstructure tags are for viper configuration unmarshaling, for config files and envvars.
 type Config struct {
-	Endpoint    string            `json:"endpoint"`
-	Timeout     string            `json:"timeout"`
-	Headers     map[string]string `json:"headers"` // TODO: needs json marshaler hook to mask tokens
-	Insecure    bool              `json:"insecure"`
-	Blocking    bool              `json:"blocking"`
-	NoTlsVerify bool              `json:"no_tls_verify"`
+	Endpoint    string            `json:"endpoint" mapstructure:"endpoint"`
+	Timeout     string            `json:"timeout" mapstructure:"timeout"`
+	Headers     map[string]string `json:"headers" mapstructure:"otlp-headers"` // TODO: needs json marshaler hook to mask tokens
+	Insecure    bool              `json:"insecure" mapstructure:"insecure"`
+	Blocking    bool              `json:"blocking" mapstructure:"otlp-blocking"`
+	NoTlsVerify bool              `json:"no_tls_verify" mapstructure:"no-tls-verify"`
 
-	ServiceName       string            `json:"service_name"`
-	SpanName          string            `json:"span_name"`
-	Kind              string            `json:"span_kind"`
-	Attributes        map[string]string `json:"span_attributes"`
-	StatusCode        string            `json:"span_status_code"`
-	StatusDescription string            `json:"span_status_description"`
+	ServiceName       string            `json:"service_name" mapstructure:"service"`
+	SpanName          string            `json:"span_name" mapstructure:"name"`
+	Kind              string            `json:"span_kind" mapstructure:"kind"`
+	Attributes        map[string]string `json:"span_attributes" mapstructure:"attrs"`
+	StatusCode        string            `json:"span_status_code" mapstructure:"status-code"`
+	StatusDescription string            `json:"span_status_description" mapstructure:"status-description"`
 
-	TraceparentCarrierFile string `json:"traceparent_carrier_file"`
-	TraceparentIgnoreEnv   bool   `json:"traceparent_ignore_env"`
-	TraceparentPrint       bool   `json:"traceparent_print"`
-	TraceparentPrintExport bool   `json:"traceparent_print_export"`
-	TraceparentRequired    bool   `json:"traceparent_required"`
+	TraceparentCarrierFile string `json:"traceparent_carrier_file" mapstructure:"tp-carrier"`
+	TraceparentIgnoreEnv   bool   `json:"traceparent_ignore_env" mapstructure:"tp-ignore-env"`
+	TraceparentPrint       bool   `json:"traceparent_print" mapstructure:"tp-print"`
+	TraceparentPrintExport bool   `json:"traceparent_print_export" mapstructure:"tp-export"`
+	TraceparentRequired    bool   `json:"traceparent_required" mapstructure:"tp-required"`
 
-	BackgroundParentPollMs int    `json:"background_parent_poll_ms"`
-	BackgroundSockdir      string `json:"background_socket_directory"`
-	BackgroundWait         bool   `json:"background_wait"`
+	BackgroundParentPollMs int    `json:"background_parent_poll_ms" mapstructure:"bp-poll-ms"`
+	BackgroundSockdir      string `json:"background_socket_directory" mapstructure:"sockdir"`
+	BackgroundWait         bool   `json:"background_wait" mapstructure:"wait"`
 
-	SpanStartTime string `json:"span_start_time"`
-	SpanEndTime   string `json:"span_end_time"`
-	EventName     string `json:"event_name"`
-	EventTime     string `json:"event_time"`
+	SpanStartTime string `json:"span_start_time" mapstructure:"start"`
+	SpanEndTime   string `json:"span_end_time" mapstructure:"end"`
+	EventName     string `json:"event_name" mapstructure:"name"`
+	EventTime     string `json:"event_time" mapstructure:"time"`
 
-	CfgFile string `json:"config_file"`
-	Verbose bool   `json:"verbose"`
-	Fail    bool   `json:"fail"`
+	CfgFile string `json:"config_file" mapstructure:"config"`
+	Verbose bool   `json:"verbose" mapstructure:"verbose"`
+	Fail    bool   `json:"fail" mapstructure:"fail"`
 }
 
 // UnmarshalJSON makes sure that any Config loaded from JSON has its default
