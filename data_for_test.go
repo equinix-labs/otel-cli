@@ -153,6 +153,8 @@ var suites = []FixtureSuite{
 				Spans: 1,
 			},
 		},
+		// OTEL_RESOURCE_ATTRIBUTES and OTEL_CLI_SERVICE_NAME should get merged into
+		// the span resource attributes
 		{
 			Name: "otel-cli span with envvar service name and attributes (recording)",
 			Config: FixtureConfig{
