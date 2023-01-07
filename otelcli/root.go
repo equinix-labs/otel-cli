@@ -153,5 +153,6 @@ func initViperConfig() {
 	} else {
 		diagnostics.ConfigFileLoaded = true
 	}
-	viper.Unmarshal(&config)
+
+	cobra.CheckErr(viper.Unmarshal(&config))
 }
