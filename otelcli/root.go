@@ -2,6 +2,7 @@ package otelcli
 
 import (
 	"os"
+	"reflect"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -154,5 +155,25 @@ func initViperConfig() {
 		diagnostics.ConfigFileLoaded = true
 	}
 
-	cobra.CheckErr(viper.Unmarshal(&config))
+	err := viper.Unmarshal(&config, viper.DecodeHook(attrsStringMapDecodeHook))
+	cobra.CheckErr(err)
+}
+
+// attrsStringMapDecodeHook is a mapstructure decode hook that's passed to viper
+// to intercept k=v,k=v string maps in envvars. Otherwise it defaults to
+// JSON which works, but doesn't match CLI and is annoying to work with.
+func attrsStringMapDecodeHook(inType reflect.Type, outType reflect.Type, data interface{}) (interface{}, error) {
+	if inType.Kind() != reflect.String {
+		return data, nil
+	}
+	if outType != reflect.TypeOf(map[string]string{}) {
+		return data, nil
+	}
+
+	asString := data.(string)
+	if asString == "" {
+		return map[string]string{}, nil
+	}
+
+	return parseCkvStringMap(asString)
 }
