@@ -108,8 +108,13 @@ func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrary
 	}
 
 	for _, attr := range span.GetAttributes() {
-		// TODO: break down by type so it doesn't return e.g. "int_value:99"
-		e.Attributes[attr.GetKey()] = attr.Value.String()
+		// TODO: this isn't great, there are ways it can cause mayhem, but
+		// should fine for known otlpserver use cases
+		val := attr.Value.String()
+		if _, shortval, found := strings.Cut(val, "_value:"); found {
+			val = strings.Trim(shortval, "\"")
+		}
+		e.Attributes[attr.GetKey()] = val
 	}
 
 	return e
