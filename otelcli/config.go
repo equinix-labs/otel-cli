@@ -2,7 +2,9 @@ package otelcli
 
 import (
 	"encoding/json"
+	"reflect"
 	"strconv"
+	"strings"
 )
 
 // config is the global configuraiton used by all of otel-cli.
@@ -51,40 +53,39 @@ func DefaultConfig() Config {
 // Config stores the runtime configuration for otel-cli.
 // This is used as a singleton as "config" and accessed from many other files.
 // Data structure is public so that it can serialize to json easily.
-// mapstructure tags are for viper configuration unmarshaling, for config files and envvars.
 type Config struct {
-	Endpoint    string            `json:"endpoint" mapstructure:"endpoint"`
-	Timeout     string            `json:"timeout" mapstructure:"timeout"`
-	Headers     map[string]string `json:"headers" mapstructure:"otlp-headers"` // TODO: needs json marshaler hook to mask tokens
-	Insecure    bool              `json:"insecure" mapstructure:"insecure"`
-	Blocking    bool              `json:"blocking" mapstructure:"otlp-blocking"`
-	NoTlsVerify bool              `json:"no_tls_verify" mapstructure:"no-tls-verify"`
+	Endpoint    string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
+	Timeout     string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
+	Headers     map[string]string `json:"headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
+	Insecure    bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
+	Blocking    bool              `json:"blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
+	NoTlsVerify bool              `json:"no_tls_verify" env:"OTEL_CLI_NO_TLS_VERIFY"`
 
-	ServiceName       string            `json:"service_name" mapstructure:"service"`
-	SpanName          string            `json:"span_name" mapstructure:"name"`
-	Kind              string            `json:"span_kind" mapstructure:"kind"`
-	Attributes        map[string]string `json:"span_attributes" mapstructure:"attrs"`
-	StatusCode        string            `json:"span_status_code" mapstructure:"status-code"`
-	StatusDescription string            `json:"span_status_description" mapstructure:"status-description"`
+	ServiceName       string            `json:"service_name" env:"OTEL_CLI_SERVICE_NAME"`
+	SpanName          string            `json:"span_name" env:"OTEL_CLI_SPAN_NAME"`
+	Kind              string            `json:"span_kind" env:"OTEL_CLI_TRACE_KIND"`
+	Attributes        map[string]string `json:"span_attributes" env:"OTEL_CLI_ATTRIBUTES"`
+	StatusCode        string            `json:"span_status_code" env:"OTEL_CLI_STATUS_CODE"`
+	StatusDescription string            `json:"span_status_description" env:"OTEL_CLI_STATUS_DESCRIPTION"`
 
-	TraceparentCarrierFile string `json:"traceparent_carrier_file" mapstructure:"tp-carrier"`
-	TraceparentIgnoreEnv   bool   `json:"traceparent_ignore_env" mapstructure:"tp-ignore-env"`
-	TraceparentPrint       bool   `json:"traceparent_print" mapstructure:"tp-print"`
-	TraceparentPrintExport bool   `json:"traceparent_print_export" mapstructure:"tp-export"`
-	TraceparentRequired    bool   `json:"traceparent_required" mapstructure:"tp-required"`
+	TraceparentCarrierFile string `json:"traceparent_carrier_file" env:"OTEL_CLI_CARRIER_FILE"`
+	TraceparentIgnoreEnv   bool   `json:"traceparent_ignore_env" env:"OTEL_CLI_IGNORE_ENV"`
+	TraceparentPrint       bool   `json:"traceparent_print" env:"OTEL_CLI_PRINT_TRACEPARENT"`
+	TraceparentPrintExport bool   `json:"traceparent_print_export" env:"OTEL_CLI_EXPORT_TRACEPARENT"`
+	TraceparentRequired    bool   `json:"traceparent_required" env:"OTEL_CLI_TRACEPARENT_REQUIRED"`
 
-	BackgroundParentPollMs int    `json:"background_parent_poll_ms" mapstructure:"bp-poll-ms"`
-	BackgroundSockdir      string `json:"background_socket_directory" mapstructure:"sockdir"`
-	BackgroundWait         bool   `json:"background_wait" mapstructure:"wait"`
+	BackgroundParentPollMs int    `json:"background_parent_poll_ms" env:""`
+	BackgroundSockdir      string `json:"background_socket_directory" env:""`
+	BackgroundWait         bool   `json:"background_wait" env:""`
 
-	SpanStartTime string `json:"span_start_time" mapstructure:"start"`
-	SpanEndTime   string `json:"span_end_time" mapstructure:"end"`
-	EventName     string `json:"event_name" mapstructure:"name"`
-	EventTime     string `json:"event_time" mapstructure:"time"`
+	SpanStartTime string `json:"span_start_time" env:""`
+	SpanEndTime   string `json:"span_end_time" env:""`
+	EventName     string `json:"event_name" env:""`
+	EventTime     string `json:"event_time" env:""`
 
-	CfgFile string `json:"config_file" mapstructure:"config"`
-	Verbose bool   `json:"verbose" mapstructure:"verbose"`
-	Fail    bool   `json:"fail" mapstructure:"fail"`
+	CfgFile string `json:"config_file" env:""`
+	Verbose bool   `json:"verbose" env:"OTEL_CLI_VERBOSE"`
+	Fail    bool   `json:"fail" env:""`
 }
 
 // UnmarshalJSON makes sure that any Config loaded from JSON has its default
@@ -97,6 +98,60 @@ func (c *Config) UnmarshalJSON(js []byte) error {
 		return err
 	}
 	*c = Config(defaults)
+	return nil
+}
+
+// LoadEnv loads environment variables into the config, overwriting current
+// values. Environment variable to config key mapping is tagged on the
+// Config struct. Multiple names for envvars is supported, comma-separated.
+// Takes a func(string)string that's usually os.Getenv, and is swappable to
+// make testing easier.
+// TODO: refactor to make easier to test independently (break out os.Getenv)
+// TODO: improve parsing errors
+func (c *Config) LoadEnv(getenv func(string) string) error {
+	// loop over each field of the Config
+	structType := reflect.TypeOf(c).Elem()
+	cValue := reflect.ValueOf(c).Elem()
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		envVars := field.Tag.Get("env")
+		// a field can have multiple comma-delimiated env vars to look in
+		for _, envVar := range strings.Split(envVars, ",") {
+			// call the provided func(string)string provided to get the
+			// envvar, usually os.Getenv but can be a fake for testing
+			envVal := getenv(envVar)
+			if envVal == "" {
+				continue
+			}
+
+			// type switch and write the value into the struct
+			target := cValue.Field(i)
+			switch target.Interface().(type) {
+			case string:
+				target.SetString(envVal)
+			case int:
+				intVal, err := strconv.ParseInt(envVal, 10, 64)
+				if err != nil {
+					return err
+				}
+				target.SetInt(intVal)
+			case bool:
+				boolVal, err := strconv.ParseBool(envVal)
+				if err != nil {
+					return err
+				}
+				target.SetBool(boolVal)
+			case map[string]string:
+				mapVal, err := parseCkvStringMap(envVal)
+				if err != nil {
+					return err
+				}
+				mapValVal := reflect.ValueOf(mapVal)
+				target.Set(mapValVal)
+			}
+		}
+	}
+
 	return nil
 }
 

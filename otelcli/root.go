@@ -2,11 +2,8 @@ package otelcli
 
 import (
 	"os"
-	"reflect"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -14,6 +11,9 @@ var rootCmd = &cobra.Command{
 	Use:   "otel-cli",
 	Short: "CLI for creating and sending OpenTelemetry spans and events.",
 	Long:  `A command-line interface for generating OpenTelemetry data on the command line.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		cobra.CheckErr(config.LoadEnv(os.Getenv))
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -24,7 +24,6 @@ func Execute(version string) {
 }
 
 func init() {
-	cobra.OnInitialize(initViperConfig)
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
 
@@ -37,8 +36,9 @@ func init() {
 
 // addCommonParams adds the --config and --endpoint params to the command.
 func addCommonParams(cmd *cobra.Command) {
-	// --config / -c a viper configuration file
-	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "config file (default is $HOME/.otel-cli.yaml)")
+	// --config / -c a JSON configuration file
+	// TODO: reimplement this to just json and the keys tagged in the Config struct
+	//cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "config file (default is $HOME/.otel-cli.json)")
 	// --endpoint an endpoint to send otlp output to
 	cmd.Flags().StringVar(&config.Endpoint, "endpoint", defaults.Endpoint, "host and port for the desired OTLP/gRPC or OTLP/HTTP endpoint (use http:// or https:// for OTLP/HTTP)")
 	// --timeout a default timeout to use in all otel-cli operations (default 1s)
@@ -47,23 +47,6 @@ func addCommonParams(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
 	// --fail causes a non-zero exit status on error
 	cmd.Flags().BoolVar(&config.Fail, "fail", defaults.Fail, "on failure, exit with a non-zero status")
-
-	var common_env_flags = map[string]string{
-		"endpoint": "OTEL_EXPORTER_OTLP_ENDPOINT",
-		"timeout":  "OTEL_EXPORTER_OTLP_TIMEOUT",
-		"verbose":  "OTEL_CLI_VERBOSE",
-	}
-	if _, ok := os.LookupEnv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"); ok {
-		common_env_flags["endpoint"] = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
-	}
-	if _, ok := os.LookupEnv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"); ok {
-		common_env_flags["timeout"] = "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"
-	}
-
-	for config_key, env_value := range common_env_flags {
-		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))
-		viper.BindEnv(config_key, env_value)
-	}
 }
 
 // addClientParams adds the common CLI flags for e.g. span and exec to the command.
@@ -84,22 +67,6 @@ func addClientParams(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&config.TraceparentPrint, "tp-print", defaults.TraceparentPrint, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
 	cmd.Flags().BoolVarP(&config.TraceparentPrintExport, "tp-export", "p", defaults.TraceparentPrintExport, "same as --tp-print but it puts an 'export ' in front so it's more convinenient to source in scripts")
 	cmd.Flags().BoolVar(&config.NoTlsVerify, "no-tls-verify", defaults.NoTlsVerify, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing and usign self-signed certificates.")
-
-	var client_env_flags = map[string]string{
-		"insecure":      "OTEL_EXPORTER_OTLP_INSECURE",
-		"otlp-headers":  "OTEL_EXPORTER_OTLP_HEADERS",
-		"otlp-blocking": "OTEL_EXPORTER_OTLP_BLOCKING",
-		"tp-required":   "OTEL_CLI_TRACEPARENT_REQUIRED",
-		"tp-carrier":    "OTEL_CLI_CARRIER_FILE",
-		"tp-ignore-env": "OTEL_CLI_IGNORE_ENV",
-		"tp-print":      "OTEL_CLI_PRINT_TRACEPARENT",
-		"tp-export":     "OTEL_CLI_EXPORT_TRACEPARENT",
-		"no-tls-verify": "OTEL_CLI_NO_TLS_VERIFY",
-	}
-	for config_key, env_value := range client_env_flags {
-		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))
-		viper.BindEnv(config_key, env_value)
-	}
 }
 
 func addSpanParams(cmd *cobra.Command) {
@@ -113,67 +80,10 @@ func addSpanParams(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&config.StatusCode, "status-code", defaults.StatusCode, "set the span status code, e.g. unset|ok|error")
 	// --status-description / -sd
 	cmd.Flags().StringVar(&config.StatusDescription, "status-description", defaults.StatusDescription, "set the span status description when a span status code of error is set, e.g. 'cancelled'")
-	var span_env_flags = map[string]string{
-		"service":            "OTEL_CLI_SERVICE_NAME",
-		"kind":               "OTEL_CLI_TRACE_KIND",
-		"status-code":        "OTEL_CLI_STATUS_CODE",
-		"status-description": "OTEL_CLI_STATUS_DESCRIPTION",
-	}
-	for config_key, env_value := range span_env_flags {
-		viper.BindPFlag(config_key, cmd.Flags().Lookup(config_key))
-		viper.BindEnv(config_key, env_value)
-	}
 }
 
 func addAttrParams(cmd *cobra.Command) {
 	// --attrs key=value,foo=bar
 	config.Attributes = make(map[string]string)
 	cmd.Flags().StringToStringVarP(&config.Attributes, "attrs", "a", defaults.Attributes, "a comma-separated list of key=value attributes")
-	viper.BindPFlag("attrs", cmd.Flags().Lookup("attrs"))
-	viper.BindEnv("attrs", "OTEL_CLI_ATTRIBUTES")
-}
-
-func initViperConfig() {
-	if config.CfgFile != "" {
-		viper.SetConfigFile(config.CfgFile)
-	} else {
-		home, err := homedir.Dir()
-		cobra.CheckErr(err)
-
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".otel-cli") // e.g. ~/.otel-cli.yaml
-	}
-
-	if err := viper.ReadInConfig(); err != nil {
-		// We want to suppress errors here if the config is not found, but only if the user has not expressly given us a location to search.
-		// Otherwise, we'll raise any config-reading error up to the user.
-		_, cfgNotFound := err.(viper.ConfigFileNotFoundError)
-		if config.CfgFile != "" || !cfgNotFound {
-			cobra.CheckErr(err)
-		}
-	} else {
-		diagnostics.ConfigFileLoaded = true
-	}
-
-	err := viper.Unmarshal(&config, viper.DecodeHook(attrsStringMapDecodeHook))
-	cobra.CheckErr(err)
-}
-
-// attrsStringMapDecodeHook is a mapstructure decode hook that's passed to viper
-// to intercept k=v,k=v string maps in envvars. Otherwise it defaults to
-// JSON which works, but doesn't match CLI and is annoying to work with.
-func attrsStringMapDecodeHook(inType reflect.Type, outType reflect.Type, data interface{}) (interface{}, error) {
-	if inType.Kind() != reflect.String {
-		return data, nil
-	}
-	if outType != reflect.TypeOf(map[string]string{}) {
-		return data, nil
-	}
-
-	asString := data.(string)
-	if asString == "" {
-		return map[string]string{}, nil
-	}
-
-	return parseCkvStringMap(asString)
 }
