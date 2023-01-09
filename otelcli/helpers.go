@@ -258,9 +258,9 @@ func parseCkvStringMap(in string) (map[string]string, error) {
 
 	out := make(map[string]string)
 	for _, pair := range pairs {
-		key, value, found := strings.Cut(pair, "=")
-		if found {
-			out[key] = value
+		parts := strings.SplitN(pair, "=", 2)
+		if parts[0] != "" && parts[1] != "" {
+			out[parts[0]] = parts[1]
 		} else {
 			return map[string]string{}, fmt.Errorf("kv pair %s must be in key=value format", pair)
 		}
