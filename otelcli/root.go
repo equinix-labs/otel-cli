@@ -12,6 +12,9 @@ var rootCmd = &cobra.Command{
 	Short: "CLI for creating and sending OpenTelemetry spans and events.",
 	Long:  `A command-line interface for generating OpenTelemetry data on the command line.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if err := config.LoadFile(); err != nil {
+			softFail("Error while loading configuration file %s: %s", config.CfgFile, err)
+		}
 		if err := config.LoadEnv(os.Getenv); err != nil {
 			// will need to specify --fail --verbose flags to see these errors
 			softFail("Error while loading environment variables: %s", err)
@@ -40,8 +43,7 @@ func init() {
 // addCommonParams adds the --config and --endpoint params to the command.
 func addCommonParams(cmd *cobra.Command) {
 	// --config / -c a JSON configuration file
-	// TODO: reimplement this to just json and the keys tagged in the Config struct
-	//cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "config file (default is $HOME/.otel-cli.json)")
+	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "JSON configuration file")
 	// --endpoint an endpoint to send otlp output to
 	cmd.Flags().StringVar(&config.Endpoint, "endpoint", defaults.Endpoint, "host and port for the desired OTLP/gRPC or OTLP/HTTP endpoint (use http:// or https:// for OTLP/HTTP)")
 	// --timeout a default timeout to use in all otel-cli operations (default 1s)

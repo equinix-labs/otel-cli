@@ -157,6 +157,50 @@ var suites = []FixtureSuite{
 			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
+	// config file
+	{
+		{
+			Name: "load a json config file",
+			Config: FixtureConfig{
+				CliArgs: []string{"status", "--config", "example-config.json"},
+			},
+			Expect: Results{
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:     true,
+					NumArgs:         3,
+					ParsedTimeoutMs: 1000,
+				},
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("localhost:4317").
+					WithTimeout("1s").
+					WithHeaders(map[string]string{"header1": "header1-value"}).
+					WithInsecure(true).
+					WithBlocking(false).
+					WithNoTlsVerify(true).
+					WithServiceName("configured_in_config_file").
+					WithSpanName("config_file_span").
+					WithKind("server").
+					WithAttributes(map[string]string{"attr1": "value1"}).
+					WithStatusCode("0").
+					WithStatusDescription("status description").
+					WithTraceparentCarrierFile("/tmp/traceparent.txt").
+					WithTraceparentIgnoreEnv(true).
+					WithTraceparentPrint(true).
+					WithTraceparentPrintExport(true).
+					WithTraceparentRequired(true).
+					WithBackgroundParentPollMs(100).
+					WithBackgroundSockdir("/tmp").
+					WithBackgroundWait(true).
+					WithSpanEndTime("now").
+					WithSpanEndTime("now").
+					WithEventName("config_file_event").
+					WithEventTime("now").
+					WithCfgFile("example-config.json").
+					WithVerbose(true).
+					WithFail(true),
+			},
+		},
+	},
 	// otel-cli with minimal config span sends a span that looks right
 	{
 		{

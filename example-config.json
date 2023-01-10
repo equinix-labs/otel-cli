@@ -1,0 +1,38 @@
+{
+   "endpoint" : "localhost:4317",
+   "timeout" : "1s",
+   "headers" : {
+      "header1" : "header1-value"
+   },
+   "blocking" : false,
+   "insecure" : true,
+   "no_tls_verify" : true,
+
+   "service_name" : "configured_in_config_file",
+
+   "span_name" : "config_file_span",
+   "span_kind" : "server",
+   "span_attributes" : {
+      "attr1" : "value1"
+   },
+   "span_end_time" : "now",
+   "span_start_time" : "now",
+   "span_status_code" : "0",
+   "span_status_description" : "status description",
+
+   "event_name" : "config_file_event",
+   "event_time" : "now",
+
+   "background_parent_poll_ms" : 100,
+   "background_socket_directory" : "/tmp",
+   "background_wait" : true,
+
+   "traceparent_carrier_file" : "/tmp/traceparent.txt",
+   "traceparent_ignore_env" : true,
+   "traceparent_print" : true,
+   "traceparent_print_export" : true,
+   "traceparent_required" : true,
+
+   "verbose" : true,
+   "fail" : true
+}

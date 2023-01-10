@@ -2,6 +2,7 @@ package otelcli
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"reflect"
 	"strconv"
 	"strings"
@@ -90,16 +91,22 @@ type Config struct {
 	Fail    bool   `json:"fail" env:""`
 }
 
-// UnmarshalJSON makes sure that any Config loaded from JSON has its default
-// values set. This is critical to comparisons in the otel-cli test suite.
-func (c *Config) UnmarshalJSON(js []byte) error {
-	// use a type alias to avoid recursion on Unmarshaler
-	type config Config
-	defaults := config(DefaultConfig())
-	if err := json.Unmarshal(js, &defaults); err != nil {
-		return err
+// LoadFile reads the file specified by -c/--config and overwrites the
+// current config values with any found in the file.
+func (c *Config) LoadFile() error {
+	if config.CfgFile == "" {
+		return nil
 	}
-	*c = Config(defaults)
+
+	js, err := ioutil.ReadFile(config.CfgFile)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read file '%s'", c.CfgFile)
+	}
+
+	if err := json.Unmarshal(js, c); err != nil {
+		return errors.Wrapf(err, "failed to parse json data in file '%s'", c.CfgFile)
+	}
+
 	return nil
 }
 
@@ -341,5 +348,11 @@ func (c Config) WithCfgFile(with string) Config {
 // WithVerbose returns the config with Verbose set to the provided value.
 func (c Config) WithVerbose(with bool) Config {
 	c.Verbose = with
+	return c
+}
+
+// WithFail returns the config with Verbose set to the provided value.
+func (c Config) WithFail(with bool) Config {
+	c.Fail = with
 	return c
 }
