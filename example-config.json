@@ -1,10 +1,10 @@
 {
    "endpoint" : "localhost:4317",
    "timeout" : "1s",
-   "headers" : {
+   "otlp_headers" : {
       "header1" : "header1-value"
    },
-   "blocking" : false,
+   "otlp_blocking" : false,
    "insecure" : true,
    "no_tls_verify" : true,
 

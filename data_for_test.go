@@ -163,15 +163,24 @@ var suites = []FixtureSuite{
 			Name: "load a json config file",
 			Config: FixtureConfig{
 				CliArgs: []string{"status", "--config", "example-config.json"},
+				// this will take priority over the config
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+				},
+				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
+				Spans: 1,
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:     true,
 					NumArgs:         3,
 					ParsedTimeoutMs: 1000,
 				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+				},
 				Config: otelcli.DefaultConfig().
-					WithEndpoint("localhost:4317").
+					WithEndpoint("*"). // tells the test framework to ignore/overwrite
 					WithTimeout("1s").
 					WithHeaders(map[string]string{"header1": "header1-value"}).
 					WithInsecure(true).

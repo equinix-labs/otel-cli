@@ -59,9 +59,9 @@ func DefaultConfig() Config {
 type Config struct {
 	Endpoint    string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
 	Timeout     string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
-	Headers     map[string]string `json:"headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
+	Headers     map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
 	Insecure    bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
-	Blocking    bool              `json:"blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
+	Blocking    bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
 	NoTlsVerify bool              `json:"no_tls_verify" env:"OTEL_CLI_NO_TLS_VERIFY"`
 
 	ServiceName       string            `json:"service_name" env:"OTEL_CLI_SERVICE_NAME"`
@@ -86,9 +86,9 @@ type Config struct {
 	EventName     string `json:"event_name" env:""`
 	EventTime     string `json:"event_time" env:""`
 
-	CfgFile string `json:"config_file" env:""`
+	CfgFile string `json:"config_file" env:"OTEL_CLI_CONFIG_FILE"`
 	Verbose bool   `json:"verbose" env:"OTEL_CLI_VERBOSE"`
-	Fail    bool   `json:"fail" env:""`
+	Fail    bool   `json:"fail" env:"OTEL_CLI_FAIL"`
 }
 
 // LoadFile reads the file specified by -c/--config and overwrites the

@@ -214,6 +214,14 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	// check the configuration
 	wantConf := fixture.Expect.Config.ToStringMap()
 	gotConf := results.Config.ToStringMap()
+	// if an expected config string is set to "*" it will match anything
+	// and is effectively ignored
+	for k, v := range wantConf {
+		if v == "*" {
+			// set to same so cmd.Diff will ignore
+			wantConf[k] = gotConf[k]
+		}
+	}
 	injectEndpoint(endpoint, wantConf)
 	if diff := cmp.Diff(wantConf, gotConf); diff != "" {
 		t.Errorf("[%s] config data did not match fixture (-want +got):\n%s", fixture.Name, diff)
