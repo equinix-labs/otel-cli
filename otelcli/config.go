@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // config is the global configuraiton used by all of otel-cli.
@@ -106,8 +108,6 @@ func (c *Config) UnmarshalJSON(js []byte) error {
 // Config struct. Multiple names for envvars is supported, comma-separated.
 // Takes a func(string)string that's usually os.Getenv, and is swappable to
 // make testing easier.
-// TODO: refactor to make easier to test independently (break out os.Getenv)
-// TODO: improve parsing errors
 func (c *Config) LoadEnv(getenv func(string) string) error {
 	// loop over each field of the Config
 	structType := reflect.TypeOf(c).Elem()
@@ -132,19 +132,19 @@ func (c *Config) LoadEnv(getenv func(string) string) error {
 			case int:
 				intVal, err := strconv.ParseInt(envVal, 10, 64)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "could not parse %s value %q as an int", envVar, envVal)
 				}
 				target.SetInt(intVal)
 			case bool:
 				boolVal, err := strconv.ParseBool(envVal)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "could not parse %s value %q as an bool", envVar, envVal)
 				}
 				target.SetBool(boolVal)
 			case map[string]string:
 				mapVal, err := parseCkvStringMap(envVal)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "could not parse %s value %q as a map", envVar, envVal)
 				}
 				mapValVal := reflect.ValueOf(mapVal)
 				target.Set(mapValVal)
