@@ -12,7 +12,10 @@ var rootCmd = &cobra.Command{
 	Short: "CLI for creating and sending OpenTelemetry spans and events.",
 	Long:  `A command-line interface for generating OpenTelemetry data on the command line.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		cobra.CheckErr(config.LoadEnv(os.Getenv))
+		if err := config.LoadEnv(os.Getenv); err != nil {
+			// will need to specify --fail --verbose flags to see these errors
+			softFail("Error while loading environment variables: %s", err)
+		}
 	},
 }
 
