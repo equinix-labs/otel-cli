@@ -177,7 +177,14 @@ func checkProcess(t *testing.T, fixture Fixture, results Results) {
 // the fixture expectation (with {{endpoint}} replaced).
 func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results) {
 	wantOutput := strings.ReplaceAll(fixture.Expect.CliOutput, "{{endpoint}}", endpoint)
-	if diff := cmp.Diff(wantOutput, results.CliOutput); diff != "" {
+	gotOutput := results.CliOutput
+	if fixture.Expect.CliOutputRe != nil {
+		gotOutput = fixture.Expect.CliOutputRe.ReplaceAllString(gotOutput, "")
+	}
+	if diff := cmp.Diff(wantOutput, gotOutput); diff != "" {
+		if fixture.Expect.CliOutputRe != nil {
+			t.Errorf("[%s] test fixture RE modified output from %q to %q", fixture.Name, fixture.Expect.CliOutput, gotOutput)
+		}
 		t.Errorf("[%s] otel-cli output did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
 }

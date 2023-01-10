@@ -5,7 +5,11 @@ package main_test
 // TODO: Results.SpanData could become a struct now
 // TODO: add instructions for adding more tests
 
-import "github.com/equinix-labs/otel-cli/otelcli"
+import (
+	"regexp"
+
+	"github.com/equinix-labs/otel-cli/otelcli"
+)
 
 type FixtureConfig struct {
 	CliArgs []string
@@ -34,11 +38,12 @@ type Results struct {
 	Env         map[string]string   `json:"env"`
 	Diagnostics otelcli.Diagnostics `json:"diagnostics"`
 	// these are specific to tests...
-	CliOutput     string // merged stdout and stderr
-	Spans         int    // number of spans received
-	Events        int    // number of events received
-	TimedOut      bool   // true when test timed out
-	CommandFailed bool   // otel-cli failed / was killed
+	CliOutput     string         // merged stdout and stderr
+	CliOutputRe   *regexp.Regexp // regular expression to clean the output before comparison
+	Spans         int            // number of spans received
+	Events        int            // number of events received
+	TimedOut      bool           // true when test timed out
+	CommandFailed bool           // otel-cli failed / was killed
 }
 
 // Fixture represents a test fixture for otel-cli.
@@ -101,8 +106,9 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
-	// otel is configured but there is no server listening so it should time out silently
+	// ensure things fail when they're supposed to fail
 	{
+		// otel is configured but there is no server listening so it should time out silently
 		{
 			Name: "timeout with no server",
 			Config: FixtureConfig{
@@ -120,6 +126,25 @@ var suites = []FixtureSuite{
 				// we want and expect a timeout and failure
 				TimedOut:      true,
 				CommandFailed: true,
+			},
+		},
+		// env -i OTEL_CLI_VERBOSE=trubbl OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317 OTEL_CLI_ATTRIBUTES=key=value ./otel-cli status --fail --verbose
+		{
+			Name: "syntax errors in environment variables cause the command to fail",
+			Config: FixtureConfig{
+				CliArgs: []string{"span", "--fail", "--verbose"},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+					"OTEL_CLI_VERBOSE":            "lmao", // invalid input
+				},
+			},
+			Expect: Results{
+				Config:        otelcli.DefaultConfig(),
+				CommandFailed: true,
+				// strips the date off the log line before comparing to expectation
+				CliOutputRe: regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
+				CliOutput: "Error while loading environment variables: could not parse OTEL_CLI_VERBOSE value " +
+					"\"lmao\" as an bool: strconv.ParseBool: parsing \"lmao\": invalid syntax\n",
 			},
 		},
 	},
