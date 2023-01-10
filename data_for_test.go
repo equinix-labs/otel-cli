@@ -128,7 +128,6 @@ var suites = []FixtureSuite{
 				CommandFailed: true,
 			},
 		},
-		// env -i OTEL_CLI_VERBOSE=trubbl OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317 OTEL_CLI_ATTRIBUTES=key=value ./otel-cli status --fail --verbose
 		{
 			Name: "syntax errors in environment variables cause the command to fail",
 			Config: FixtureConfig{
