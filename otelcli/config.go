@@ -351,7 +351,7 @@ func (c Config) WithVerbose(with bool) Config {
 	return c
 }
 
-// WithFail returns the config with Verbose set to the provided value.
+// WithFail returns the config with Fail set to the provided value.
 func (c Config) WithFail(with bool) Config {
 	c.Fail = with
 	return c
