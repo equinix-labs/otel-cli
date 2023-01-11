@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -288,5 +289,24 @@ func TestFlattenStringMap(t *testing.T) {
 
 	if out != "getting=bored,more=stuff,okay=that's enough,sample1=value1" {
 		t.Fail()
+	}
+}
+
+func TestParseCkvStringMap(t *testing.T) {
+	expect := map[string]string{
+		"sample1": "value1",
+		"more":    "stuff",
+		"getting": "bored",
+		"okay":    "that's enough",
+		"1":       "324",
+	}
+
+	got, err := parseCkvStringMap("1=324,getting=bored,more=stuff,okay=that's enough,sample1=value1")
+	if err != nil {
+		t.Errorf("error on valid input: %s", err)
+	}
+
+	if diff := cmp.Diff(expect, got); diff != "" {
+		t.Errorf("maps didn't match (-want +got):\n%s", diff)
 	}
 }
