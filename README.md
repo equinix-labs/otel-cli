@@ -93,27 +93,34 @@ otel-cli server json --dir $dir --timeout 60 --max-spans 5
 
 ## Configuration
 
-Everything is configurable via CLI arguments and environment variables. If no endpoint
-is specified, otel-cli will run in non-recording mode and not attempt to contact any servers.
+Everything is configurable via CLI arguments, json config, and environment
+variables. If no endpoint is specified, otel-cli will run in non-recording
+mode and not attempt to contact any servers.
 
-| CLI argument         | environment variable          | config file key    | example value  |
-| -------------------- | ----------------------------- | ------------------ | -------------- |
-| --endpoint           | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint           | localhost:4317 |
-| --insecure           | OTEL_EXPORTER_OTLP_INSECURE   | insecure           | false          |
-| --timeout            | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout            | 1s             |
-| --otlp-headers       | OTEL_EXPORTER_OTLP_HEADERS    | otlp-headers       | k=v,a=b        |
-| --otlp-blocking      | OTEL_EXPORTER_OTLP_BLOCKING   | otlp-blocking      | false          |
-| --service            | OTEL_CLI_SERVICE_NAME         | service            | myapp          |
-| --kind               | OTEL_CLI_TRACE_KIND           | kind               | server         |
-| --status-code        | OTEL_CLI_STATUS_CODE          | status-code        | error          |
-| --status-description | OTEL_CLI_STATUS_DESCRIPTION   | status-description | cancelled      |
-| --attrs              | OTEL_CLI_ATTRIBUTES           | attrs              | k=v,a=b        |
-| --tp-required        | OTEL_CLI_TRACEPARENT_REQUIRED | tp-required        | false          |
-| --tp-carrier         | OTEL_CLI_CARRIER_FILE         | tp-carrier         | filename.txt   |
-| --tp-ignore-env      | OTEL_CLI_IGNORE_ENV           | tp-ignore-env      | false          |
-| --tp-print           | OTEL_CLI_PRINT_TRACEPARENT    | tp-print           | false          |
-| --tp-export          | OTEL_CLI_EXPORT_TRACEPARENT   | tp-export          | false          |
-| --no-tls-verify      | OTEL_CLI_NO_TLS_VERIFY        | no-tls-verify      | false          |
+All three modes of config can be mixed. Command line args are loaded first,
+then config file, then environment variables.
+
+| CLI argument         | environment variable          | config file key          | example value  |
+| -------------------- | ----------------------------- | ------------------------ | -------------- |
+| --endpoint           | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint                 | localhost:4317 |
+| --insecure           | OTEL_EXPORTER_OTLP_INSECURE   | insecure                 | false          |
+| --timeout            | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout                  | 1s             |
+| --otlp-headers       | OTEL_EXPORTER_OTLP_HEADERS    | otlp_headers             | k=v,a=b        |
+| --otlp-blocking      | OTEL_EXPORTER_OTLP_BLOCKING   | otlp_blocking            | false          |
+| --config             | OTEL_CLI_CONFIG_FILE          | config_file              | config.json    |
+| --verbose            | OTEL_CLI_VERBOSE              | verbose                  | false          |
+| --fail               | OTEL_CLI_FAIL                 | fail                     | false          |
+| --service            | OTEL_CLI_SERVICE_NAME         | service_name             | myapp          |
+| --kind               | OTEL_CLI_TRACE_KIND           | span_kind                | server         |
+| --status-code        | OTEL_CLI_STATUS_CODE          | span_status_code         | error          |
+| --status-description | OTEL_CLI_STATUS_DESCRIPTION   | span_status_description  | cancelled      |
+| --attrs              | OTEL_CLI_ATTRIBUTES           | span_attributes          | k=v,a=b        |
+| --tp-required        | OTEL_CLI_TRACEPARENT_REQUIRED | traceparent_required     | false          |
+| --tp-carrier         | OTEL_CLI_CARRIER_FILE         | traceparent_carrier_file | filename.txt   |
+| --tp-ignore-env      | OTEL_CLI_IGNORE_ENV           | traceparent_ignore_env   | false          |
+| --tp-print           | OTEL_CLI_PRINT_TRACEPARENT    | traceparent_print        | false          |
+| --tp-export          | OTEL_CLI_EXPORT_TRACEPARENT   | traceparent_print_export | false          |
+| --no-tls-verify      | OTEL_CLI_NO_TLS_VERIFY        | no_tls_verify            | false          |
 
 [Valid timeout units](https://pkg.go.dev/time#ParseDuration) are "ns", "us"/"µs", "ms", "s", "m", "h".
 

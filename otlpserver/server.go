@@ -98,7 +98,7 @@ func (cs *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest)
 		for _, ils := range ilSpans {
 			for _, span := range ils.GetSpans() {
 				// convert protobuf spans to something easier for humans to consume
-				ces := NewCliEventFromSpan(span, ils)
+				ces := NewCliEventFromSpan(span, ils, resource)
 				events := CliEventList{}
 				for _, se := range span.GetEvents() {
 					events = append(events, NewCliEventFromSpanEvent(se, span, ils))
