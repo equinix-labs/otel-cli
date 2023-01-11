@@ -345,7 +345,7 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"span_id":    "*",
 					"trace_id":   "*",
-					"attributes": `abc=string_value:"def"`, // weird format because of limitation in OTLP server
+					"attributes": `abc=def`, // weird format because of limitation in OTLP server
 				},
 				Spans:  1,
 				Events: 1,
