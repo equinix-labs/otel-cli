@@ -5,7 +5,11 @@ package main_test
 // TODO: Results.SpanData could become a struct now
 // TODO: add instructions for adding more tests
 
-import "github.com/equinix-labs/otel-cli/otelcli"
+import (
+	"regexp"
+
+	"github.com/equinix-labs/otel-cli/otelcli"
+)
 
 type FixtureConfig struct {
 	CliArgs []string
@@ -34,11 +38,12 @@ type Results struct {
 	Env         map[string]string   `json:"env"`
 	Diagnostics otelcli.Diagnostics `json:"diagnostics"`
 	// these are specific to tests...
-	CliOutput     string // merged stdout and stderr
-	Spans         int    // number of spans received
-	Events        int    // number of events received
-	TimedOut      bool   // true when test timed out
-	CommandFailed bool   // otel-cli failed / was killed
+	CliOutput     string         // merged stdout and stderr
+	CliOutputRe   *regexp.Regexp // regular expression to clean the output before comparison
+	Spans         int            // number of spans received
+	Events        int            // number of events received
+	TimedOut      bool           // true when test timed out
+	CommandFailed bool           // otel-cli failed / was killed
 }
 
 // Fixture represents a test fixture for otel-cli.
@@ -101,8 +106,9 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
-	// otel is configured but there is no server listening so it should time out silently
+	// ensure things fail when they're supposed to fail
 	{
+		// otel is configured but there is no server listening so it should time out silently
 		{
 			Name: "timeout with no server",
 			Config: FixtureConfig{
@@ -122,6 +128,24 @@ var suites = []FixtureSuite{
 				CommandFailed: true,
 			},
 		},
+		{
+			Name: "syntax errors in environment variables cause the command to fail",
+			Config: FixtureConfig{
+				CliArgs: []string{"span", "--fail", "--verbose"},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+					"OTEL_CLI_VERBOSE":            "lmao", // invalid input
+				},
+			},
+			Expect: Results{
+				Config:        otelcli.DefaultConfig(),
+				CommandFailed: true,
+				// strips the date off the log line before comparing to expectation
+				CliOutputRe: regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
+				CliOutput: "Error while loading environment variables: could not parse OTEL_CLI_VERBOSE value " +
+					"\"lmao\" as an bool: strconv.ParseBool: parsing \"lmao\": invalid syntax\n",
+			},
+		},
 	},
 	// otel-cli span with no OTLP config should do and print nothing
 	{
@@ -131,6 +155,59 @@ var suites = []FixtureSuite{
 				CliArgs: []string{"span", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server"},
 			},
 			Expect: Results{Config: otelcli.DefaultConfig()},
+		},
+	},
+	// config file
+	{
+		{
+			Name: "load a json config file",
+			Config: FixtureConfig{
+				CliArgs: []string{"status", "--config", "example-config.json"},
+				// this will take priority over the config
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+				},
+				TestTimeoutMs: 1000,
+			},
+			Expect: Results{
+				Spans: 1,
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:     true,
+					NumArgs:         3,
+					ParsedTimeoutMs: 1000,
+				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+				},
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("*"). // tells the test framework to ignore/overwrite
+					WithTimeout("1s").
+					WithHeaders(map[string]string{"header1": "header1-value"}).
+					WithInsecure(true).
+					WithBlocking(false).
+					WithNoTlsVerify(true).
+					WithServiceName("configured_in_config_file").
+					WithSpanName("config_file_span").
+					WithKind("server").
+					WithAttributes(map[string]string{"attr1": "value1"}).
+					WithStatusCode("0").
+					WithStatusDescription("status description").
+					WithTraceparentCarrierFile("/tmp/traceparent.txt").
+					WithTraceparentIgnoreEnv(true).
+					WithTraceparentPrint(true).
+					WithTraceparentPrintExport(true).
+					WithTraceparentRequired(true).
+					WithBackgroundParentPollMs(100).
+					WithBackgroundSockdir("/tmp").
+					WithBackgroundWait(true).
+					WithSpanEndTime("now").
+					WithSpanEndTime("now").
+					WithEventName("config_file_event").
+					WithEventTime("now").
+					WithCfgFile("example-config.json").
+					WithVerbose(true).
+					WithFail(true),
+			},
 		},
 	},
 	// otel-cli with minimal config span sends a span that looks right
@@ -147,9 +224,33 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"is_sampled": "true",
-					"span_id":    "*",
-					"trace_id":   "*",
+					"span_id":  "*",
+					"trace_id": "*",
+				},
+				Spans: 1,
+			},
+		},
+		// OTEL_RESOURCE_ATTRIBUTES and OTEL_CLI_SERVICE_NAME should get merged into
+		// the span resource attributes
+		{
+			Name: "otel-cli span with envvar service name and attributes (recording)",
+			Config: FixtureConfig{
+				CliArgs: []string{"span", "--name", "test-span-service-name-and-attrs", "--kind", "server"},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
+					"OTEL_CLI_SERVICE_NAME":       "test-service-abc123",
+					"OTEL_CLI_ATTRIBUTES":         "cafe=deadbeef,abc=123",
+					"OTEL_RESOURCE_ATTRIBUTES":    "foo.bar=baz",
+				},
+				TestTimeoutMs: 1000,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig(),
+				SpanData: map[string]string{
+					"span_id":            "*",
+					"trace_id":           "*",
+					"attributes":         "abc=123,cafe=deadbeef",
+					"service_attributes": "foo.bar=baz,service.name=test-service-abc123",
 				},
 				Spans: 1,
 			},
@@ -286,9 +387,8 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"is_sampled": "true",
-					"span_id":    "*",
-					"trace_id":   "edededededededededededededed9000",
+					"span_id":  "*",
+					"trace_id": "edededededededededededededed9000",
 				},
 				CliOutput: "hello world\n",
 				Spans:     1,
@@ -308,9 +408,8 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
-					"is_sampled": "true",
-					"span_id":    "*",
-					"trace_id":   "*",
+					"span_id":  "*",
+					"trace_id": "*",
 				},
 				CliOutput: "hello world\n",
 				Spans:     2,

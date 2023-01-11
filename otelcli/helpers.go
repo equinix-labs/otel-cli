@@ -2,6 +2,7 @@ package otelcli
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"log"
@@ -244,4 +245,26 @@ func flattenStringMap(mp map[string]string, emptyValue string) string {
 	}
 
 	return out
+}
+
+// parseCkvStringMap parses key=value,foo=bar formatted strings as a line of CSV
+// and returns it as a string map.
+func parseCkvStringMap(in string) (map[string]string, error) {
+	r := csv.NewReader(strings.NewReader(in))
+	pairs, err := r.Read()
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	out := make(map[string]string)
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, "=", 2)
+		if parts[0] != "" && parts[1] != "" {
+			out[parts[0]] = parts[1]
+		} else {
+			return map[string]string{}, fmt.Errorf("kv pair %s must be in key=value format", pair)
+		}
+	}
+
+	return out, nil
 }
