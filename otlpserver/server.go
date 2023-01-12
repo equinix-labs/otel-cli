@@ -48,7 +48,7 @@ func NewServer(cb Callback, stop Stopper) *Server {
 	go func() {
 		<-s.stopper
 		stop(&s)
-		s.server.Stop()
+		s.server.GracefulStop()
 	}()
 
 	return &s
@@ -107,6 +107,7 @@ func (cs *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest)
 				f := cs.callback
 				done := f(ces, events)
 				if done {
+					go cs.StopWait()
 					return &v1.ExportTraceServiceResponse{}, nil
 				}
 			}
