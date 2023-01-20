@@ -94,14 +94,14 @@ func (cs *Server) StopWait() {
 func (cs *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
-		ilSpans := resource.GetInstrumentationLibrarySpans()
-		for _, ils := range ilSpans {
-			for _, span := range ils.GetSpans() {
+		scopeSpans := resource.GetScopeSpans()
+		for _, ss := range scopeSpans {
+			for _, span := range ss.GetSpans() {
 				// convert protobuf spans to something easier for humans to consume
-				ces := NewCliEventFromSpan(span, ils, resource)
+				ces := NewCliEventFromSpan(span, ss, resource)
 				events := CliEventList{}
 				for _, se := range span.GetEvents() {
-					events = append(events, NewCliEventFromSpanEvent(se, span, ils))
+					events = append(events, NewCliEventFromSpanEvent(se, span, ss))
 				}
 
 				f := cs.callback
