@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/google/go-cmp v0.5.9
 	github.com/pkg/errors v0.9.1
-	github.com/pterm/pterm v0.12.53
+	github.com/pterm/pterm v0.12.54
 	github.com/spf13/cobra v1.6.1
 	go.opentelemetry.io/otel v1.11.2
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.11.2
@@ -18,7 +18,7 @@ require (
 
 require (
 	atomicgo.dev/cursor v0.1.1 // indirect
-	atomicgo.dev/keyboard v0.2.8 // indirect
+	atomicgo.dev/keyboard v0.2.9 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
