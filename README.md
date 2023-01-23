@@ -124,6 +124,15 @@ then config file, then environment variables.
 
 [Valid timeout units](https://pkg.go.dev/time#ParseDuration) are "ns", "us"/"µs", "ms", "s", "m", "h".
 
+### Endpoint URIs
+
+otel-cli deviates from the OTel specification for endpoint URIs.
+
+   * bare `host:port` endpoints are assumed to be gRPC
+   * `grpc://` URIs are supported
+   * `http://` and `https://` are assumed to be HTTP _only_ (the spec reuses them for gRPC)
+   * loopback addresses without an https:// prefix are assumed to be unencrypted
+
 ## Easy local dev
 
 We want working on otel-cli to be easy, so we've provided a few different ways to get

@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"strings"
 	"sync"
 
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -65,6 +66,7 @@ func (cs *Server) ServeGPRC(listener net.Listener) error {
 // ListenAndServeGRPC starts a TCP listener then starts the GRPC server using
 // ServeGRPC for you.
 func (cs *Server) ListenAndServeGPRC(otlpEndpoint string) {
+	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "grpc://")
 	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)

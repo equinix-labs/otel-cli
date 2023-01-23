@@ -3,6 +3,7 @@ package otelcli
 import (
 	"encoding/json"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -17,7 +18,7 @@ var config Config
 // defaults is a Config set to default values used by Cobra
 var defaults = DefaultConfig()
 
-const defaultOtlpEndpoint = "localhost:4317"
+const defaultOtlpEndpoint = "grpc://localhost:4317"
 const spanBgSockfilename = "otel-cli-background.sock"
 
 // DefaultConfig returns a Config with all defaults set.
@@ -127,6 +128,10 @@ func (c *Config) LoadEnv(getenv func(string) string) error {
 			// call the provided func(string)string provided to get the
 			// envvar, usually os.Getenv but can be a fake for testing
 			envVal := getenv(envVar)
+
+			// prevent OTel SDK and child processes from reading config envvars
+			os.Unsetenv(envVar)
+
 			if envVal == "" {
 				continue
 			}
