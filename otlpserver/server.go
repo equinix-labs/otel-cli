@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"strings"
 	"sync"
 
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -65,6 +66,7 @@ func (cs *Server) ServeGPRC(listener net.Listener) error {
 // ListenAndServeGRPC starts a TCP listener then starts the GRPC server using
 // ServeGRPC for you.
 func (cs *Server) ListenAndServeGPRC(otlpEndpoint string) {
+	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "grpc://")
 	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
@@ -94,14 +96,14 @@ func (cs *Server) StopWait() {
 func (cs *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
-		ilSpans := resource.GetInstrumentationLibrarySpans()
-		for _, ils := range ilSpans {
-			for _, span := range ils.GetSpans() {
+		scopeSpans := resource.GetScopeSpans()
+		for _, ss := range scopeSpans {
+			for _, span := range ss.GetSpans() {
 				// convert protobuf spans to something easier for humans to consume
-				ces := NewCliEventFromSpan(span, ils, resource)
+				ces := NewCliEventFromSpan(span, ss, resource)
 				events := CliEventList{}
 				for _, se := range span.GetEvents() {
-					events = append(events, NewCliEventFromSpanEvent(se, span, ils))
+					events = append(events, NewCliEventFromSpanEvent(se, span, ss))
 				}
 
 				f := cs.callback

@@ -13,7 +13,7 @@ jobs:
       - name: Setup
         uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: 1.18
       # otel-cli's main test needs the binary built ahead of time
       # also this validates it can acutally build before we get there
       - name: Build

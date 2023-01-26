@@ -19,101 +19,6 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func grpcOptions() []otlpgrpc.Option {
-	grpcOpts := []otlpgrpc.Option{otlpgrpc.WithEndpoint(config.Endpoint)}
-
-	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
-	if timeout := parseCliTimeout(); timeout > 0 {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithTimeout(timeout))
-	}
-
-	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
-	// but I expect most users of this program to point at a localhost endpoint that might not
-	// have any encryption available, or setting it up raises the bar of entry too high.
-	// The compromise is to automatically flip this flag to true when endpoint contains an
-	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	if config.Insecure || isLoopbackAddr(config.Endpoint) {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
-	} else if !isInsecureSchema(config.Endpoint) {
-		var tlsConfig *tls.Config
-		if config.NoTlsVerify {
-			tlsConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
-		}
-		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))))
-	}
-
-	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(config.Headers) > 0 {
-		// fortunately WithHeaders can accept the string map as-is
-		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(config.Headers))
-	}
-
-	// OTLP examples usually show this with the grpc.WithBlock() dial option to
-	// make the connection synchronous, but it's not the right default for cli
-	// instead, rely on the shutdown methods to make sure everything is flushed
-	// by the time the program exits.
-	if config.Blocking {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
-	}
-
-	return grpcOpts
-}
-
-func httpOptions() []otlphttp.Option {
-	endpointURL, _ := url.Parse(config.Endpoint)
-
-	var endpointHostAndPort = endpointURL.Host
-	if endpointURL.Port() == "" {
-		if endpointURL.Scheme == "https" {
-			endpointHostAndPort += ":443"
-		} else {
-			endpointHostAndPort += ":80"
-		}
-	}
-	httpOpts := []otlphttp.Option{otlphttp.WithEndpoint(endpointHostAndPort)}
-
-	if endpointURL.Path == "" {
-		// Per spec, /v1/traces is the default:
-		// (https://github.com/open-telemetry/opentelemetry-specification/blob/c14f5416605cb1bfce6e6e1984cbbeceb1bf35a2/specification/protocol/exporter.md#endpoint-urls-for-otlphttp)
-		endpointURL.Path = "/v1/traces"
-	}
-
-	httpOpts = append(httpOpts, otlphttp.WithURLPath(endpointURL.Path))
-
-	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
-	if timeout := parseCliTimeout(); timeout > 0 {
-		httpOpts = append(httpOpts, otlphttp.WithTimeout(timeout))
-	}
-
-	// otlphttp does the right thing and forces us to say WithInsecure to disable
-	// encryption, but I expect most users of this program to point at a localhost
-	// endpoint that might not have any encryption available, or setting it up
-	// raises the bar of entry too high.  The compromise is to automatically flip
-	// this flag to true when endpoint contains an an obvious "localhost",
-	// "127.0.0.x", or "::1" address.
-	if config.Insecure || isLoopbackAddr(config.Endpoint) {
-		httpOpts = append(httpOpts, otlphttp.WithInsecure())
-	} else if !isInsecureSchema(config.Endpoint) {
-		var tlsConfig *tls.Config
-		if config.NoTlsVerify {
-			tlsConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
-		}
-		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig))
-	}
-
-	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(config.Headers) > 0 {
-		// fortunately WithHeaders can accept the string map as-is
-		httpOpts = append(httpOpts, otlphttp.WithHeaders(config.Headers))
-	}
-
-	return httpOpts
-}
-
 // initTracer sets up the OpenTelemetry plumbing so it's ready to use.
 // Returns a context and a func() that encapuslates clean shutdown.
 func initTracer() (context.Context, func()) {
@@ -131,6 +36,11 @@ func initTracer() (context.Context, func()) {
 	var exporter sdktrace.SpanExporter // allows overwrite in --test mode
 	var err error
 
+	// The OTel spec does not support grpc:// or any way to deterministically demand
+	// gRPC via the endpoint URI, preferring OTEL_EXPORTER_PROTOCOL to do so. This is
+	// awkward for otel-cli so we break with the spec. otel-cli will only resolve
+	// http(s):// to HTTP protocols, defaults bare host:port to gRPC, and supports
+	// grpc:// to definitely use gRPC to connect out.
 	if strings.HasPrefix(config.Endpoint, "http://") ||
 		strings.HasPrefix(config.Endpoint, "https://") {
 		exporter, err = otlphttp.New(ctx, httpOptions()...)
@@ -182,14 +92,125 @@ func initTracer() (context.Context, func()) {
 	}
 }
 
+// grpcOptions convets config settings to an otlpgrpc.Option list.
+func grpcOptions() []otlpgrpc.Option {
+	grpcOpts := []otlpgrpc.Option{}
+
+	// per comment in initTracer(), grpc:// is specific to otel-cli
+	if strings.HasPrefix(config.Endpoint, "grpc://") {
+		ep, err := url.Parse(config.Endpoint)
+		if err != nil {
+			softFail("error parsing provided gRPC URI '%s': %s", config.Endpoint, err)
+		}
+		grpcOpts = append(grpcOpts, otlpgrpc.WithEndpoint(ep.Hostname()+":"+ep.Port()))
+	} else {
+		grpcOpts = append(grpcOpts, otlpgrpc.WithEndpoint(config.Endpoint))
+	}
+
+	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
+	if timeout := parseCliTimeout(); timeout > 0 {
+		grpcOpts = append(grpcOpts, otlpgrpc.WithTimeout(timeout))
+	}
+
+	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
+	// but I expect most users of this program to point at a localhost endpoint that might not
+	// have any encryption available, or setting it up raises the bar of entry too high.
+	// The compromise is to automatically flip this flag to true when endpoint contains an
+	// an obvious "localhost", "127.0.0.x", or "::1" address.
+	if config.Insecure || isLoopbackAddr(config.Endpoint) {
+		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
+	} else if !isInsecureSchema(config.Endpoint) {
+		var tlsConfig *tls.Config
+		if config.NoTlsVerify {
+			tlsConfig = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+		}
+		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))))
+	}
+
+	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
+	if len(config.Headers) > 0 {
+		// fortunately WithHeaders can accept the string map as-is
+		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(config.Headers))
+	}
+
+	// OTLP examples usually show this with the grpc.WithBlock() dial option to
+	// make the connection synchronous, but it's not the right default for cli
+	// instead, rely on the shutdown methods to make sure everything is flushed
+	// by the time the program exits.
+	if config.Blocking {
+		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
+	}
+
+	return grpcOpts
+}
+
+// httpOptions converts config to an otlphttp.Option list.
+func httpOptions() []otlphttp.Option {
+	endpointURL, err := url.Parse(config.Endpoint)
+	if err != nil {
+		softFail("error parsing provided HTTP URI '%s': %s", config.Endpoint, err)
+	}
+
+	var endpointHostAndPort = endpointURL.Host
+	if endpointURL.Port() == "" {
+		if endpointURL.Scheme == "https" {
+			endpointHostAndPort += ":443"
+		} else {
+			endpointHostAndPort += ":80"
+		}
+	}
+	httpOpts := []otlphttp.Option{otlphttp.WithEndpoint(endpointHostAndPort)}
+
+	if endpointURL.Path == "" {
+		// Per spec, /v1/traces is the default:
+		// (https://github.com/open-telemetry/opentelemetry-specification/blob/c14f5416605cb1bfce6e6e1984cbbeceb1bf35a2/specification/protocol/exporter.md#endpoint-urls-for-otlphttp)
+		endpointURL.Path = "/v1/traces"
+	}
+
+	httpOpts = append(httpOpts, otlphttp.WithURLPath(endpointURL.Path))
+
+	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
+	if timeout := parseCliTimeout(); timeout > 0 {
+		httpOpts = append(httpOpts, otlphttp.WithTimeout(timeout))
+	}
+
+	// otlphttp does the right thing and forces us to say WithInsecure to disable
+	// encryption, but I expect most users of this program to point at a localhost
+	// endpoint that might not have any encryption available, or setting it up
+	// raises the bar of entry too high.  The compromise is to automatically flip
+	// this flag to true when endpoint contains an an obvious "localhost",
+	// "127.0.0.x", or "::1" address.
+	if config.Insecure || isLoopbackAddr(config.Endpoint) {
+		httpOpts = append(httpOpts, otlphttp.WithInsecure())
+	} else if !isInsecureSchema(config.Endpoint) {
+		var tlsConfig *tls.Config
+		if config.NoTlsVerify {
+			tlsConfig = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+		}
+		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig))
+	}
+
+	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
+	if len(config.Headers) > 0 {
+		// fortunately WithHeaders can accept the string map as-is
+		httpOpts = append(httpOpts, otlphttp.WithHeaders(config.Headers))
+	}
+
+	return httpOpts
+}
+
 // isLoopbackAddr takes a dial string, looks up the address, then returns true
 // if it points at either a v4 or v6 loopback address.
 // As I understood the OTLP spec, only host:port or an HTTP URL are acceptable.
 // This function is _not_ meant to validate the endpoint, that will happen when
 // otel-go attempts to connect to the endpoint.
 func isLoopbackAddr(endpoint string) bool {
-	hpRe := regexp.MustCompile(`^[\w.-]+:\d+$`)
-	uriRe := regexp.MustCompile(`^(http|https)`)
+	hpRe := regexp.MustCompile(`^[\w\.-]+:\d+$`)
+	uriRe := regexp.MustCompile(`^(grpc|http|https):`)
 
 	endpoint = strings.TrimSpace(endpoint)
 
@@ -207,6 +228,11 @@ func isLoopbackAddr(endpoint string) bool {
 		return false
 	} else {
 		softFail("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
+	}
+
+	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
+		diagnostics.DetectedLocalhost = true
+		return true
 	}
 
 	ips, err := net.LookupIP(hostname)

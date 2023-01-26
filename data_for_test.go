@@ -79,8 +79,7 @@ var suites = []FixtureSuite{
 		{
 			Name: "minimum configuration (recording)",
 			Config: FixtureConfig{
-				CliArgs:       []string{"status"},
-				Env:           map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"},
+				CliArgs:       []string{"status", "--endpoint", "{{endpoint}}"},
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
@@ -92,12 +91,9 @@ var suites = []FixtureSuite{
 					"span_id":  "*",
 					"trace_id": "*",
 				},
-				Env: map[string]string{
-					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
-				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
-					NumArgs:           1,
+					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 					OtelError:         "",
@@ -176,11 +172,8 @@ var suites = []FixtureSuite{
 					NumArgs:         3,
 					ParsedTimeoutMs: 1000,
 				},
-				Env: map[string]string{
-					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
-				},
 				Config: otelcli.DefaultConfig().
-					WithEndpoint("*"). // tells the test framework to ignore/overwrite
+					WithEndpoint("{{endpoint}}"). // tells the test framework to ignore/overwrite
 					WithTimeout("1s").
 					WithHeaders(map[string]string{"header1": "header1-value"}).
 					WithInsecure(true).
@@ -399,10 +392,9 @@ var suites = []FixtureSuite{
 		{
 			Name: "otel-cli span exec (nested)",
 			Config: FixtureConfig{
-				CliArgs: []string{"exec", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server", "./otel-cli", "exec", "--tp-ignore-env", "echo hello world $TRACEPARENT"},
-				Env: map[string]string{
-					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
-				},
+				CliArgs: []string{
+					"exec", "--name", "outer", "--endpoint", "{{endpoint}}", "--fail", "--verbose", "--",
+					"./otel-cli", "exec", "--name", "inner", "--endpoint", "{{endpoint}}", "--tp-required", "--fail", "--verbose", "echo hello world"},
 			},
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),

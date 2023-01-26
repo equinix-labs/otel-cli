@@ -17,7 +17,7 @@ type CliEvent struct {
 	TraceID           string            `json:"trace_id"`
 	SpanID            string            `json:"span_id"`
 	Parent            string            `json:"parent_span_id"`
-	Library           string            `json:"library"`
+	Scope             string            `json:"scope"`
 	Name              string            `json:"name"`
 	Kind              string            `json:"kind"`
 	Start             time.Time         `json:"start"`
@@ -52,7 +52,7 @@ func (ce CliEvent) ToStringMap() map[string]string {
 		"trace_id":           ce.TraceID,
 		"span_id":            ce.SpanID,
 		"parent":             ce.Parent,
-		"library":            ce.Library,
+		"scope":              ce.Scope,
 		"name":               ce.Name,
 		"kind":               ce.Kind,
 		"start":              stime,
@@ -71,12 +71,12 @@ func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
 func (cel CliEventList) Less(i, j int) bool { return cel[i].Nanos < cel[j].Nanos }
 
 // NewCliEventFromSpan converts a raw grpc span into a CliEvent.
-func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans, rss *v1.ResourceSpans) CliEvent {
+func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss *v1.ResourceSpans) CliEvent {
 	e := CliEvent{
 		TraceID:           hex.EncodeToString(span.GetTraceId()),
 		SpanID:            hex.EncodeToString(span.GetSpanId()),
 		Parent:            hex.EncodeToString(span.GetParentSpanId()),
-		Library:           ils.InstrumentationLibrary.Name,
+		Scope:             scopeSpans.GetScope().Name,
 		Start:             time.Unix(0, int64(span.GetStartTimeUnixNano())),
 		End:               time.Unix(0, int64(span.GetEndTimeUnixNano())),
 		ElapsedMs:         int64((span.GetEndTimeUnixNano() - span.GetStartTimeUnixNano()) / 1000000),
@@ -123,13 +123,13 @@ func NewCliEventFromSpan(span *tracepb.Span, ils *tracepb.InstrumentationLibrary
 
 // NewCliEventFromSpanEvent takes a span event, span, and ils and returns an event
 // with all the span event info filled in.
-func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, ils *tracepb.InstrumentationLibrarySpans) CliEvent {
+func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, scopeSpans *tracepb.ScopeSpans) CliEvent {
 	// start with the span, rewrite it for the event
 	e := CliEvent{
 		TraceID:     hex.EncodeToString(span.GetTraceId()),
 		SpanID:      hex.EncodeToString(span.GetSpanId()),
 		Parent:      hex.EncodeToString(span.GetSpanId()),
-		Library:     ils.InstrumentationLibrary.Name,
+		Scope:       scopeSpans.GetScope().Name,
 		Kind:        "event",
 		Start:       time.Unix(0, int64(se.GetTimeUnixNano())),
 		End:         time.Unix(0, int64(se.GetTimeUnixNano())),
