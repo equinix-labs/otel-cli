@@ -235,7 +235,22 @@ Please file issues and PRs on the GitHub project at https://github.com/equinix-l
 
 ## Releases
 
-This project is really new and still experimental, releases are TBD.
+Releases are managed by goreleaser. Currently this is limited to @tobert due to rules in
+the equinix-labs organization. For now releases are not automated, but will be by the time
+a v1.0 rolls out and the test suite is robust enough that we feel confident.
+
+Testing the release: `goreleaser release --snapshot --rm-dist`
+
+To release, a GitHub personal access token is required. The release also needs to be tagged
+in git.
+
+```shell
+git checkout main # make sure we tag on main
+git pull --rebase # get the latest HEAD
+git tag v0.1.1    # tag HEAD with the next version
+git push --tags   # push new tag up to GitHub
+goreleaser release --rm-dist
+```
 
 ## License
 

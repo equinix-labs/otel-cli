@@ -1,3 +1,5 @@
+# last updated for goreleaser v1.14.1
+
 before:
   hooks:
     - go mod tidy
@@ -44,30 +46,20 @@ nfpms:
     maintainer: Amy Tobey <atobey@equinix.com>
     description: OpenTelemetry CLI Application (Server & Client)
     license: Apache 2.0
-    file_name_template: "{{.ProjectName}}_{{.Version}}_{{.Arch}}"
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
     formats:
       - apk
       - deb
       - rpm
 
 archives:
-  - name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-    format: tar.gz
+  - format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+    builds_info:
+      group: root
+      owner: root
+    rlcp: true
 
 brews:
   # This means the repository must be equinix-labs/homebrew-otel-cli
