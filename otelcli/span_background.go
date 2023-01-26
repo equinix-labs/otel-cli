@@ -54,6 +54,7 @@ func init() {
 	addCommonParams(spanBgCmd)
 	addSpanParams(spanBgCmd)
 	addClientParams(spanBgCmd)
+	addAttrParams(spanBgCmd)
 }
 
 // spanBgSockfile returns the full filename for the socket file under the
