@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	colv1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -31,6 +31,9 @@ type CliEvent struct {
 	// the methods below will set this to true before returning
 	// to make it easy for consumers to tell if they got a zero value
 	IsPopulated bool `json:"has_been_modified"`
+	// somewhere for the server to put interesting facts about a span
+	// like what HTTP path it arrived on, what http method, etc.
+	ServerMeta map[string]string `json:"server_meta"`
 }
 
 // ToStringMap flattens a CliEvent into a string map for testing.
@@ -60,6 +63,7 @@ func (ce CliEvent) ToStringMap() map[string]string {
 		"attributes":         mapToKVString(ce.Attributes),
 		"service_attributes": mapToKVString(ce.ServiceAttributes),
 		"is_populated":       strconv.FormatBool(ce.IsPopulated),
+		"server_meta":        mapToKVString(ce.ServerMeta),
 	}
 }
 
@@ -71,7 +75,7 @@ func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
 func (cel CliEventList) Less(i, j int) bool { return cel[i].Nanos < cel[j].Nanos }
 
 // NewCliEventFromSpan converts a raw grpc span into a CliEvent.
-func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss *v1.ResourceSpans) CliEvent {
+func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.ResourceSpans, serverMeta map[string]string) CliEvent {
 	e := CliEvent{
 		TraceID:           hex.EncodeToString(span.GetTraceId()),
 		SpanID:            hex.EncodeToString(span.GetSpanId()),
@@ -85,6 +89,7 @@ func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss
 		ServiceAttributes: make(map[string]string),
 		Nanos:             span.GetStartTimeUnixNano(),
 		IsPopulated:       true,
+		ServerMeta:        make(map[string]string),
 	}
 
 	// copy service attributes over by string, which includes service.name
@@ -93,15 +98,15 @@ func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss
 	}
 
 	switch span.GetKind() {
-	case tracepb.Span_SPAN_KIND_CLIENT:
+	case v1.Span_SPAN_KIND_CLIENT:
 		e.Kind = "client"
-	case tracepb.Span_SPAN_KIND_SERVER:
+	case v1.Span_SPAN_KIND_SERVER:
 		e.Kind = "server"
-	case tracepb.Span_SPAN_KIND_PRODUCER:
+	case v1.Span_SPAN_KIND_PRODUCER:
 		e.Kind = "producer"
-	case tracepb.Span_SPAN_KIND_CONSUMER:
+	case v1.Span_SPAN_KIND_CONSUMER:
 		e.Kind = "consumer"
-	case tracepb.Span_SPAN_KIND_INTERNAL:
+	case v1.Span_SPAN_KIND_INTERNAL:
 		e.Kind = "internal"
 	default:
 		e.Kind = "unspecified"
@@ -118,12 +123,17 @@ func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss
 		e.Attributes[attr.GetKey()] = val
 	}
 
+	// explicitly copy the map, do not share the ref
+	for k, v := range serverMeta {
+		e.ServerMeta[k] = v
+	}
+
 	return e
 }
 
 // NewCliEventFromSpanEvent takes a span event, span, and ils and returns an event
 // with all the span event info filled in.
-func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, scopeSpans *tracepb.ScopeSpans) CliEvent {
+func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.ScopeSpans, serverMeta map[string]string) CliEvent {
 	// start with the span, rewrite it for the event
 	e := CliEvent{
 		TraceID:     hex.EncodeToString(span.GetTraceId()),
@@ -138,13 +148,46 @@ func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, scopeS
 		Attributes:  make(map[string]string), // overwrite the one from the span
 		Nanos:       se.GetTimeUnixNano(),
 		IsPopulated: true,
+		ServerMeta:  make(map[string]string),
 	}
 
 	for _, attr := range se.GetAttributes() {
 		e.Attributes[attr.GetKey()] = attr.Value.String()
 	}
 
+	// explicitly copy the map, do not share the ref
+	for k, v := range serverMeta {
+		e.ServerMeta[k] = v
+	}
+
 	return e
+}
+
+// otelToCliEvent takes an otel trace request data structure and converts
+// it to CliEvents, calling the provided callback for each span in the
+// request.
+func otelToCliEvent(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta map[string]string) bool {
+	rss := req.GetResourceSpans()
+	for _, resource := range rss {
+		scopeSpans := resource.GetScopeSpans()
+		for _, ss := range scopeSpans {
+			for _, span := range ss.GetSpans() {
+				// convert protobuf spans to something easier for humans to consume
+				ces := NewCliEventFromSpan(span, ss, resource, serverMeta)
+				events := CliEventList{}
+				for _, se := range span.GetEvents() {
+					events = append(events, NewCliEventFromSpanEvent(se, span, ss, serverMeta))
+				}
+
+				done := cb(ces, events)
+				if done {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // mapToKVString flattens attribute string maps into "k=v,k=v" strings.

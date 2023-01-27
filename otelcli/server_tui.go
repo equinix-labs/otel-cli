@@ -40,17 +40,17 @@ func doServerTui(cmd *cobra.Command, args []string) {
 
 	tuiServer.events = []otlpserver.CliEvent{}
 
-	stop := func(*otlpserver.Server) {
+	stop := func(otlpserver.OtlpServer) {
 		tuiServer.area.Stop()
 	}
 
-	cs := otlpserver.NewServer(renderTui, stop)
+	cs := otlpserver.NewGrpcServer(renderTui, stop)
 
 	// unlike the rest of otel-cli, server should default to localhost:4317
 	if config.Endpoint == "" {
 		config.Endpoint = defaultOtlpEndpoint
 	}
-	cs.ListenAndServeGPRC(config.Endpoint)
+	cs.ListenAndServe(config.Endpoint)
 }
 
 // renderTui takes the given span and events, appends them to the in-memory

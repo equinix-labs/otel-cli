@@ -11,6 +11,13 @@ import (
 	"github.com/equinix-labs/otel-cli/otelcli"
 )
 
+type serverProtocol int
+
+const (
+	grpcProtocol serverProtocol = iota
+	httpProtocol
+)
+
 type FixtureConfig struct {
 	CliArgs []string
 	Env     map[string]string
@@ -19,6 +26,8 @@ type FixtureConfig struct {
 	// when true this test will be excluded under go -test.short mode
 	// TODO: maybe move this up to the suite?
 	IsLongTest bool
+	// either grpcProtocol or httpProtocol, defaults to grpc
+	ServerProtocol serverProtocol
 	// for timeout tests we need to start the server to generate the endpoint
 	// but do not want it to answer when otel-cli calls, this does that
 	StopServerBeforeExec bool
@@ -77,10 +86,11 @@ var suites = []FixtureSuite{
 	// setting minimum envvars should result in a span being received
 	{
 		{
-			Name: "minimum configuration (recording)",
+			Name: "minimum configuration (recording, grpc)",
 			Config: FixtureConfig{
-				CliArgs:       []string{"status", "--endpoint", "{{endpoint}}"},
-				TestTimeoutMs: 1000,
+				ServerProtocol: grpcProtocol,
+				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}"},
+				TestTimeoutMs:  1000,
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
@@ -88,8 +98,35 @@ var suites = []FixtureSuite{
 					WithEndpoint("{{endpoint}}").
 					WithInsecure(false),
 				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
+					"span_id":     "*",
+					"trace_id":    "*",
+					"server_meta": "proto=grpc",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           3,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+					OtelError:         "",
+				},
+				Spans: 1,
+			},
+		}, {
+			Name: "minimum configuration (recording, http)",
+			Config: FixtureConfig{
+				ServerProtocol: httpProtocol,
+				CliArgs:        []string{"status", "--endpoint", "http://{{endpoint}}"},
+				TestTimeoutMs:  1000,
+			},
+			Expect: Results{
+				// otel-cli should NOT set insecure when it auto-detects localhost
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("http://{{endpoint}}").
+					WithInsecure(false),
+				SpanData: map[string]string{
+					"span_id":     "*",
+					"trace_id":    "*",
+					"server_meta": "host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
