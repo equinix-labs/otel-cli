@@ -163,6 +163,9 @@ func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.S
 	return e
 }
 
+// otelToCliEvent takes an otel trace request data structure and converts
+// it to CliEvents, calling the provided callback for each span in the
+// request.
 func otelToCliEvent(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta map[string]string) bool {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
