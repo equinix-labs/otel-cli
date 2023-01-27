@@ -86,15 +86,41 @@ var suites = []FixtureSuite{
 	// setting minimum envvars should result in a span being received
 	{
 		{
-			Name: "minimum configuration (recording)",
+			Name: "minimum configuration (recording, grpc)",
 			Config: FixtureConfig{
-				CliArgs:       []string{"status", "--endpoint", "{{endpoint}}"},
-				TestTimeoutMs: 1000,
+				ServerProtocol: grpcProtocol,
+				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}"},
+				TestTimeoutMs:  1000,
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
 				Config: otelcli.DefaultConfig().
 					WithEndpoint("{{endpoint}}").
+					WithInsecure(false),
+				SpanData: map[string]string{
+					"span_id":  "*",
+					"trace_id": "*",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           3,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+					OtelError:         "",
+				},
+				Spans: 1,
+			},
+		}, {
+			Name: "minimum configuration (recording, http)",
+			Config: FixtureConfig{
+				ServerProtocol: httpProtocol,
+				CliArgs:        []string{"status", "--endpoint", "http://{{endpoint}}"},
+				TestTimeoutMs:  1000,
+			},
+			Expect: Results{
+				// otel-cli should NOT set insecure when it auto-detects localhost
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("http://{{endpoint}}").
 					WithInsecure(false),
 				SpanData: map[string]string{
 					"span_id":  "*",
