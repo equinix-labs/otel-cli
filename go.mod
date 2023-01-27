@@ -3,6 +3,7 @@ module github.com/equinix-labs/otel-cli
 go 1.18
 
 require (
+	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.9
 	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.53
@@ -23,7 +24,6 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gookit/color v1.5.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect

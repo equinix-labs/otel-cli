@@ -1,25 +1,16 @@
 package otlpserver
 
 import (
-	"fmt"
+	"context"
+	"encoding/json"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"os"
 
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	"google.golang.org/protobuf/proto"
 )
-
-const (
-	pbContentType   = "application/x-protobuf"
-	jsonContentType = "application/json"
-)
-
-// see: https://github.com/open-telemetry/opentelemetry-collector/blob/e5208293ec5d4e04939ff52d60519ddbaa12d87a/pdata/internal/data/protogen/collector/trace/v1/trace_service.pb.go#L33
-type ExportTraceServiceRequest struct {
-	ResourceSpans []*v1.ResourceSpans `protobuf:"bytes,1,rep,name=resource_spans,json=resourceSpans,proto3" json:"resource_spans,omitempty"`
-}
 
 type HttpServer struct {
 	server   *http.Server
@@ -39,13 +30,28 @@ func NewHttpServer(cb Callback, stop Stopper) *HttpServer {
 	return &s
 }
 
+// ServeHTTP processes every request as if it is a trace regardless of
+// method and path or anything else.
 func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Fatalf("Error while reading request body: %s", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "\n\n%q\n\n", data)
+	msg := v1.ExportTraceServiceRequest{}
+	switch req.Header.Get("Content-Type") {
+	case "application/x-protobuf":
+		proto.Unmarshal(data, &msg)
+	case "application/json":
+		json.Unmarshal(data, &msg)
+	default:
+		rw.WriteHeader(http.StatusNotAcceptable)
+	}
+
+	done := otelToCliEvent(hs.callback, &msg)
+	if done {
+		go hs.StopWait()
+	}
 }
 
 // ServeHttp takes a listener and starts the HTTP server on that listener.
@@ -67,11 +73,12 @@ func (hs *HttpServer) ListenAndServe(otlpEndpoint string) {
 	}
 }
 
-// Stop sends a value to the server shutdown goroutine so it stops HTTP
-// and calls the stop function given to newServer. Safe to call multiple times.
+// Stop closes the http server and all active connections immediately.
 func (hs *HttpServer) Stop() {
+	hs.server.Close()
 }
 
-// StopWait stops the server and waits for it to affirm shutdown.
+// StopWait stops the http server gracefully.
 func (hs *HttpServer) StopWait() {
+	hs.server.Shutdown(context.Background())
 }

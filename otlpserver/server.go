@@ -1,3 +1,7 @@
+// otlpserver is an OTLP server with HTTP and gRPC backends available.
+// It takes a lot of shortcuts to keep things simple and is not intended
+// to be used as a serious OTLP service. Primarily it is for the test
+// suite and also supports the otel-cli server features.
 package otlpserver
 
 import (
@@ -12,6 +16,8 @@ type Callback func(CliEvent, CliEventList) bool
 // server is shut down.
 type Stopper func(OtlpServer)
 
+// OtlpServer abstracts the minimum interface required for an OTLP
+// server to be either HTTP or gRPC (but not both, for now).
 type OtlpServer interface {
 	ListenAndServe(otlpEndpoint string)
 	Serve(listener net.Listener) error

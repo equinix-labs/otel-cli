@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	colv1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -144,6 +145,30 @@ func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.S
 	}
 
 	return e
+}
+
+func otelToCliEvent(cb Callback, req *colv1.ExportTraceServiceRequest) bool {
+	rss := req.GetResourceSpans()
+	for _, resource := range rss {
+		scopeSpans := resource.GetScopeSpans()
+		for _, ss := range scopeSpans {
+			for _, span := range ss.GetSpans() {
+				// convert protobuf spans to something easier for humans to consume
+				ces := NewCliEventFromSpan(span, ss, resource)
+				events := CliEventList{}
+				for _, se := range span.GetEvents() {
+					events = append(events, NewCliEventFromSpanEvent(se, span, ss))
+				}
+
+				done := cb(ces, events)
+				if done {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // mapToKVString flattens attribute string maps into "k=v,k=v" strings.
