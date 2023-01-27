@@ -316,7 +316,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 		return results.Spans >= fixture.Expect.Spans
 	}
 
-	cs := otlpserver.NewGrpcServer(cb, func(*otlpserver.GrpcServer) {})
+	cs := otlpserver.NewServer("grpc", cb, func(*otlpserver.GrpcServer) {})
 	defer cs.Stop()
 
 	serverTimeout := time.Duration(fixture.Config.TestTimeoutMs) * time.Millisecond
@@ -349,7 +349,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	// TODO: might be neat to have a mode where we start the listener and do nothing
 	// with it to simulate a hung server or opentelemetry-collector
 	go func() {
-		cs.ServeGPRC(listener)
+		cs.Serve(listener)
 	}()
 
 	// let things go this far to generate the endpoint port then stop the server before

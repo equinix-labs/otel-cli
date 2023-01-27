@@ -1,5 +1,3 @@
-// otlpserver is a lightweight OTLP/gRPC server implementation intended for use
-// in otel-cli and end-to-end testing of OpenTelemetry applications.
 package otlpserver
 
 import (
@@ -14,18 +12,10 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Callback is a type for the function passed to newServer that is
-// called for each incoming span.
-type GrpcCallback func(CliEvent, CliEventList) bool
-
-// GrpcStopper is the function passed to newServer to be called when the
-// server is shut down.
-type GrpcStopper func(*GrpcServer)
-
 // GrpcServer is a gRPC/OTLP server handle.
 type GrpcServer struct {
 	server   *grpc.Server
-	callback GrpcCallback
+	callback Callback
 	stoponce sync.Once
 	stopper  chan struct{}
 	stopdone chan struct{}
@@ -33,9 +23,9 @@ type GrpcServer struct {
 	v1.UnimplementedTraceServiceServer
 }
 
-// NewServer takes a callback and stop function and returns a Server ready
-// to run with .ServeGRPC().
-func NewGrpcServer(cb GrpcCallback, stop GrpcStopper) *GrpcServer {
+// NewGrpcServer takes a callback and stop function and returns a Server ready
+// to run with .Serve().
+func NewGrpcServer(cb Callback, stop Stopper) *GrpcServer {
 	s := GrpcServer{
 		server:   grpc.NewServer(),
 		callback: cb,
@@ -57,7 +47,7 @@ func NewGrpcServer(cb GrpcCallback, stop GrpcStopper) *GrpcServer {
 
 // ServeGRPC takes a listener and starts the GRPC server on that listener.
 // Blocks until Stop() is called.
-func (gs *GrpcServer) ServeGPRC(listener net.Listener) error {
+func (gs *GrpcServer) Serve(listener net.Listener) error {
 	err := gs.server.Serve(listener)
 	gs.stopdone <- struct{}{}
 	return err
@@ -65,13 +55,13 @@ func (gs *GrpcServer) ServeGPRC(listener net.Listener) error {
 
 // ListenAndServeGRPC starts a TCP listener then starts the GRPC server using
 // ServeGRPC for you.
-func (gs *GrpcServer) ListenAndServeGPRC(otlpEndpoint string) {
+func (gs *GrpcServer) ListenAndServe(otlpEndpoint string) {
 	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "grpc://")
 	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
 	}
-	if err := gs.ServeGPRC(listener); err != nil {
+	if err := gs.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
 }

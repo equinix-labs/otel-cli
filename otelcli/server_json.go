@@ -52,7 +52,7 @@ func doServerJson(cmd *cobra.Command, args []string) {
 	if config.Endpoint == "" {
 		config.Endpoint = defaultOtlpEndpoint
 	}
-	cs.ListenAndServeGPRC(config.Endpoint)
+	cs.ListenAndServe(config.Endpoint)
 }
 
 // writeFile takes the spans and events and writes them out to json files in the
