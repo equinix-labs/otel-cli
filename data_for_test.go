@@ -26,7 +26,7 @@ type FixtureConfig struct {
 	// when true this test will be excluded under go -test.short mode
 	// TODO: maybe move this up to the suite?
 	IsLongTest bool
-	// either grpc or http, empty will cause an error
+	// either grpcProtocol or httpProtocol, defaults to grpc
 	ServerProtocol serverProtocol
 	// for timeout tests we need to start the server to generate the endpoint
 	// but do not want it to answer when otel-cli calls, this does that
