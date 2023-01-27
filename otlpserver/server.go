@@ -12,7 +12,7 @@ import (
 // called for each incoming span.
 type Callback func(CliEvent, CliEventList) bool
 
-// GrpcStopper is the function passed to newServer to be called when the
+// Stopper is the function passed to newServer to be called when the
 // server is shut down.
 type Stopper func(OtlpServer)
 
