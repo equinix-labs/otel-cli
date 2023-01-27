@@ -31,6 +31,9 @@ type CliEvent struct {
 	// the methods below will set this to true before returning
 	// to make it easy for consumers to tell if they got a zero value
 	IsPopulated bool `json:"has_been_modified"`
+	// somewhere for the server to put interesting facts about a span
+	// like what HTTP path it arrived on, what http method, etc.
+	ServerMeta map[string]string `json:"server_meta"`
 }
 
 // ToStringMap flattens a CliEvent into a string map for testing.
@@ -60,6 +63,7 @@ func (ce CliEvent) ToStringMap() map[string]string {
 		"attributes":         mapToKVString(ce.Attributes),
 		"service_attributes": mapToKVString(ce.ServiceAttributes),
 		"is_populated":       strconv.FormatBool(ce.IsPopulated),
+		"server_meta":        mapToKVString(ce.ServerMeta),
 	}
 }
 
@@ -71,7 +75,7 @@ func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
 func (cel CliEventList) Less(i, j int) bool { return cel[i].Nanos < cel[j].Nanos }
 
 // NewCliEventFromSpan converts a raw grpc span into a CliEvent.
-func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.ResourceSpans) CliEvent {
+func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.ResourceSpans, serverMeta map[string]string) CliEvent {
 	e := CliEvent{
 		TraceID:           hex.EncodeToString(span.GetTraceId()),
 		SpanID:            hex.EncodeToString(span.GetSpanId()),
@@ -85,6 +89,7 @@ func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.Resou
 		ServiceAttributes: make(map[string]string),
 		Nanos:             span.GetStartTimeUnixNano(),
 		IsPopulated:       true,
+		ServerMeta:        make(map[string]string),
 	}
 
 	// copy service attributes over by string, which includes service.name
@@ -118,12 +123,17 @@ func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.Resou
 		e.Attributes[attr.GetKey()] = val
 	}
 
+	// explicitly copy the map, do not share the ref
+	for k, v := range serverMeta {
+		e.ServerMeta[k] = v
+	}
+
 	return e
 }
 
 // NewCliEventFromSpanEvent takes a span event, span, and ils and returns an event
 // with all the span event info filled in.
-func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.ScopeSpans) CliEvent {
+func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.ScopeSpans, serverMeta map[string]string) CliEvent {
 	// start with the span, rewrite it for the event
 	e := CliEvent{
 		TraceID:     hex.EncodeToString(span.GetTraceId()),
@@ -138,26 +148,32 @@ func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.S
 		Attributes:  make(map[string]string), // overwrite the one from the span
 		Nanos:       se.GetTimeUnixNano(),
 		IsPopulated: true,
+		ServerMeta:  make(map[string]string),
 	}
 
 	for _, attr := range se.GetAttributes() {
 		e.Attributes[attr.GetKey()] = attr.Value.String()
 	}
 
+	// explicitly copy the map, do not share the ref
+	for k, v := range serverMeta {
+		e.ServerMeta[k] = v
+	}
+
 	return e
 }
 
-func otelToCliEvent(cb Callback, req *colv1.ExportTraceServiceRequest) bool {
+func otelToCliEvent(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta map[string]string) bool {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
 		scopeSpans := resource.GetScopeSpans()
 		for _, ss := range scopeSpans {
 			for _, span := range ss.GetSpans() {
 				// convert protobuf spans to something easier for humans to consume
-				ces := NewCliEventFromSpan(span, ss, resource)
+				ces := NewCliEventFromSpan(span, ss, resource, serverMeta)
 				events := CliEventList{}
 				for _, se := range span.GetEvents() {
-					events = append(events, NewCliEventFromSpanEvent(se, span, ss))
+					events = append(events, NewCliEventFromSpanEvent(se, span, ss, serverMeta))
 				}
 
 				done := cb(ces, events)

@@ -123,8 +123,9 @@ var suites = []FixtureSuite{
 					WithEndpoint("http://{{endpoint}}").
 					WithInsecure(false),
 				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
+					"span_id":     "*",
+					"trace_id":    "*",
+					"server_meta": "host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,

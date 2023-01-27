@@ -48,7 +48,14 @@ func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		rw.WriteHeader(http.StatusNotAcceptable)
 	}
 
-	done := otelToCliEvent(hs.callback, &msg)
+	meta := map[string]string{
+		"method": req.Method,
+		"proto":  req.Proto,
+		"host":   req.Host,
+		"uri":    req.RequestURI,
+	}
+
+	done := otelToCliEvent(hs.callback, &msg, meta)
 	if done {
 		go hs.StopWait()
 	}
