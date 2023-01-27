@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -71,7 +70,7 @@ func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
 func (cel CliEventList) Less(i, j int) bool { return cel[i].Nanos < cel[j].Nanos }
 
 // NewCliEventFromSpan converts a raw grpc span into a CliEvent.
-func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss *v1.ResourceSpans) CliEvent {
+func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.ResourceSpans) CliEvent {
 	e := CliEvent{
 		TraceID:           hex.EncodeToString(span.GetTraceId()),
 		SpanID:            hex.EncodeToString(span.GetSpanId()),
@@ -93,15 +92,15 @@ func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss
 	}
 
 	switch span.GetKind() {
-	case tracepb.Span_SPAN_KIND_CLIENT:
+	case v1.Span_SPAN_KIND_CLIENT:
 		e.Kind = "client"
-	case tracepb.Span_SPAN_KIND_SERVER:
+	case v1.Span_SPAN_KIND_SERVER:
 		e.Kind = "server"
-	case tracepb.Span_SPAN_KIND_PRODUCER:
+	case v1.Span_SPAN_KIND_PRODUCER:
 		e.Kind = "producer"
-	case tracepb.Span_SPAN_KIND_CONSUMER:
+	case v1.Span_SPAN_KIND_CONSUMER:
 		e.Kind = "consumer"
-	case tracepb.Span_SPAN_KIND_INTERNAL:
+	case v1.Span_SPAN_KIND_INTERNAL:
 		e.Kind = "internal"
 	default:
 		e.Kind = "unspecified"
@@ -123,7 +122,7 @@ func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss
 
 // NewCliEventFromSpanEvent takes a span event, span, and ils and returns an event
 // with all the span event info filled in.
-func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, scopeSpans *tracepb.ScopeSpans) CliEvent {
+func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.ScopeSpans) CliEvent {
 	// start with the span, rewrite it for the event
 	e := CliEvent{
 		TraceID:     hex.EncodeToString(span.GetTraceId()),
