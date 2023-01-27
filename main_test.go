@@ -316,7 +316,13 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 		return results.Spans >= fixture.Expect.Spans
 	}
 
-	cs := otlpserver.NewServer("grpc", cb, func(*otlpserver.GrpcServer) {})
+	var cs otlpserver.OtlpServer
+	switch fixture.Config.ServerProtocol {
+	case grpcProtocol:
+		cs = otlpserver.NewServer("grpc", cb, func(otlpserver.OtlpServer) {})
+	case httpProtocol:
+		cs = otlpserver.NewServer("http", cb, func(otlpserver.OtlpServer) {})
+	}
 	defer cs.Stop()
 
 	serverTimeout := time.Duration(fixture.Config.TestTimeoutMs) * time.Millisecond

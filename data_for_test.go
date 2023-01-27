@@ -11,6 +11,13 @@ import (
 	"github.com/equinix-labs/otel-cli/otelcli"
 )
 
+type serverProtocol int
+
+const (
+	grpcProtocol serverProtocol = iota
+	httpProtocol
+)
+
 type FixtureConfig struct {
 	CliArgs []string
 	Env     map[string]string
@@ -19,6 +26,8 @@ type FixtureConfig struct {
 	// when true this test will be excluded under go -test.short mode
 	// TODO: maybe move this up to the suite?
 	IsLongTest bool
+	// either grpc or http, empty will cause an error
+	ServerProtocol serverProtocol
 	// for timeout tests we need to start the server to generate the endpoint
 	// but do not want it to answer when otel-cli calls, this does that
 	StopServerBeforeExec bool

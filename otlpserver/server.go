@@ -10,7 +10,7 @@ type Callback func(CliEvent, CliEventList) bool
 
 // GrpcStopper is the function passed to newServer to be called when the
 // server is shut down.
-type Stopper func(*GrpcServer)
+type Stopper func(OtlpServer)
 
 type OtlpServer interface {
 	ListenAndServe(otlpEndpoint string)
@@ -25,8 +25,8 @@ func NewServer(protocol string, cb Callback, stop Stopper) OtlpServer {
 	switch protocol {
 	case "grpc":
 		return NewGrpcServer(cb, stop)
-	case "http/protobuf":
-	case "http/json":
+	case "http":
+		return NewHttpServer(cb, stop)
 	}
 
 	return nil

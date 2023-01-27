@@ -1,9 +1,12 @@
 package otlpserver
 
 import (
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -24,19 +27,30 @@ type HttpServer struct {
 }
 
 // NewServer takes a callback and stop function and returns a Server ready
-// to run with .ServeHttp().
+// to run with .Serve().
 func NewHttpServer(cb Callback, stop Stopper) *HttpServer {
 	s := HttpServer{
 		server:   &http.Server{},
 		callback: cb,
 	}
 
+	s.server.Handler = &s
+
 	return &s
+}
+
+func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	data, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Fatalf("Error while reading request body: %s", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n\n%q\n\n", data)
 }
 
 // ServeHttp takes a listener and starts the HTTP server on that listener.
 // Blocks until Stop() is called.
-func (hs *HttpServer) ServeHttp(listener net.Listener) error {
+func (hs *HttpServer) Serve(listener net.Listener) error {
 	err := hs.server.Serve(listener)
 	return err
 }
@@ -48,7 +62,7 @@ func (hs *HttpServer) ListenAndServe(otlpEndpoint string) {
 	if err != nil {
 		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
 	}
-	if err := hs.ServeHttp(listener); err != nil {
+	if err := hs.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
 }
