@@ -37,7 +37,7 @@ func init() {
 
 func doServerJson(cmd *cobra.Command, args []string) {
 	stop := func(*otlpserver.Server) {}
-	cs := otlpserver.NewServer(renderJson, stop)
+	cs := otlpserver.NewGrpcServer(renderJson, stop)
 
 	// stops the grpc server after timeout
 	timeout := parseCliTimeout()

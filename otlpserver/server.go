@@ -35,7 +35,7 @@ type Server struct {
 
 // NewServer takes a callback and stop function and returns a Server ready
 // to run with .ServeGRPC().
-func NewServer(cb Callback, stop Stopper) *Server {
+func NewGrpcServer(cb Callback, stop Stopper) *Server {
 	s := Server{
 		server:   grpc.NewServer(),
 		callback: cb,

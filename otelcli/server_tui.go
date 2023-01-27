@@ -44,7 +44,7 @@ func doServerTui(cmd *cobra.Command, args []string) {
 		tuiServer.area.Stop()
 	}
 
-	cs := otlpserver.NewServer(renderTui, stop)
+	cs := otlpserver.NewGrpcServer(renderTui, stop)
 
 	// unlike the rest of otel-cli, server should default to localhost:4317
 	if config.Endpoint == "" {
