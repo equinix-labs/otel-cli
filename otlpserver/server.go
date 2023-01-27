@@ -16,16 +16,16 @@ import (
 
 // Callback is a type for the function passed to newServer that is
 // called for each incoming span.
-type Callback func(CliEvent, CliEventList) bool
+type GrpcCallback func(CliEvent, CliEventList) bool
 
-// Stopper is the function passed to newServer to be called when the
+// GrpcStopper is the function passed to newServer to be called when the
 // server is shut down.
-type Stopper func(*Server)
+type GrpcStopper func(*GrpcServer)
 
-// Server is a gRPC/OTLP server handle.
-type Server struct {
+// GrpcServer is a gRPC/OTLP server handle.
+type GrpcServer struct {
 	server   *grpc.Server
-	callback Callback
+	callback GrpcCallback
 	stoponce sync.Once
 	stopper  chan struct{}
 	stopdone chan struct{}
@@ -35,8 +35,8 @@ type Server struct {
 
 // NewServer takes a callback and stop function and returns a Server ready
 // to run with .ServeGRPC().
-func NewGrpcServer(cb Callback, stop Stopper) *Server {
-	s := Server{
+func NewGrpcServer(cb GrpcCallback, stop GrpcStopper) *GrpcServer {
+	s := GrpcServer{
 		server:   grpc.NewServer(),
 		callback: cb,
 		stopper:  make(chan struct{}),
@@ -57,43 +57,43 @@ func NewGrpcServer(cb Callback, stop Stopper) *Server {
 
 // ServeGRPC takes a listener and starts the GRPC server on that listener.
 // Blocks until Stop() is called.
-func (cs *Server) ServeGPRC(listener net.Listener) error {
-	err := cs.server.Serve(listener)
-	cs.stopdone <- struct{}{}
+func (gs *GrpcServer) ServeGPRC(listener net.Listener) error {
+	err := gs.server.Serve(listener)
+	gs.stopdone <- struct{}{}
 	return err
 }
 
 // ListenAndServeGRPC starts a TCP listener then starts the GRPC server using
 // ServeGRPC for you.
-func (cs *Server) ListenAndServeGPRC(otlpEndpoint string) {
+func (gs *GrpcServer) ListenAndServeGPRC(otlpEndpoint string) {
 	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "grpc://")
 	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
 	}
-	if err := cs.ServeGPRC(listener); err != nil {
+	if err := gs.ServeGPRC(listener); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
 }
 
 // Stop sends a value to the server shutdown goroutine so it stops GRPC
 // and calls the stop function given to newServer. Safe to call multiple times.
-func (cs *Server) Stop() {
-	cs.stoponce.Do(func() {
-		cs.stopper <- struct{}{}
+func (gs *GrpcServer) Stop() {
+	gs.stoponce.Do(func() {
+		gs.stopper <- struct{}{}
 	})
 }
 
 // StopWait stops the server and waits for it to affirm shutdown.
-func (cs *Server) StopWait() {
-	cs.Stop()
-	cs.doneonce.Do(func() {
-		<-cs.stopdone
+func (gs *GrpcServer) StopWait() {
+	gs.Stop()
+	gs.doneonce.Do(func() {
+		<-gs.stopdone
 	})
 }
 
 // Export implements the gRPC server interface for exporting messages.
-func (cs *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
+func (gs *GrpcServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
 		scopeSpans := resource.GetScopeSpans()
@@ -106,10 +106,10 @@ func (cs *Server) Export(ctx context.Context, req *v1.ExportTraceServiceRequest)
 					events = append(events, NewCliEventFromSpanEvent(se, span, ss))
 				}
 
-				f := cs.callback
+				f := gs.callback
 				done := f(ces, events)
 				if done {
-					go cs.StopWait()
+					go gs.StopWait()
 					return &v1.ExportTraceServiceResponse{}, nil
 				}
 			}

@@ -40,7 +40,7 @@ func doServerTui(cmd *cobra.Command, args []string) {
 
 	tuiServer.events = []otlpserver.CliEvent{}
 
-	stop := func(*otlpserver.Server) {
+	stop := func(*otlpserver.GrpcServer) {
 		tuiServer.area.Stop()
 	}
 
