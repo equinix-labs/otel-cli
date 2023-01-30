@@ -128,9 +128,9 @@ then config file, then environment variables.
 ### Endpoint URIs
 
 otel-cli deviates from the OTel specification for endpoint URIs. Mainly, otel-cli supports
-bare host:port for grpc endpoints. The optional http/json is not supported by
-opentelemetry-go so otel-cli does not support it. To use gRPC with an http endpoint,
-set the protocol with --protocol or the envvar.
+bare host:port for grpc endpoints and continues to default to gRPC. The optional http/json
+is not supported by opentelemetry-go so otel-cli does not support it. To use gRPC with an
+http endpoint, set the protocol with --protocol or the envvar.
 
    * bare `host:port` endpoints are assumed to be gRPC and are not supported for HTTP
    * `http://` and `https://` are assumed to be HTTP unless --protocol is set to `grpc`.
