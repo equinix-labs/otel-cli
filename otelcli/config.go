@@ -25,6 +25,7 @@ const spanBgSockfilename = "otel-cli-background.sock"
 func DefaultConfig() Config {
 	return Config{
 		Endpoint:               "",
+		Protocol:               "",
 		Timeout:                "1s",
 		Headers:                map[string]string{},
 		Insecure:               false,
@@ -59,6 +60,7 @@ func DefaultConfig() Config {
 // Data structure is public so that it can serialize to json easily.
 type Config struct {
 	Endpoint    string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
+	Protocol    string            `json:"protocol" env:"OTEL_EXPORTER_OTLP_PROTOCOL,OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
 	Timeout     string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
 	Headers     map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
 	Insecure    bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
@@ -172,6 +174,7 @@ func (c *Config) LoadEnv(getenv func(string) string) error {
 func (c Config) ToStringMap() map[string]string {
 	return map[string]string{
 		"endpoint":                    c.Endpoint,
+		"protocol":                    c.Protocol,
 		"timeout":                     c.Timeout,
 		"headers":                     flattenStringMap(c.Headers, "{}"),
 		"insecure":                    strconv.FormatBool(c.Insecure),
@@ -203,6 +206,12 @@ func (c Config) ToStringMap() map[string]string {
 // WithEndpoint returns the config with Endpoint set to the provided value.
 func (c Config) WithEndpoint(with string) Config {
 	c.Endpoint = with
+	return c
+}
+
+// WithProtocol returns the config with protocol set to the provided value.
+func (c Config) WithProtocol(with string) Config {
+	c.Protocol = with
 	return c
 }
 
