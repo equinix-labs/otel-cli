@@ -23,7 +23,7 @@ Example:
 }
 
 // StatusOutput captures all the data we want to print out for this subcommand
-// and is also is used in ../main_test.go for automated testing.
+// and is also used in ../main_test.go for automated testing.
 type StatusOutput struct {
 	Config      Config            `json:"config"`
 	SpanData    map[string]string `json:"span_data"`
