@@ -49,10 +49,11 @@ func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	meta := map[string]string{
-		"method": req.Method,
-		"proto":  req.Proto,
-		"host":   req.Host,
-		"uri":    req.RequestURI,
+		"method":       req.Method,
+		"proto":        req.Proto,
+		"content-type": req.Header.Get("Content-Type"),
+		"host":         req.Host,
+		"uri":          req.RequestURI,
 	}
 
 	done := otelToCliEvent(hs.callback, &msg, meta)

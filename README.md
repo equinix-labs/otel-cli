@@ -103,6 +103,7 @@ then config file, then environment variables.
 | CLI argument         | environment variable          | config file key          | example value  |
 | -------------------- | ----------------------------- | ------------------------ | -------------- |
 | --endpoint           | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint                 | localhost:4317 |
+| --protocol           | OTEL_EXPORTER_OTLP_PROTOCOL   | protocol                 | http/protobuf  |
 | --insecure           | OTEL_EXPORTER_OTLP_INSECURE   | insecure                 | false          |
 | --timeout            | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout                  | 1s             |
 | --otlp-headers       | OTEL_EXPORTER_OTLP_HEADERS    | otlp_headers             | k=v,a=b        |
@@ -126,11 +127,13 @@ then config file, then environment variables.
 
 ### Endpoint URIs
 
-otel-cli deviates from the OTel specification for endpoint URIs.
+otel-cli deviates from the OTel specification for endpoint URIs. Mainly, otel-cli supports
+bare host:port for grpc endpoints. The optional http/json is not supported by
+opentelemetry-go so otel-cli does not support it. To use gRPC with an http endpoint,
+set the protocol with --protocol or the envvar.
 
-   * bare `host:port` endpoints are assumed to be gRPC
-   * `grpc://` URIs are supported
-   * `http://` and `https://` are assumed to be HTTP _only_ (the spec reuses them for gRPC)
+   * bare `host:port` endpoints are assumed to be gRPC and are not supported for HTTP
+   * `http://` and `https://` are assumed to be HTTP unless --protocol is set to `grpc`.
    * loopback addresses without an https:// prefix are assumed to be unencrypted
 
 ## Easy local dev
