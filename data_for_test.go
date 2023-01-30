@@ -473,7 +473,7 @@ var suites = []FixtureSuite{
 		{
 			Name: "--protocol http/protobuf",
 			Config: FixtureConfig{
-				ServerProtocol: grpcProtocol,
+				ServerProtocol: httpProtocol,
 				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}", "--protocol", "http/protobuf"},
 				TestTimeoutMs:  1000,
 			},
@@ -495,7 +495,7 @@ var suites = []FixtureSuite{
 		{
 			Name: "--protocol http/json",
 			Config: FixtureConfig{
-				ServerProtocol: grpcProtocol,
+				ServerProtocol: httpProtocol,
 				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}", "--protocol", "http/json"},
 				TestTimeoutMs:  1000,
 			},
@@ -517,9 +517,8 @@ var suites = []FixtureSuite{
 		{
 			Name: "protocol: bad config",
 			Config: FixtureConfig{
-				ServerProtocol: grpcProtocol,
-				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}", "--protocol", "xxx"},
-				TestTimeoutMs:  1000,
+				CliArgs:       []string{"status", "--endpoint", "{{endpoint}}", "--protocol", "xxx"},
+				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
 				CommandFailed: true,
@@ -564,7 +563,7 @@ var suites = []FixtureSuite{
 		{
 			Name: "OTEL_EXPORTER_OTLP_PROTOCOL http/protobuf",
 			Config: FixtureConfig{
-				ServerProtocol: grpcProtocol,
+				ServerProtocol: httpProtocol,
 				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}"},
 				TestTimeoutMs:  1000,
 				Env: map[string]string{
@@ -589,7 +588,7 @@ var suites = []FixtureSuite{
 		{
 			Name: "OTEL_EXPORTER_OTLP_PROTOCOL http/json",
 			Config: FixtureConfig{
-				ServerProtocol: grpcProtocol,
+				ServerProtocol: httpProtocol,
 				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}"},
 				TestTimeoutMs:  1000,
 				Env: map[string]string{
@@ -614,9 +613,8 @@ var suites = []FixtureSuite{
 		{
 			Name: "OTEL_EXPORTER_OTLP_PROTOCOL: bad config",
 			Config: FixtureConfig{
-				ServerProtocol: grpcProtocol,
-				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}"},
-				TestTimeoutMs:  1000,
+				CliArgs:       []string{"status", "--endpoint", "{{endpoint}}"},
+				TestTimeoutMs: 1000,
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_PROTOCOL": "roflcopter",
 				},
