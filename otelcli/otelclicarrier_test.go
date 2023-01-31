@@ -134,7 +134,7 @@ func TestWriteTraceparentToFile(t *testing.T) {
 	saveTraceparentToFile(ctx, file.Name())
 
 	// read the data back, it should just be the traceparent string
-	data, err := ioutil.ReadFile(file.Name())
+	data, err := os.ReadFile(file.Name())
 	if err != nil {
 		t.Fatalf("failed to read tempfile '%s': %s", file.Name(), err)
 	}

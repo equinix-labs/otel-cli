@@ -2,7 +2,6 @@ package otelcli
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strconv"
@@ -99,7 +98,7 @@ func (c *Config) LoadFile() error {
 		return nil
 	}
 
-	js, err := ioutil.ReadFile(config.CfgFile)
+	js, err := os.ReadFile(config.CfgFile)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read file '%s'", c.CfgFile)
 	}

@@ -60,7 +60,7 @@ otel-cli exec --service my-service --name "curl google" curl https://google.com
 otel-cli exec --kind producer "otel-cli exec --kind consumer sleep 1"
 
 # if a traceparent envvar is set it will be automatically picked up and
-# used by span and exec. use --ignore-tp-env to ignore it even when present
+# used by span and exec. use --tp-ignore-env to ignore it even when present
 export TRACEPARENT=00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01
 
 # create a span with a custom start/end time using either RFC3339,
