@@ -78,7 +78,6 @@ var suites = []FixtureSuite{
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording: false,
 					NumArgs:     1,
-					OtelError:   "",
 				},
 			},
 		},
@@ -107,7 +106,6 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
-					OtelError:         "",
 				},
 				Spans: 1,
 			},
@@ -126,14 +124,13 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"span_id":     "*",
 					"trace_id":    "*",
-					"server_meta": "host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
+					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
-					OtelError:         "",
 				},
 				Spans: 1,
 			},
@@ -442,6 +439,145 @@ var suites = []FixtureSuite{
 				},
 				CliOutput: "hello world\n",
 				Spans:     2,
+			},
+		},
+	},
+	// validate OTEL_EXPORTER_OTLP_PROTOCOL / --protocol
+	{
+		// --protocol
+		{
+			Name: "--protocol grpc",
+			Config: FixtureConfig{
+				ServerProtocol: grpcProtocol,
+				CliArgs:        []string{"status", "--endpoint", "{{endpoint}}", "--protocol", "grpc"},
+				TestTimeoutMs:  1000,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().WithEndpoint("{{endpoint}}").WithProtocol("grpc"),
+				SpanData: map[string]string{
+					"server_meta": "proto=grpc",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           5,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 1,
+			},
+		},
+		{
+			Name: "--protocol http/protobuf",
+			Config: FixtureConfig{
+				ServerProtocol: httpProtocol,
+				CliArgs:        []string{"status", "--endpoint", "http://{{endpoint}}", "--protocol", "http/protobuf"},
+				TestTimeoutMs:  1000,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
+				SpanData: map[string]string{
+					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           5,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 1,
+			},
+		},
+		{
+			Name: "protocol: bad config",
+			Config: FixtureConfig{
+				CliArgs:       []string{"status", "--endpoint", "{{endpoint}}", "--protocol", "xxx", "--verbose", "--fail"},
+				TestTimeoutMs: 1000,
+			},
+			Expect: Results{
+				CommandFailed: true,
+				CliOutputRe:   regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
+				CliOutput:     "invalid protocol setting \"xxx\"\n",
+				Config:        otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       false,
+					NumArgs:           7,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 0,
+			},
+		},
+		// OTEL_EXPORTER_OTLP_PROTOCOL
+		{
+			Name: "OTEL_EXPORTER_OTLP_PROTOCOL grpc",
+			Config: FixtureConfig{
+				ServerProtocol: grpcProtocol,
+				// validate protocol can be set to grpc with an http endpoint
+				CliArgs:       []string{"status", "--endpoint", "http://{{endpoint}}"},
+				TestTimeoutMs: 1000,
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+				},
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("grpc"),
+				SpanData: map[string]string{
+					"server_meta": "proto=grpc",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           3,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 1,
+			},
+		},
+		{
+			Name: "OTEL_EXPORTER_OTLP_PROTOCOL http/protobuf",
+			Config: FixtureConfig{
+				ServerProtocol: httpProtocol,
+				CliArgs:        []string{"status", "--endpoint", "http://{{endpoint}}"},
+				TestTimeoutMs:  1000,
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+				},
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
+				SpanData: map[string]string{
+					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           3,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 1,
+			},
+		},
+		{
+			Name: "OTEL_EXPORTER_OTLP_PROTOCOL: bad config",
+			Config: FixtureConfig{
+				CliArgs:       []string{"status", "--endpoint", "http://{{endpoint}}", "--fail", "--verbose"},
+				TestTimeoutMs: 1000,
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_PROTOCOL": "roflcopter",
+				},
+			},
+			Expect: Results{
+				CommandFailed: true,
+				CliOutputRe:   regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
+				CliOutput:     "invalid protocol setting \"roflcopter\"\n",
+				Config:        otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}"),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       false,
+					NumArgs:           3,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 0,
 			},
 		},
 	},

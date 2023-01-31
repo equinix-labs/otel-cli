@@ -33,6 +33,10 @@ func initTracer() (context.Context, func()) {
 		return ctx, func() {}
 	}
 
+	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
+		softFail("invalid protocol setting %q", config.Protocol)
+	}
+
 	var exporter sdktrace.SpanExporter // allows overwrite in --test mode
 	var err error
 
@@ -41,8 +45,10 @@ func initTracer() (context.Context, func()) {
 	// awkward for otel-cli so we break with the spec. otel-cli will only resolve
 	// http(s):// to HTTP protocols, defaults bare host:port to gRPC, and supports
 	// grpc:// to definitely use gRPC to connect out.
-	if strings.HasPrefix(config.Endpoint, "http://") ||
-		strings.HasPrefix(config.Endpoint, "https://") {
+	if config.Protocol != "grpc" &&
+		(strings.HasPrefix(config.Protocol, "http/") ||
+			strings.HasPrefix(config.Endpoint, "http://") ||
+			strings.HasPrefix(config.Endpoint, "https://")) {
 		exporter, err = otlphttp.New(ctx, httpOptions()...)
 		if err != nil {
 			softFail("failed to configure OTLP/HTTP exporter: %s", err)
@@ -97,7 +103,9 @@ func grpcOptions() []otlpgrpc.Option {
 	grpcOpts := []otlpgrpc.Option{}
 
 	// per comment in initTracer(), grpc:// is specific to otel-cli
-	if strings.HasPrefix(config.Endpoint, "grpc://") {
+	if strings.HasPrefix(config.Endpoint, "grpc://") ||
+		strings.HasPrefix(config.Endpoint, "http://") ||
+		strings.HasPrefix(config.Endpoint, "https://") {
 		ep, err := url.Parse(config.Endpoint)
 		if err != nil {
 			softFail("error parsing provided gRPC URI '%s': %s", config.Endpoint, err)

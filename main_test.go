@@ -144,7 +144,7 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 
 	// many of the basic plumbing tests use status so it has its own set of checks
 	// but these shouldn't run for testing the other subcommands
-	if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" {
+	if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" && !fixture.Expect.CommandFailed {
 		checkStatusData(t, fixture, endpoint, results)
 	} else {
 		// checking the text output only makes sense for non-status paths
@@ -296,7 +296,10 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
 	started := time.Now()
 
-	var results Results
+	results := Results{
+		SpanData: map[string]string{},
+		Env:      map[string]string{},
+	}
 	var retSpan otlpserver.CliEvent
 	var retEvents otlpserver.CliEventList
 
@@ -409,7 +412,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 
 	// only try to parse status json if it was a status command
 	// TODO: support variations on otel-cli where status isn't the first arg
-	if len(cliOut) > 0 && len(args) > 0 && args[0] == "status" {
+	if len(cliOut) > 0 && len(args) > 0 && args[0] == "status" && !fixture.Expect.CommandFailed {
 		err = json.Unmarshal(cliOut, &results)
 		if err != nil {
 			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Name, err)
