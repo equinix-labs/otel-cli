@@ -125,7 +125,7 @@ func grpcOptions() []otlpgrpc.Option {
 	// have any encryption available, or setting it up raises the bar of entry too high.
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	if config.Insecure || isLoopbackAddr(config.Endpoint) {
+	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
 		var tlsConfig *tls.Config
@@ -190,7 +190,7 @@ func httpOptions() []otlphttp.Option {
 	// raises the bar of entry too high.  The compromise is to automatically flip
 	// this flag to true when endpoint contains an an obvious "localhost",
 	// "127.0.0.x", or "::1" address.
-	if config.Insecure || isLoopbackAddr(config.Endpoint) {
+	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		httpOpts = append(httpOpts, otlphttp.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
 		var tlsConfig *tls.Config
