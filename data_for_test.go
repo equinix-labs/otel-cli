@@ -235,6 +235,26 @@ var suites = []FixtureSuite{
 					"\"lmao\" as an bool: strconv.ParseBool: parsing \"lmao\": invalid syntax\n",
 			},
 		},
+		{
+			Name: "https:// should fail when TLS is not available",
+			Config: FixtureConfig{
+				ServerProtocol: httpProtocol,
+				CliArgs:        []string{"status", "--endpoint", "https://{{endpoint}}"},
+				TestTimeoutMs:  1000,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("https://{{endpoint}}"),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           3,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+					OtelError:         `traces export: Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
+				},
+				Spans: 0,
+			},
+		},
 	},
 	// otel-cli span with no OTLP config should do and print nothing
 	{
