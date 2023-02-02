@@ -27,7 +27,8 @@ type FixtureConfig struct {
 	// TODO: maybe move this up to the suite?
 	IsLongTest bool
 	// either grpcProtocol or httpProtocol, defaults to grpc
-	ServerProtocol serverProtocol
+	ServerProtocol   serverProtocol
+	ServerTLSEnabled bool
 	// for timeout tests we need to start the server to generate the endpoint
 	// but do not want it to answer when otel-cli calls, this does that
 	StopServerBeforeExec bool
@@ -131,6 +132,64 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+				},
+				Spans: 1,
+			},
+		},
+		// TLS connections
+		/*
+			{
+				Name: "minimum configuration (tls, recording, grpc)",
+				Config: FixtureConfig{
+					ServerProtocol:   grpcProtocol,
+					CliArgs:          []string{"status", "--endpoint", "https://{{endpoint}}", "--protocol", "grpc", "--no-tls-verify"},
+					TestTimeoutMs:    1000,
+					ServerTLSEnabled: true,
+					Env: map[string]string{
+						"SSL_CERT_FILE": "{{cert}}",
+					},
+				},
+				Expect: Results{
+					// otel-cli should NOT set insecure when it auto-detects localhost
+					Config: otelcli.DefaultConfig().
+						WithEndpoint("{{endpoint}}"),
+					Diagnostics: otelcli.Diagnostics{
+						IsRecording:       true,
+						NumArgs:           6,
+						DetectedLocalhost: true,
+						ParsedTimeoutMs:   1000,
+					},
+					Spans: 1,
+					Env: map[string]string{
+						"SSL_CERT_FILE": "{{cert}}",
+					},
+				},
+			},
+		*/
+		{
+			Name: "minimum configuration (tls, recording, https)",
+			Config: FixtureConfig{
+				ServerProtocol:   httpProtocol,
+				CliArgs:          []string{"status", "--endpoint", "https://{{endpoint}}", "--no-tls-verify"},
+				TestTimeoutMs:    2000,
+				ServerTLSEnabled: true,
+				Env: map[string]string{
+					"SSL_CERT_FILE": "{{cert}}",
+				},
+			},
+			Expect: Results{
+				// otel-cli should NOT set insecure when it auto-detects localhost
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("https://{{endpoint}}").
+					WithNoTlsVerify(true),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           4,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Env: map[string]string{
+					"SSL_CERT_FILE": "{{cert}}",
 				},
 				Spans: 1,
 			},
