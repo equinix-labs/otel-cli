@@ -42,6 +42,7 @@ func TestOtelCli(t *testing.T) {
 	}
 
 	tlsTest = generateTLSData(t)
+	defer tlsTest.cleanup()
 
 	var fixtureCount int
 	for _, suite := range suites {

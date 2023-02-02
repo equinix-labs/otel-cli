@@ -185,6 +185,15 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	return out
 }
 
+func (t tlsHelpers) cleanup() {
+	os.Remove(t.caFile)
+	os.Remove(t.caPrivKeyFile)
+	os.Remove(t.clientFile)
+	os.Remove(t.clientPrivKeyFile)
+	os.Remove(t.serverFile)
+	os.Remove(t.serverPrivKeyFile)
+}
+
 func pemToTempFile(t *testing.T, buf *bytes.Buffer) string {
 	tmp, err := os.CreateTemp(os.TempDir(), "otel-cli-test-pem")
 	if err != nil {
