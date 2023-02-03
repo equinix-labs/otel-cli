@@ -45,23 +45,34 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	var err error
 	var out tlsHelpers
 
+	// this gets reused for each cert, with CommonName overwritten for each
+	subject := pkix.Name{
+		CommonName:    "otel-cli certificate authority",
+		Organization:  []string{"otel-cli testing, inc"},
+		Country:       []string{"Open Source"},
+		Province:      []string{"Go"},
+		Locality:      []string{"OpenTelemetry"},
+		StreetAddress: []string{"github.com/equinix-labs/otel-cli"},
+		PostalCode:    []string{"4317"},
+	}
+
+	expire := time.Now().Add(time.Hour * 1000)
+
 	// ------------- CA -------------
 
 	out.ca = &x509.Certificate{
-		SerialNumber: big.NewInt(4317),
-		Subject: pkix.Name{
-			Organization:  []string{"otel-cli testing, inc"},
-			Country:       []string{"Open Source"},
-			Province:      []string{"Go"},
-			Locality:      []string{"OpenTelemetry"},
-			StreetAddress: []string{"github.com/equinix-labs/otel-cli"},
-			PostalCode:    []string{"4317"},
+		SerialNumber:          big.NewInt(4317),
+		Subject:               subject,
+		NotBefore:             time.Now(),
+		NotAfter:              expire,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageClientAuth,
+			x509.ExtKeyUsageServerAuth,
+			x509.ExtKeyUsageOCSPSigning,
 		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().Add(time.Hour),
-		IsCA:        true,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 	}
 
 	// create a private key
@@ -79,7 +90,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	// get the PEM encoding that the tests will use
 	out.caPEM = new(bytes.Buffer)
 	pem.Encode(out.caPEM, &pem.Block{Type: "CERTIFICATE", Bytes: caBytes})
-	out.caFile = pemToTempFile(t, out.caPEM)
+	out.caFile = pemToTempFile(t, "ca-cert", out.caPEM)
 
 	out.caPrivKeyPEM = new(bytes.Buffer)
 	caPrivKeyBytes, err := x509.MarshalECPrivateKey(out.caPrivKey)
@@ -87,7 +98,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 		t.Fatalf("error marshaling server cert: %s", err)
 	}
 	pem.Encode(out.caPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: caPrivKeyBytes})
-	out.caPrivKeyFile = pemToTempFile(t, out.caPrivKeyPEM)
+	out.caPrivKeyFile = pemToTempFile(t, "ca-privkey", out.caPrivKeyPEM)
 
 	out.certpool = x509.NewCertPool()
 	out.certpool.AppendCertsFromPEM(out.caPEM.Bytes())
@@ -97,16 +108,20 @@ func generateTLSData(t *testing.T) tlsHelpers {
 
 	// ------------- server -------------
 
+	subject.CommonName = "server"
 	out.serverCert = &x509.Certificate{
 		SerialNumber: big.NewInt(4318),
-		Subject:      out.ca.Subject,
+		Subject:      subject,
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 		DNSNames:     []string{"localhost"},
 		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(time.Hour),
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:     x509.KeyUsageDigitalSignature,
+		NotAfter:     expire,
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageClientAuth,
+			x509.ExtKeyUsageServerAuth,
+		},
+		KeyUsage: x509.KeyUsageKeyAgreement | x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 	}
 
 	out.serverPrivKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
@@ -121,7 +136,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 
 	out.serverPEM = new(bytes.Buffer)
 	pem.Encode(out.serverPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverBytes})
-	out.serverFile = pemToTempFile(t, out.serverPEM)
+	out.serverFile = pemToTempFile(t, "server-cert", out.serverPEM)
 
 	out.serverPrivKeyPEM = new(bytes.Buffer)
 	serverPrivKeyBytes, err := x509.MarshalECPrivateKey(out.serverPrivKey)
@@ -129,7 +144,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 		t.Fatalf("error marshaling server cert: %s", err)
 	}
 	pem.Encode(out.serverPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: serverPrivKeyBytes})
-	out.serverPrivKeyFile = pemToTempFile(t, out.serverPrivKeyPEM)
+	out.serverPrivKeyFile = pemToTempFile(t, "server-privkey", out.serverPrivKeyPEM)
 
 	out.serverCertPair, err = tls.X509KeyPair(out.serverPEM.Bytes(), out.serverPrivKeyPEM.Bytes())
 	if err != nil {
@@ -143,15 +158,16 @@ func generateTLSData(t *testing.T) tlsHelpers {
 
 	// ------------- client -------------
 
+	subject.CommonName = "client"
 	out.clientCert = &x509.Certificate{
 		SerialNumber: big.NewInt(4319),
-		Subject:      out.ca.Subject,
+		Subject:      subject,
 		SubjectKeyId: []byte{1, 2, 3, 4, 7},
 		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 		DNSNames:     []string{"localhost"},
 		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(time.Hour),
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		NotAfter:     expire,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
@@ -167,7 +183,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 
 	out.clientPEM = new(bytes.Buffer)
 	pem.Encode(out.clientPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientBytes})
-	out.clientFile = pemToTempFile(t, out.clientPEM)
+	out.clientFile = pemToTempFile(t, "client-cert", out.clientPEM)
 
 	out.clientPrivKeyPEM = new(bytes.Buffer)
 	clientPrivKeyBytes, err := x509.MarshalECPrivateKey(out.clientPrivKey)
@@ -175,7 +191,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 		t.Fatalf("error marshaling client cert: %s", err)
 	}
 	pem.Encode(out.clientPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: clientPrivKeyBytes})
-	out.clientPrivKeyFile = pemToTempFile(t, out.clientPrivKeyPEM)
+	out.clientPrivKeyFile = pemToTempFile(t, "client-privkey", out.clientPrivKeyPEM)
 
 	out.clientTLSConf = &tls.Config{
 		RootCAs: out.certpool,
@@ -193,8 +209,8 @@ func (t tlsHelpers) cleanup() {
 	os.Remove(t.serverPrivKeyFile)
 }
 
-func pemToTempFile(t *testing.T, buf *bytes.Buffer) string {
-	tmp, err := os.CreateTemp(os.TempDir(), "otel-cli-test-pem")
+func pemToTempFile(t *testing.T, tmpl string, buf *bytes.Buffer) string {
+	tmp, err := os.CreateTemp(os.TempDir(), "otel-cli-test-"+tmpl+"-pem")
 	if err != nil {
 		t.Fatalf("error creating temp file: %s", err)
 	}

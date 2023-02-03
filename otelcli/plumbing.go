@@ -3,8 +3,10 @@ package otelcli
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"net"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
@@ -128,11 +130,20 @@ func grpcOptions() []otlpgrpc.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		var tlsConfig *tls.Config
+		tlsConfig := &tls.Config{}
 		if config.NoTlsVerify {
-			tlsConfig = &tls.Config{
-				InsecureSkipVerify: true,
+			diagnostics.InsecureSkipVerify = true
+			tlsConfig.InsecureSkipVerify = true
+		}
+		if config.Certificate != "" {
+			data, err := os.ReadFile(config.Certificate)
+			if err != nil {
+				softFail("uanble to load certificate: %s", err)
 			}
+
+			certpool := x509.NewCertPool()
+			certpool.AppendCertsFromPEM(data)
+			tlsConfig.RootCAs = certpool
 		}
 		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))))
 	}
@@ -193,11 +204,10 @@ func httpOptions() []otlphttp.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		httpOpts = append(httpOpts, otlphttp.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		var tlsConfig *tls.Config
+		tlsConfig := &tls.Config{}
 		if config.NoTlsVerify {
-			tlsConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
+			diagnostics.InsecureSkipVerify = true
+			tlsConfig.InsecureSkipVerify = true
 		}
 		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig))
 	}
