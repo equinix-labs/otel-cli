@@ -16,3 +16,5 @@ otel-cli
 # vendor/
 
 dist/
+
+*.pem
