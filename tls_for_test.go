@@ -17,7 +17,6 @@ import (
 )
 
 type tlsHelpers struct {
-	pool              string
 	ca                *x509.Certificate
 	caPrivKey         *ecdsa.PrivateKey
 	caPEM             *bytes.Buffer
@@ -147,7 +146,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	out.clientCert = &x509.Certificate{
 		SerialNumber: big.NewInt(4319),
 		Subject:      out.ca.Subject,
-		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		SubjectKeyId: []byte{1, 2, 3, 4, 7},
 		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 		DNSNames:     []string{"localhost"},
 		NotBefore:    time.Now(),
