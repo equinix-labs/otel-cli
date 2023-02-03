@@ -25,8 +25,6 @@ import (
 const minimumPath = `/bin:/usr/bin`
 const defaultTestTimeout = time.Second
 
-var tlsTest tlsHelpers
-
 func TestMain(m *testing.M) {
 	// wipe out this process's envvars right away to avoid pollution & leakage
 	os.Clearenv()
@@ -40,9 +38,6 @@ func TestOtelCli(t *testing.T) {
 	if os.IsNotExist(err) {
 		t.Fatalf("otel-cli must be built and present as ./otel-cli for this test suite to work (try: go build)")
 	}
-
-	tlsTest = generateTLSData(t)
-	defer tlsTest.cleanup()
 
 	var fixtureCount int
 	for _, suite := range suites {
@@ -72,6 +67,10 @@ func TestOtelCli(t *testing.T) {
 	if len(suites) == 0 || fixtureCount == 0 {
 		t.Fatal("no test fixtures loaded!")
 	}
+
+	// generates a CA, client, and server certs to use in tests
+	tlsData := generateTLSData(t)
+	defer tlsData.cleanup()
 
 	for _, suite := range suites {
 		// a fixture can be backgrounded after starting it up for e.g. otel-cli span background
@@ -111,7 +110,7 @@ func TestOtelCli(t *testing.T) {
 			fixtureWait := make(chan struct{})
 			fixtureDone := make(chan struct{})
 
-			go runFixture(t, fixture, fixtureWait, fixtureDone)
+			go runFixture(t, fixture, fixtureWait, fixtureDone, tlsData)
 
 			if fixture.Config.Background {
 				// save off the channels for flow control
@@ -129,16 +128,16 @@ func TestOtelCli(t *testing.T) {
 
 // runFixture runs the OTLP server & command, waits for signal, checks
 // results, then signals it's done.
-func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}) {
+func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}, tlsData tlsHelpers) {
 	// sets up an OTLP server, runs otel-cli, packages data up in these return vals
-	endpoint, results, span, events := runOtelCli(t, fixture)
+	endpoint, results, span, events := runOtelCli(t, fixture, tlsData)
 	<-wait
-	checkAll(t, fixture, endpoint, results, span, events)
+	checkAll(t, fixture, endpoint, results, span, events, tlsData)
 	done <- struct{}{}
 }
 
 // checkAll gathers up all the check* funcs below into one function.
-func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, span otlpserver.CliEvent, events otlpserver.CliEventList) {
+func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, span otlpserver.CliEvent, events otlpserver.CliEventList, tlsData tlsHelpers) {
 	// check timeout and process status expectations
 	checkProcess(t, fixture, results)
 
@@ -146,15 +145,15 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 	checkSpanCount(t, fixture, results)
 
 	// compares the data in each recorded span against expectations in the fixture
-	checkSpanData(t, fixture, endpoint, span, events)
+	checkSpanData(t, fixture, endpoint, span, events, tlsData)
 
 	// many of the basic plumbing tests use status so it has its own set of checks
 	// but these shouldn't run for testing the other subcommands
 	if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" && !fixture.Expect.CommandFailed {
-		checkStatusData(t, fixture, endpoint, results)
+		checkStatusData(t, fixture, endpoint, results, tlsData)
 	} else {
 		// checking the text output only makes sense for non-status paths
-		checkOutput(t, fixture, endpoint, results)
+		checkOutput(t, fixture, endpoint, results, tlsData)
 	}
 }
 
@@ -181,8 +180,8 @@ func checkProcess(t *testing.T, fixture Fixture, results Results) {
 
 // checkOutput looks that otel-cli output stored in the results and compares against
 // the fixture expectation (with {{endpoint}} replaced).
-func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results) {
-	wantOutput := injectVars(fixture.Expect.CliOutput, endpoint)
+func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results, tlsData tlsHelpers) {
+	wantOutput := injectVars(fixture.Expect.CliOutput, endpoint, tlsData)
 	gotOutput := results.CliOutput
 	if fixture.Expect.CliOutputRe != nil {
 		gotOutput = fixture.Expect.CliOutputRe.ReplaceAllString(gotOutput, "")
@@ -197,9 +196,9 @@ func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results
 
 // checkStatusData compares the sections of otel-cli status output against
 // fixture data, substituting {{endpoint}} into fixture data as needed.
-func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Results) {
+func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Results, tlsData tlsHelpers) {
 	// check the env
-	injectMapVars(endpoint, fixture.Expect.Env)
+	injectMapVars(endpoint, fixture.Expect.Env, tlsData)
 	if diff := cmp.Diff(fixture.Expect.Env, results.Env); diff != "" {
 		t.Errorf("env data did not match fixture in %q (-want +got):\n%s", fixture.Name, diff)
 	}
@@ -207,7 +206,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	// check diagnostics, use string maps so the diff output is easy to compare to json
 	wantDiag := fixture.Expect.Diagnostics.ToStringMap()
 	gotDiag := results.Diagnostics.ToStringMap()
-	injectMapVars(endpoint, wantDiag)
+	injectMapVars(endpoint, wantDiag, tlsData)
 	// there's almost always going to be cli_args in practice, so if the fixture has
 	// an empty string, just ignore that key
 	if wantDiag["cli_args"] == "" {
@@ -228,7 +227,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 			wantConf[k] = gotConf[k]
 		}
 	}
-	injectMapVars(endpoint, wantConf)
+	injectMapVars(endpoint, wantConf, tlsData)
 	if diff := cmp.Diff(wantConf, gotConf); diff != "" {
 		t.Errorf("[%s] config data did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
@@ -249,10 +248,10 @@ var spanRegexChecks = map[string]*regexp.Regexp{
 
 // checkSpanData compares the data in spans received from otel-cli against the
 // fixture data.
-func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserver.CliEvent, events otlpserver.CliEventList) {
+func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserver.CliEvent, events otlpserver.CliEventList, tlsData tlsHelpers) {
 	// check the expected span data against what was received by the OTLP server
 	gotSpan := span.ToStringMap()
-	injectMapVars(endpoint, gotSpan)
+	injectMapVars(endpoint, gotSpan, tlsData)
 	// remove keys that aren't supported for comparison (for now)
 	delete(gotSpan, "is_populated")
 	delete(gotSpan, "library")
@@ -291,7 +290,7 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 	}
 
 	// do a diff on a generated map that sets values to * when the * check succeeded
-	injectMapVars(endpoint, wantSpan)
+	injectMapVars(endpoint, wantSpan, tlsData)
 	if diff := cmp.Diff(wantSpan, gotSpan); diff != "" {
 		t.Errorf("[%s] otel span info did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
@@ -299,7 +298,7 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 
 // runOtelCli runs the a server and otel-cli together and captures their
 // output as data to return for further testing.
-func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
+func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
 	started := time.Now()
 
 	results := Results{
@@ -355,7 +354,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	var listener net.Listener
 	var err error
 	if fixture.Config.ServerTLSEnabled {
-		listener, err = tls.Listen("tcp", "localhost:0", tlsTest.serverTLSConf)
+		listener, err = tls.Listen("tcp", "localhost:0", tlsData.serverTLSConf)
 	} else {
 		listener, err = net.Listen("tcp", "localhost:0")
 	}
@@ -386,11 +385,11 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results, otlpserver.CliE
 	args := []string{}
 	if len(fixture.Config.CliArgs) > 0 {
 		for _, v := range fixture.Config.CliArgs {
-			args = append(args, injectVars(v, endpoint))
+			args = append(args, injectVars(v, endpoint, tlsData))
 		}
 	}
 	statusCmd := exec.Command("./otel-cli", args...)
-	statusCmd.Env = mkEnviron(endpoint, fixture.Config.Env)
+	statusCmd.Env = mkEnviron(endpoint, fixture.Config.Env, tlsData)
 
 	cancelProcessTimeout := make(chan struct{}, 1)
 	go func() {
@@ -472,11 +471,11 @@ gather:
 }
 
 // mkEnviron converts a string map to a list of k=v strings and tacks on PATH.
-func mkEnviron(endpoint string, env map[string]string) []string {
+func mkEnviron(endpoint string, env map[string]string, tlsData tlsHelpers) []string {
 	mapped := make([]string, len(env)+1)
 	var i int
 	for k, v := range env {
-		mapped[i] = k + "=" + injectVars(v, endpoint)
+		mapped[i] = k + "=" + injectVars(v, endpoint, tlsData)
 		i++
 	}
 
@@ -489,9 +488,9 @@ func mkEnviron(endpoint string, env map[string]string) []string {
 
 // injectMapVars iterates over the map and updates the values, replacing all instances
 // of {{endpoint}}, {{cert}}, {{client_key}}, and {{client_key_cert}} with test values.
-func injectMapVars(endpoint string, target map[string]string) {
+func injectMapVars(endpoint string, target map[string]string, tlsData tlsHelpers) {
 	for k, v := range target {
-		target[k] = injectVars(v, endpoint)
+		target[k] = injectVars(v, endpoint, tlsData)
 	}
 }
 
@@ -501,10 +500,10 @@ func injectMapVars(endpoint string, target map[string]string) {
 // grab a random port. Once that's generated we need to inject it into all the values
 // so the test comparisons work as expected. Similarly for TLS testing, a temp CA and
 // certs are created and need to be injected.
-func injectVars(in, endpoint string) string {
+func injectVars(in, endpoint string, tlsData tlsHelpers) string {
 	out := strings.ReplaceAll(in, "{{endpoint}}", endpoint)
-	out = strings.ReplaceAll(out, "{{cert}}", tlsTest.caFile)
-	out = strings.ReplaceAll(out, "{{client_key}}", tlsTest.clientPrivKeyFile)
-	out = strings.ReplaceAll(out, "{{client_key_cert}}", tlsTest.clientFile)
+	out = strings.ReplaceAll(out, "{{cert}}", tlsData.caFile)
+	out = strings.ReplaceAll(out, "{{client_key}}", tlsData.clientPrivKeyFile)
+	out = strings.ReplaceAll(out, "{{client_key_cert}}", tlsData.clientFile)
 	return out
 }
