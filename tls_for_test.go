@@ -24,8 +24,8 @@ type tlsHelpers struct {
 	clientFile        string
 	clientPrivKeyFile string
 	serverTLSConf     *tls.Config
-	certpool          *x509.CertPool
 	clientTLSConf     *tls.Config
+	certpool          *x509.CertPool
 }
 
 func generateTLSData(t *testing.T) tlsHelpers {
