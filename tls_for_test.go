@@ -17,27 +17,14 @@ import (
 )
 
 type tlsHelpers struct {
-	ca                *x509.Certificate
-	caPrivKey         *ecdsa.PrivateKey
-	caPEM             *bytes.Buffer
-	caPrivKeyPEM      *bytes.Buffer
 	caFile            string
 	caPrivKeyFile     string
-	serverCert        *x509.Certificate
-	serverPrivKey     *ecdsa.PrivateKey
-	serverPEM         *bytes.Buffer
 	serverFile        string
-	serverPrivKeyPEM  *bytes.Buffer
 	serverPrivKeyFile string
-	serverCertPair    tls.Certificate
-	certpool          *x509.CertPool
-	serverTLSConf     *tls.Config
-	clientCert        *x509.Certificate
-	clientPrivKey     *ecdsa.PrivateKey
-	clientPEM         *bytes.Buffer
 	clientFile        string
-	clientPrivKeyPEM  *bytes.Buffer
 	clientPrivKeyFile string
+	serverTLSConf     *tls.Config
+	certpool          *x509.CertPool
 	clientTLSConf     *tls.Config
 }
 
@@ -60,7 +47,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 
 	// ------------- CA -------------
 
-	out.ca = &x509.Certificate{
+	ca := &x509.Certificate{
 		SerialNumber:          big.NewInt(4317),
 		Subject:               subject,
 		NotBefore:             time.Now(),
@@ -76,32 +63,32 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	}
 
 	// create a private key
-	out.caPrivKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	caPrivKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
 		t.Fatalf("error generating ca private key: %s", err)
 	}
 
 	// create a cert on the CA with the ^^ private key
-	caBytes, err := x509.CreateCertificate(rand.Reader, out.ca, out.ca, &out.caPrivKey.PublicKey, out.caPrivKey)
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
 	if err != nil {
 		t.Fatalf("error generating ca cert: %s", err)
 	}
 
 	// get the PEM encoding that the tests will use
-	out.caPEM = new(bytes.Buffer)
-	pem.Encode(out.caPEM, &pem.Block{Type: "CERTIFICATE", Bytes: caBytes})
-	out.caFile = pemToTempFile(t, "ca-cert", out.caPEM)
+	caPEM := new(bytes.Buffer)
+	pem.Encode(caPEM, &pem.Block{Type: "CERTIFICATE", Bytes: caBytes})
+	out.caFile = pemToTempFile(t, "ca-cert", caPEM)
 
-	out.caPrivKeyPEM = new(bytes.Buffer)
-	caPrivKeyBytes, err := x509.MarshalECPrivateKey(out.caPrivKey)
+	caPrivKeyPEM := new(bytes.Buffer)
+	caPrivKeyBytes, err := x509.MarshalECPrivateKey(caPrivKey)
 	if err != nil {
 		t.Fatalf("error marshaling server cert: %s", err)
 	}
-	pem.Encode(out.caPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: caPrivKeyBytes})
-	out.caPrivKeyFile = pemToTempFile(t, "ca-privkey", out.caPrivKeyPEM)
+	pem.Encode(caPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: caPrivKeyBytes})
+	out.caPrivKeyFile = pemToTempFile(t, "ca-privkey", caPrivKeyPEM)
 
 	out.certpool = x509.NewCertPool()
-	out.certpool.AppendCertsFromPEM(out.caPEM.Bytes())
+	out.certpool.AppendCertsFromPEM(caPEM.Bytes())
 
 	data := new(bytes.Buffer)
 	pem.Encode(data, &pem.Block{Type: "EC PRIVATE KEY", Bytes: caPrivKeyBytes})
@@ -109,7 +96,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	// ------------- server -------------
 
 	subject.CommonName = "server"
-	out.serverCert = &x509.Certificate{
+	serverCert := &x509.Certificate{
 		SerialNumber: big.NewInt(4318),
 		Subject:      subject,
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
@@ -124,42 +111,42 @@ func generateTLSData(t *testing.T) tlsHelpers {
 		KeyUsage: x509.KeyUsageKeyAgreement | x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 	}
 
-	out.serverPrivKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	serverPrivKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
 		t.Fatalf("error generating server private key: %s", err)
 	}
 
-	serverBytes, err := x509.CreateCertificate(rand.Reader, out.serverCert, out.ca, &out.serverPrivKey.PublicKey, out.caPrivKey)
+	serverBytes, err := x509.CreateCertificate(rand.Reader, serverCert, ca, &serverPrivKey.PublicKey, caPrivKey)
 	if err != nil {
 		t.Fatalf("error generating server cert: %s", err)
 	}
 
-	out.serverPEM = new(bytes.Buffer)
-	pem.Encode(out.serverPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverBytes})
-	out.serverFile = pemToTempFile(t, "server-cert", out.serverPEM)
+	serverPEM := new(bytes.Buffer)
+	pem.Encode(serverPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverBytes})
+	out.serverFile = pemToTempFile(t, "server-cert", serverPEM)
 
-	out.serverPrivKeyPEM = new(bytes.Buffer)
-	serverPrivKeyBytes, err := x509.MarshalECPrivateKey(out.serverPrivKey)
+	serverPrivKeyPEM := new(bytes.Buffer)
+	serverPrivKeyBytes, err := x509.MarshalECPrivateKey(serverPrivKey)
 	if err != nil {
 		t.Fatalf("error marshaling server cert: %s", err)
 	}
-	pem.Encode(out.serverPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: serverPrivKeyBytes})
-	out.serverPrivKeyFile = pemToTempFile(t, "server-privkey", out.serverPrivKeyPEM)
+	pem.Encode(serverPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: serverPrivKeyBytes})
+	out.serverPrivKeyFile = pemToTempFile(t, "server-privkey", serverPrivKeyPEM)
 
-	out.serverCertPair, err = tls.X509KeyPair(out.serverPEM.Bytes(), out.serverPrivKeyPEM.Bytes())
+	serverCertPair, err := tls.X509KeyPair(serverPEM.Bytes(), serverPrivKeyPEM.Bytes())
 	if err != nil {
 		t.Fatalf("error generating server cert pair: %s", err)
 	}
 
 	out.serverTLSConf = &tls.Config{
 		RootCAs:      out.certpool,
-		Certificates: []tls.Certificate{out.serverCertPair},
+		Certificates: []tls.Certificate{serverCertPair},
 	}
 
 	// ------------- client -------------
 
 	subject.CommonName = "client"
-	out.clientCert = &x509.Certificate{
+	clientCert := &x509.Certificate{
 		SerialNumber: big.NewInt(4319),
 		Subject:      subject,
 		SubjectKeyId: []byte{1, 2, 3, 4, 7},
@@ -171,27 +158,27 @@ func generateTLSData(t *testing.T) tlsHelpers {
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
-	out.clientPrivKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	clientPrivKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 	if err != nil {
 		t.Fatalf("error generating client private key: %s", err)
 	}
 
-	clientBytes, err := x509.CreateCertificate(rand.Reader, out.clientCert, out.ca, &out.clientPrivKey.PublicKey, out.caPrivKey)
+	clientBytes, err := x509.CreateCertificate(rand.Reader, clientCert, ca, &clientPrivKey.PublicKey, caPrivKey)
 	if err != nil {
 		t.Fatalf("error generating client cert: %s", err)
 	}
 
-	out.clientPEM = new(bytes.Buffer)
-	pem.Encode(out.clientPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientBytes})
-	out.clientFile = pemToTempFile(t, "client-cert", out.clientPEM)
+	clientPEM := new(bytes.Buffer)
+	pem.Encode(clientPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientBytes})
+	out.clientFile = pemToTempFile(t, "client-cert", clientPEM)
 
-	out.clientPrivKeyPEM = new(bytes.Buffer)
-	clientPrivKeyBytes, err := x509.MarshalECPrivateKey(out.clientPrivKey)
+	clientPrivKeyPEM := new(bytes.Buffer)
+	clientPrivKeyBytes, err := x509.MarshalECPrivateKey(clientPrivKey)
 	if err != nil {
 		t.Fatalf("error marshaling client cert: %s", err)
 	}
-	pem.Encode(out.clientPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: clientPrivKeyBytes})
-	out.clientPrivKeyFile = pemToTempFile(t, "client-privkey", out.clientPrivKeyPEM)
+	pem.Encode(clientPrivKeyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: clientPrivKeyBytes})
+	out.clientPrivKeyFile = pemToTempFile(t, "client-privkey", clientPrivKeyPEM)
 
 	out.clientTLSConf = &tls.Config{
 		RootCAs: out.certpool,
