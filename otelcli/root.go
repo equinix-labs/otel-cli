@@ -63,10 +63,10 @@ func addCommonParams(cmd *cobra.Command) {
 func addClientParams(cmd *cobra.Command) {
 	config.Headers = make(map[string]string)
 	// OTEL_EXPORTER standard env and variable params
-	cmd.Flags().BoolVar(&config.Insecure, "insecure", defaults.Insecure, "refuse to connect if TLS is unavailable (true by default when endpoint is localhost)")
 	cmd.Flags().StringToStringVar(&config.Headers, "otlp-headers", defaults.Headers, "a comma-sparated list of key=value headers to send on OTLP connection")
 	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", defaults.Blocking, "block on connecting to the OTLP server before proceeding")
 
+	cmd.Flags().BoolVar(&config.Insecure, "insecure", defaults.Insecure, "allow connecting to cleartext endpoints")
 	cmd.Flags().StringVar(&config.CACert, "tls-ca-cert", defaults.CACert, "a file containing the certificate authority bundle")
 	cmd.Flags().StringVar(&config.ClientCert, "tls-client-cert", defaults.ClientCert, "a file containing the client certificate")
 	cmd.Flags().StringVar(&config.ClientKey, "tls-client-key", defaults.ClientKey, "a file containing the client certificate key")
