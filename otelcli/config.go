@@ -66,7 +66,7 @@ type Config struct {
 	Blocking    bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
 	NoTlsVerify bool              `json:"no_tls_verify" env:"OTEL_CLI_NO_TLS_VERIFY"`
 
-	ServiceName       string            `json:"service_name" env:"OTEL_CLI_SERVICE_NAME"`
+	ServiceName       string            `json:"service_name" env:"OTEL_CLI_SERVICE_NAME,OTEL_SERVICE_NAME"`
 	SpanName          string            `json:"span_name" env:"OTEL_CLI_SPAN_NAME"`
 	Kind              string            `json:"span_kind" env:"OTEL_CLI_TRACE_KIND"`
 	Attributes        map[string]string `json:"span_attributes" env:"OTEL_CLI_ATTRIBUTES"`
@@ -124,6 +124,9 @@ func (c *Config) LoadEnv(getenv func(string) string) error {
 	for i := 0; i < structType.NumField(); i++ {
 		field := structType.Field(i)
 		envVars := field.Tag.Get("env")
+		if envVars == "" {
+			continue
+		}
 		// a field can have multiple comma-delimiated env vars to look in
 		for _, envVar := range strings.Split(envVars, ",") {
 			// call the provided func(string)string provided to get the
