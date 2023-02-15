@@ -43,7 +43,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 		PostalCode:    []string{"4317"},
 	}
 
-	expire := time.Now().Add(time.Hour * 1000)
+	expire := time.Now().Add(time.Hour)
 
 	// ------------- CA -------------
 
