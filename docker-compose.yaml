@@ -2,13 +2,13 @@
 version: '2.1'
 services:
   jaeger:
-    image: jaegertracing/all-in-one:1.41.0
+    image: jaegertracing/all-in-one:1.42.0
     ports:
       - "16686:16686"
       - "14268"
       - "14250"
   otel-collector:
-    image: otel/opentelemetry-collector:0.70.0
+    image: otel/opentelemetry-collector:0.71.0
     volumes:
       - ./configs/otel-collector.yaml:/local.yaml
     command: --config /local.yaml
