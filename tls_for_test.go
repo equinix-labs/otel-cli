@@ -16,7 +16,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
 	"net"
@@ -41,34 +40,16 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	var err error
 	var out tlsHelpers
 
-	// this gets reused for each cert, with CommonName overwritten for each
-	subject := pkix.Name{
-		CommonName:    "otel-cli certificate authority",
-		Organization:  []string{"otel-cli testing, inc"},
-		Country:       []string{"Open Source"},
-		Province:      []string{"Go"},
-		Locality:      []string{"OpenTelemetry"},
-		StreetAddress: []string{"github.com/equinix-labs/otel-cli"},
-		PostalCode:    []string{"4317"},
-	}
-
 	expire := time.Now().Add(time.Hour)
 
 	// ------------- CA -------------
 
 	ca := &x509.Certificate{
 		SerialNumber:          big.NewInt(4317),
-		Subject:               subject,
 		NotBefore:             time.Now(),
 		NotAfter:              expire,
 		IsCA:                  true,
 		BasicConstraintsValid: true,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-			x509.ExtKeyUsageServerAuth,
-			x509.ExtKeyUsageOCSPSigning,
-		},
-		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 	}
 
 	// create a private key
@@ -104,19 +85,11 @@ func generateTLSData(t *testing.T) tlsHelpers {
 
 	// ------------- server -------------
 
-	subject.CommonName = "server"
 	serverCert := &x509.Certificate{
 		SerialNumber: big.NewInt(4318),
-		Subject:      subject,
 		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
-		DNSNames:     []string{"localhost"},
 		NotBefore:    time.Now(),
 		NotAfter:     expire,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-			x509.ExtKeyUsageServerAuth,
-		},
-		KeyUsage: x509.KeyUsageKeyAgreement | x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 	}
 
 	serverPrivKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
@@ -151,23 +124,16 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	// No amount of client config changes would work. The opentelemetry collector also sets
 	// RootCAs by default so it seems safe to copy that behavior here.
 	out.serverTLSConf = &tls.Config{
-		RootCAs:      out.certpool,
-		ServerName:   "localhost",
 		ClientCAs:    out.certpool,
 		Certificates: []tls.Certificate{serverCertPair},
 	}
 
 	// ------------- client -------------
 
-	subject.CommonName = "client"
 	clientCert := &x509.Certificate{
 		SerialNumber: big.NewInt(4319),
-		Subject:      subject,
-		DNSNames:     []string{"localhost"},
 		NotBefore:    time.Now(),
 		NotAfter:     expire,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
 	clientPrivKey, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
