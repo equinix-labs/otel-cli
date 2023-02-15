@@ -110,16 +110,38 @@ func tlsConfig() *tls.Config {
 		tlsConfig.InsecureSkipVerify = true
 	}
 
-	// TODO: is this the right thing to do? Need to make sure ...
+	// puts the provided CA certificate into the root pool
+	// when not provided, Go TLS will automatically load the system CA pool
 	if config.CACert != "" {
 		data, err := os.ReadFile(config.CACert)
 		if err != nil {
-			softFail("uanble to load certificate: %s", err)
+			softFail("uanble to load CA certificate: %s", err)
 		}
 
 		certpool := x509.NewCertPool()
 		certpool.AppendCertsFromPEM(data)
-		//tlsConfig.RootCAs = certpool
+		tlsConfig.RootCAs = certpool
+	}
+
+	// client certificate authentication
+	if config.ClientCert != "" && config.ClientKey != "" {
+		clientPEM, err := os.ReadFile(config.ClientCert)
+		if err != nil {
+			softFail("Unable to read client certificate file %s: %s", config.ClientCert, err)
+		}
+		clientKeyPEM, err := os.ReadFile(config.ClientKey)
+		if err != nil {
+			softFail("Unable to read client key file %s: %s", config.ClientKey, err)
+		}
+		certPair, err := tls.X509KeyPair(clientPEM, clientKeyPEM)
+		if err != nil {
+			softFail("error loading client cert pair: %s", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{certPair}
+	} else if config.ClientCert != "" {
+		softFail("client cert and key must be specified together")
+	} else if config.ClientKey != "" {
+		softFail("client cert and key must be specified together")
 	}
 
 	return tlsConfig
