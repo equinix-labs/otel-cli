@@ -67,9 +67,12 @@ func addClientParams(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&config.Headers, "otlp-headers", defaults.Headers, "a comma-sparated list of key=value headers to send on OTLP connection")
 	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", defaults.Blocking, "block on connecting to the OTLP server before proceeding")
 
-	cmd.Flags().StringVar(&config.CACert, "ca-cert", defaults.CACert, "a file containing the certificate authority bundle")
-	cmd.Flags().StringVar(&config.ClientCert, "client-cert", defaults.ClientCert, "a file containing the client certificate")
-	cmd.Flags().StringVar(&config.ClientKey, "client-key", defaults.ClientKey, "a file containing the client certificate key")
+	cmd.Flags().StringVar(&config.CACert, "tls-ca-cert", defaults.CACert, "a file containing the certificate authority bundle")
+	cmd.Flags().StringVar(&config.ClientCert, "tls-client-cert", defaults.ClientCert, "a file containing the client certificate")
+	cmd.Flags().StringVar(&config.ClientKey, "tls-client-key", defaults.ClientKey, "a file containing the client certificate key")
+	cmd.Flags().BoolVar(&config.NoTlsVerify, "tls-no-verify", defaults.NoTlsVerify, "insecure! disables verification of the server certificate and name, mostly for self-signed CAs")
+	// --no-tls-verify is deprecated, will remove before 1.0
+	cmd.Flags().BoolVar(&config.NoTlsVerify, "no-tls-verify", defaults.NoTlsVerify, "(deprecated) same as --tls-no-verify")
 
 	// OTEL_CLI trace propagation options
 	cmd.Flags().BoolVar(&config.TraceparentRequired, "tp-required", defaults.TraceparentRequired, "when set to true, fail and log if a traceparent can't be picked up from TRACEPARENT ennvar or a carrier file")
@@ -77,7 +80,6 @@ func addClientParams(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&config.TraceparentIgnoreEnv, "tp-ignore-env", defaults.TraceparentIgnoreEnv, "ignore the TRACEPARENT envvar even if it's set")
 	cmd.Flags().BoolVar(&config.TraceparentPrint, "tp-print", defaults.TraceparentPrint, "print the trace id, span id, and the w3c-formatted traceparent representation of the new span")
 	cmd.Flags().BoolVarP(&config.TraceparentPrintExport, "tp-export", "p", defaults.TraceparentPrintExport, "same as --tp-print but it puts an 'export ' in front so it's more convinenient to source in scripts")
-	cmd.Flags().BoolVar(&config.NoTlsVerify, "no-tls-verify", defaults.NoTlsVerify, "enable it when TLS is enabled and you want to ignore the certificate validation. This is common when you are testing with self-signed certificates.")
 }
 
 func addSpanParams(cmd *cobra.Command) {
