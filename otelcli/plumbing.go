@@ -115,7 +115,7 @@ func tlsConfig() *tls.Config {
 	if config.CACert != "" {
 		data, err := os.ReadFile(config.CACert)
 		if err != nil {
-			softFail("uanble to load CA certificate: %s", err)
+			softFail("failed to load CA certificate: %s", err)
 		}
 
 		certpool := x509.NewCertPool()
@@ -127,15 +127,15 @@ func tlsConfig() *tls.Config {
 	if config.ClientCert != "" && config.ClientKey != "" {
 		clientPEM, err := os.ReadFile(config.ClientCert)
 		if err != nil {
-			softFail("Unable to read client certificate file %s: %s", config.ClientCert, err)
+			softFail("failed to read client certificate file %s: %s", config.ClientCert, err)
 		}
 		clientKeyPEM, err := os.ReadFile(config.ClientKey)
 		if err != nil {
-			softFail("Unable to read client key file %s: %s", config.ClientKey, err)
+			softFail("failed to read client key file %s: %s", config.ClientKey, err)
 		}
 		certPair, err := tls.X509KeyPair(clientPEM, clientKeyPEM)
 		if err != nil {
-			softFail("error loading client cert pair: %s", err)
+			softFail("failed to parse client cert pair: %s", err)
 		}
 		tlsConfig.Certificates = []tls.Certificate{certPair}
 	} else if config.ClientCert != "" {
