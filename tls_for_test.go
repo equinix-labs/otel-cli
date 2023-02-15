@@ -1,5 +1,14 @@
 package main_test
 
+/*
+ * This file implements a certificate authority and certs for testing otel-cli's
+ * TLS settings.
+ *
+ * Do NOT copy this code for production systems. It makes a few compromises to
+ * optimize for testing and ephemeral certs that are totally inappropriate for
+ * use in settings where security matters.
+ */
+
 import (
 	"bytes"
 	"crypto/ecdsa"
