@@ -137,7 +137,12 @@ func generateTLSData(t *testing.T) tlsHelpers {
 		t.Fatalf("error generating server cert pair: %s", err)
 	}
 
+	// In theory, the server shouldn't need this CA in the RootCAs pool to accept client
+	// connections. Without it, grpc refuses the client connection with invalid CA.
+	// No amount of client config changes would work. The opentelemetry collector also sets
+	// RootCAs by default so it seems safe to copy that behavior here.
 	out.serverTLSConf = &tls.Config{
+		RootCAs:      out.certpool,
 		ServerName:   "localhost",
 		ClientCAs:    out.certpool,
 		Certificates: []tls.Certificate{serverCertPair},
