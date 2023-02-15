@@ -100,6 +100,31 @@ func initTracer() (context.Context, func()) {
 	}
 }
 
+// tlsConfig evaluates otel-cli configuration and returns a tls.Config
+// that can be used by grpc or https.
+func tlsConfig() *tls.Config {
+	tlsConfig := &tls.Config{}
+
+	if config.NoTlsVerify {
+		diagnostics.InsecureSkipVerify = true
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	// TODO: is this the right thing to do? Need to make sure ...
+	if config.Certificate != "" {
+		data, err := os.ReadFile(config.Certificate)
+		if err != nil {
+			softFail("uanble to load certificate: %s", err)
+		}
+
+		certpool := x509.NewCertPool()
+		certpool.AppendCertsFromPEM(data)
+		//tlsConfig.RootCAs = certpool
+	}
+
+	return tlsConfig
+}
+
 // grpcOptions convets config settings to an otlpgrpc.Option list.
 func grpcOptions() []otlpgrpc.Option {
 	grpcOpts := []otlpgrpc.Option{}
@@ -130,22 +155,7 @@ func grpcOptions() []otlpgrpc.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		tlsConfig := &tls.Config{}
-		if config.NoTlsVerify {
-			diagnostics.InsecureSkipVerify = true
-			tlsConfig.InsecureSkipVerify = true
-		}
-		if config.Certificate != "" {
-			data, err := os.ReadFile(config.Certificate)
-			if err != nil {
-				softFail("uanble to load certificate: %s", err)
-			}
-
-			certpool := x509.NewCertPool()
-			certpool.AppendCertsFromPEM(data)
-			tlsConfig.RootCAs = certpool
-		}
-		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig())))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
@@ -204,12 +214,7 @@ func httpOptions() []otlphttp.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		httpOpts = append(httpOpts, otlphttp.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		tlsConfig := &tls.Config{}
-		if config.NoTlsVerify {
-			diagnostics.InsecureSkipVerify = true
-			tlsConfig.InsecureSkipVerify = true
-		}
-		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig))
+		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig()))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
