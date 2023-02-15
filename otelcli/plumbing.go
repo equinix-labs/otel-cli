@@ -111,8 +111,8 @@ func tlsConfig() *tls.Config {
 	}
 
 	// TODO: is this the right thing to do? Need to make sure ...
-	if config.Certificate != "" {
-		data, err := os.ReadFile(config.Certificate)
+	if config.CACert != "" {
+		data, err := os.ReadFile(config.CACert)
 		if err != nil {
 			softFail("uanble to load certificate: %s", err)
 		}

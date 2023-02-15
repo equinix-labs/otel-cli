@@ -67,7 +67,7 @@ func addClientParams(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&config.Headers, "otlp-headers", defaults.Headers, "a comma-sparated list of key=value headers to send on OTLP connection")
 	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", defaults.Blocking, "block on connecting to the OTLP server before proceeding")
 
-	cmd.Flags().StringVar(&config.Certificate, "cacert", defaults.Certificate, "a file containing the server's CA certificate")
+	cmd.Flags().StringVar(&config.CACert, "ca-cert", defaults.CACert, "a file containing the certificate authority bundle")
 	cmd.Flags().StringVar(&config.ClientCert, "client-cert", defaults.ClientCert, "a file containing the client certificate")
 	cmd.Flags().StringVar(&config.ClientKey, "client-key", defaults.ClientKey, "a file containing the client certificate key")
 

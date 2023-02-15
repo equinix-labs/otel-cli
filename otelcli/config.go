@@ -66,9 +66,10 @@ type Config struct {
 	Blocking    bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
 	NoTlsVerify bool              `json:"no_tls_verify" env:"OTEL_CLI_NO_TLS_VERIFY"`
 
-	Certificate string `json:"certificate_file" env:"OTEL_EXPORTER_OTLP_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE"`
-	ClientKey   string `json:"client_key_file" env:"OTEL_EXPORTER_OTLP_CLIENT_KEY,OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY"`
-	ClientCert  string `json:"client_key_certificate_file" env:"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE"`
+	// json keys match the otel collector yaml
+	CACert     string `json:"ca_file" env:"OTEL_EXPORTER_OTLP_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE"`
+	ClientKey  string `json:"cert_file" env:"OTEL_EXPORTER_OTLP_CLIENT_KEY,OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY"`
+	ClientCert string `json:"key_file" env:"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE"`
 
 	ServiceName       string            `json:"service_name" env:"OTEL_CLI_SERVICE_NAME"`
 	SpanName          string            `json:"span_name" env:"OTEL_CLI_SPAN_NAME"`
