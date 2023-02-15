@@ -99,7 +99,6 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	serverCert := &x509.Certificate{
 		SerialNumber: big.NewInt(4318),
 		Subject:      subject,
-		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 		DNSNames:     []string{"localhost"},
 		NotBefore:    time.Now(),
@@ -139,7 +138,8 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	}
 
 	out.serverTLSConf = &tls.Config{
-		RootCAs:      out.certpool,
+		ServerName:   "localhost",
+		ClientCAs:    out.certpool,
 		Certificates: []tls.Certificate{serverCertPair},
 	}
 
@@ -149,8 +149,6 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	clientCert := &x509.Certificate{
 		SerialNumber: big.NewInt(4319),
 		Subject:      subject,
-		SubjectKeyId: []byte{1, 2, 3, 4, 7},
-		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 		DNSNames:     []string{"localhost"},
 		NotBefore:    time.Now(),
 		NotAfter:     expire,
@@ -181,7 +179,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	out.clientPrivKeyFile = pemToTempFile(t, "client-privkey", clientPrivKeyPEM)
 
 	out.clientTLSConf = &tls.Config{
-		RootCAs: out.certpool,
+		ServerName: "localhost",
 	}
 
 	return out
