@@ -138,56 +138,53 @@ var suites = []FixtureSuite{
 		},
 		// TLS connections
 		{
-			Name: "minimum configuration (tls, recording, grpc)",
+			Name: "minimum configuration (tls, no-verify, recording, grpc)",
 			Config: FixtureConfig{
-				ServerProtocol:   grpcProtocol,
-				CliArgs:          []string{"status", "--endpoint", "https://{{endpoint}}", "--protocol", "grpc"},
+				ServerProtocol: grpcProtocol,
+				CliArgs: []string{
+					"status",
+					"--endpoint", "https://{{endpoint}}",
+					"--protocol", "grpc",
+					"--verbose", "--fail", "--no-tls-verify",
+				},
 				TestTimeoutMs:    1000,
 				ServerTLSEnabled: true,
-				Env: map[string]string{
-					"SSL_CERT_FILE": "{{cert}}",
-				},
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
 				Config: otelcli.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}").
-					WithProtocol("grpc"),
+					WithProtocol("grpc").
+					WithVerbose(true).
+					WithNoTlsVerify(true),
 				Diagnostics: otelcli.Diagnostics{
-					IsRecording:       true,
-					NumArgs:           5,
-					DetectedLocalhost: true,
-					ParsedTimeoutMs:   1000,
+					IsRecording:        true,
+					NumArgs:            8,
+					DetectedLocalhost:  true,
+					InsecureSkipVerify: true,
+					ParsedTimeoutMs:    1000,
 				},
 				Spans: 1,
-				Env: map[string]string{
-					"SSL_CERT_FILE": "{{cert}}",
-				},
 			},
 		},
 		{
-			Name: "minimum configuration (tls, recording, https)",
+			Name: "minimum configuration (tls, no-verify, recording, https)",
 			Config: FixtureConfig{
 				ServerProtocol:   httpProtocol,
-				CliArgs:          []string{"status", "--endpoint", "https://{{endpoint}}"},
+				CliArgs:          []string{"status", "--endpoint", "https://{{endpoint}}", "--no-tls-verify"},
 				TestTimeoutMs:    2000,
 				ServerTLSEnabled: true,
-				Env: map[string]string{
-					"SSL_CERT_FILE": "{{cert}}",
-				},
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
 				Config: otelcli.DefaultConfig().
+					WithNoTlsVerify(true).
 					WithEndpoint("https://{{endpoint}}"),
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
-					NumArgs:           3,
+					NumArgs:           4,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
-				},
-				Env: map[string]string{
-					"SSL_CERT_FILE": "{{cert}}",
 				},
 				Spans: 1,
 			},
