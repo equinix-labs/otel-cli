@@ -354,7 +354,11 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 	var listener net.Listener
 	var err error
 	if fixture.Config.ServerTLSEnabled {
-		listener, err = tls.Listen("tcp", "localhost:0", tlsData.serverTLSConf)
+		tlsConf := *tlsData.serverTLSConf
+		if fixture.Config.ServerTLSAuthEnabled {
+			tlsConf.ClientAuth = tls.RequireAndVerifyClientCert
+		}
+		listener, err = tls.Listen("tcp", "localhost:0", &tlsConf)
 	} else {
 		listener, err = net.Listen("tcp", "localhost:0")
 	}
@@ -427,6 +431,7 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 		err = json.Unmarshal(cliOut, &results)
 		if err != nil {
 			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Name, err)
+			t.Logf("[%s] output received: %q", fixture.Name, cliOut)
 			return endpoint, results, retSpan, retEvents
 		}
 
