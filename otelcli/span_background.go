@@ -50,6 +50,7 @@ func init() {
 	spanBgCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
 
 	spanBgCmd.Flags().BoolVar(&config.BackgroundWait, "wait", defaults.BackgroundWait, "wait for background to be fully started and then return")
+	spanBgCmd.Flags().BoolVar(&config.BackgroundSkipParentPidCheck, "skip-pid-check", defaults.BackgroundSkipParentPidCheck, "disable checking parent pid")
 
 	addCommonParams(spanBgCmd)
 	addSpanParams(spanBgCmd)
@@ -99,20 +100,21 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	// when the parent is gone. the most straightforward approach that should
 	// be fine on most Unix-ish operating systems is to poll getppid and exit
 	// when the parent process pid changes
-	// TODO: make this configurable?
-	ppid := os.Getppid()
-	go func() {
-		for {
-			time.Sleep(time.Duration(config.BackgroundParentPollMs) * time.Millisecond)
+	if !config.BackgroundSkipParentPidCheck {
+		ppid := os.Getppid()
+		go func() {
+			for {
+				time.Sleep(time.Duration(config.BackgroundParentPollMs) * time.Millisecond)
 
-			// check if the parent process has changed, exit when it does
-			cppid := os.Getppid()
-			if cppid != ppid {
-				spanBgEndEvent("parent_exited", span)
-				bgs.Shutdown()
+				// check if the parent process has changed, exit when it does
+				cppid := os.Getppid()
+				if cppid != ppid {
+					spanBgEndEvent("parent_exited", span)
+					bgs.Shutdown()
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	// start the timeout goroutine, this is a little late but the server
 	// has to be up for this to make much sense
