@@ -171,25 +171,43 @@ Many SaaS vendors accept OTLP these days so one option is to send directly to th
 recommended for production since it will slow your code down on the roundtrips. It is recommended
 to use an opentelemetry-collector locally.
 
-Another option is to run the local docker compose Jaeger setup in the root of this repo with
-`docker-compose up`. This will bring up a stock Jaeger instance that can accept OTLP connections.
+Another option is to use [`otel-desktop-viewer`](https://github.com/CtrlSpice/otel-desktop-viewer). 
+This will bring up a server that can accept OTLP connections.
 
-If you're not sure what to choose, try `otel-cli server tui` or `docker-compose up`.
+If you're not sure what to choose, try `otel-cli server tui` or `otel-desktop-viewer`.
 
-### Local Jaeger setup
-
-Just run `docker-compose up` from this repository, and you'll get an OpenTelemetry collector and a local
-Jaeger all-in-one setup ready to go.
-
-The OpenTelemetry collector is listening on `localhost:4317`, and the Jaeger UI will be running on
-`localhost:16686`. Since these are the expected defaults of `otel-cli`, you can get started with no further configuration:
+### `otel-desktop-viewer` setup
 
 ```shell
-docker-compose up
-./otel-cli exec -n my-cool-thing -s interesting-step echo 'hello world'
+# install the CLI tool
+go install github.com/CtrlSpice/otel-desktop-viewer@latest
+
+# run it!
+$(go env GOPATH)/bin/otel-desktop-viewer
+
+# if you have $GOPATH/bin added to your $PATH you can call it directly!
+otel-desktop-viewer
+
+# if not you can add it to your $PATH by running this or adding it to
+# your startup script (usually ~/.bashrc or ~/.zshrc)
+export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 
-This trace will be available in the Jaeger UI at `localhost:16686`.
+The OpenTelemetry collector is listening on `localhost:4318`, and the UI will be running on
+`localhost:8000`.
+
+```shell
+# start the desktop viewer (best to do this in a separate terminal)
+otel-desktop-viewer
+
+# configure otel-cli to send to our desktop viewer endpoint
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+
+# use otel-cli to generate spans!
+otel-cli exec --service my-service --name "curl google" curl https://google.com
+```
+
+This trace will be available at `localhost:8000`.
 
 ### SaaS tracing vendor
 
