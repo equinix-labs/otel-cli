@@ -12,14 +12,15 @@ var diagnostics Diagnostics
 // diagnosing issues with otel-cli. The only user-facing feature that should be
 // using these is otel-cli status.
 type Diagnostics struct {
-	CliArgs           []string `json:"cli_args"`
-	IsRecording       bool     `json:"is_recording"`
-	ConfigFileLoaded  bool     `json:"config_file_loaded"`
-	NumArgs           int      `json:"number_of_args"`
-	DetectedLocalhost bool     `json:"detected_localhost"`
-	ParsedTimeoutMs   int64    `json:"parsed_timeout_ms"`
-	OtelError         string   `json:"otel_error"`
-	ExecExitCode      int      `json:"exec_exit_code"`
+	CliArgs            []string `json:"cli_args"`
+	IsRecording        bool     `json:"is_recording"`
+	ConfigFileLoaded   bool     `json:"config_file_loaded"`
+	NumArgs            int      `json:"number_of_args"`
+	DetectedLocalhost  bool     `json:"detected_localhost"`
+	InsecureSkipVerify bool     `json:"insecure_skip_verify"`
+	ParsedTimeoutMs    int64    `json:"parsed_timeout_ms"`
+	OtelError          string   `json:"otel_error"`
+	ExecExitCode       int      `json:"exec_exit_code"`
 }
 
 // Handle complies with the otel error handler interface to capture errors

@@ -3,8 +3,10 @@ package otelcli
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"net"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
@@ -98,6 +100,53 @@ func initTracer() (context.Context, func()) {
 	}
 }
 
+// tlsConfig evaluates otel-cli configuration and returns a tls.Config
+// that can be used by grpc or https.
+func tlsConfig() *tls.Config {
+	tlsConfig := &tls.Config{}
+
+	if config.NoTlsVerify {
+		diagnostics.InsecureSkipVerify = true
+		tlsConfig.InsecureSkipVerify = true
+	}
+
+	// puts the provided CA certificate into the root pool
+	// when not provided, Go TLS will automatically load the system CA pool
+	if config.CACert != "" {
+		data, err := os.ReadFile(config.CACert)
+		if err != nil {
+			softFail("failed to load CA certificate: %s", err)
+		}
+
+		certpool := x509.NewCertPool()
+		certpool.AppendCertsFromPEM(data)
+		tlsConfig.RootCAs = certpool
+	}
+
+	// client certificate authentication
+	if config.ClientCert != "" && config.ClientKey != "" {
+		clientPEM, err := os.ReadFile(config.ClientCert)
+		if err != nil {
+			softFail("failed to read client certificate file %s: %s", config.ClientCert, err)
+		}
+		clientKeyPEM, err := os.ReadFile(config.ClientKey)
+		if err != nil {
+			softFail("failed to read client key file %s: %s", config.ClientKey, err)
+		}
+		certPair, err := tls.X509KeyPair(clientPEM, clientKeyPEM)
+		if err != nil {
+			softFail("failed to parse client cert pair: %s", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{certPair}
+	} else if config.ClientCert != "" {
+		softFail("client cert and key must be specified together")
+	} else if config.ClientKey != "" {
+		softFail("client cert and key must be specified together")
+	}
+
+	return tlsConfig
+}
+
 // grpcOptions convets config settings to an otlpgrpc.Option list.
 func grpcOptions() []otlpgrpc.Option {
 	grpcOpts := []otlpgrpc.Option{}
@@ -128,13 +177,7 @@ func grpcOptions() []otlpgrpc.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		var tlsConfig *tls.Config
-		if config.NoTlsVerify {
-			tlsConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
-		}
-		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig))))
+		grpcOpts = append(grpcOpts, otlpgrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig())))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
@@ -193,13 +236,7 @@ func httpOptions() []otlphttp.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		httpOpts = append(httpOpts, otlphttp.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		var tlsConfig *tls.Config
-		if config.NoTlsVerify {
-			tlsConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
-		}
-		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig))
+		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig()))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints

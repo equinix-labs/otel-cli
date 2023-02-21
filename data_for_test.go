@@ -28,6 +28,10 @@ type FixtureConfig struct {
 	IsLongTest bool
 	// either grpcProtocol or httpProtocol, defaults to grpc
 	ServerProtocol serverProtocol
+	// sets up the server with the test CA, requiring TLS
+	ServerTLSEnabled bool
+	// tells the server to require client certificate authentication
+	ServerTLSAuthEnabled bool
 	// for timeout tests we need to start the server to generate the endpoint
 	// but do not want it to answer when otel-cli calls, this does that
 	StopServerBeforeExec bool
@@ -129,6 +133,122 @@ var suites = []FixtureSuite{
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 1,
+			},
+		},
+	},
+	// TLS connections
+	{
+		{
+			Name: "minimum configuration (tls, no-verify, recording, grpc)",
+			Config: FixtureConfig{
+				ServerProtocol: grpcProtocol,
+				CliArgs: []string{
+					"status",
+					"--endpoint", "https://{{endpoint}}",
+					"--protocol", "grpc",
+					"--verbose", "--fail", "--no-tls-verify",
+				},
+				TestTimeoutMs:    1000,
+				ServerTLSEnabled: true,
+			},
+			Expect: Results{
+				// otel-cli should NOT set insecure when it auto-detects localhost
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("https://{{endpoint}}").
+					WithProtocol("grpc").
+					WithVerbose(true).
+					WithNoTlsVerify(true),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:        true,
+					NumArgs:            8,
+					DetectedLocalhost:  true,
+					InsecureSkipVerify: true,
+					ParsedTimeoutMs:    1000,
+				},
+				Spans: 1,
+			},
+		},
+		{
+			Name: "minimum configuration (tls, no-verify, recording, https)",
+			Config: FixtureConfig{
+				ServerProtocol:   httpProtocol,
+				CliArgs:          []string{"status", "--endpoint", "https://{{endpoint}}", "--tls-no-verify"},
+				TestTimeoutMs:    2000,
+				ServerTLSEnabled: true,
+			},
+			Expect: Results{
+				// otel-cli should NOT set insecure when it auto-detects localhost
+				Config: otelcli.DefaultConfig().
+					WithNoTlsVerify(true).
+					WithEndpoint("https://{{endpoint}}"),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           4,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+				Spans: 1,
+			},
+		},
+		{
+			Name: "minimum configuration (tls, client cert auth, recording, grpc)",
+			Config: FixtureConfig{
+				ServerProtocol: grpcProtocol,
+				CliArgs: []string{
+					"status",
+					"--endpoint", "https://{{endpoint}}",
+					"--protocol", "grpc",
+					"--verbose", "--fail",
+					"--tls-ca-cert", "{{cacert}}",
+					"--tls-client-cert", "{{client_cert}}",
+					"--tls-client-key", "{{client_key}}",
+				},
+				TestTimeoutMs:        1000,
+				ServerTLSEnabled:     true,
+				ServerTLSAuthEnabled: true,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("https://{{endpoint}}").
+					WithProtocol("grpc").
+					WithVerbose(true),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:        true,
+					NumArgs:            13,
+					DetectedLocalhost:  true,
+					InsecureSkipVerify: true,
+					ParsedTimeoutMs:    1000,
+				},
+				Spans: 1,
+			},
+		},
+		{
+			Name: "minimum configuration (tls, client cert auth, recording, https)",
+			Config: FixtureConfig{
+				ServerProtocol: httpProtocol,
+				CliArgs: []string{
+					"status",
+					"--endpoint", "https://{{endpoint}}",
+					"--verbose", "--fail",
+					"--tls-ca-cert", "{{cacert}}",
+					"--tls-client-cert", "{{client_cert}}",
+					"--tls-client-key", "{{client_key}}",
+				},
+				TestTimeoutMs:        2000,
+				ServerTLSEnabled:     true,
+				ServerTLSAuthEnabled: true,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().
+					WithEndpoint("https://{{endpoint}}").
+					WithVerbose(true),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					NumArgs:           11,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
