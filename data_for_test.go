@@ -1,9 +1,11 @@
 package main_test
 
-// Data structures and data for functional testing of otel-cli.
-
+// This file implements data structures and data for functional testing of
+// otel-cli.
+//
+// See: TESTING.md
+//
 // TODO: Results.SpanData could become a struct now
-// TODO: add instructions for adding more tests
 
 import (
 	"regexp"

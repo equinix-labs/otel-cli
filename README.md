@@ -111,7 +111,7 @@ then config file, then environment variables.
 | --config             | OTEL_CLI_CONFIG_FILE          | config_file              | config.json    |
 | --verbose            | OTEL_CLI_VERBOSE              | verbose                  | false          |
 | --fail               | OTEL_CLI_FAIL                 | fail                     | false          |
-| --service            | OTEL_CLI_SERVICE_NAME         | service_name             | myapp          |
+| --service            | OTEL_SERVICE_NAME             | service_name             | myapp          |
 | --kind               | OTEL_CLI_TRACE_KIND           | span_kind                | server         |
 | --status-code        | OTEL_CLI_STATUS_CODE          | span_status_code         | error          |
 | --status-description | OTEL_CLI_STATUS_DESCRIPTION   | span_status_description  | cancelled      |
@@ -135,6 +135,19 @@ http endpoint, set the protocol with --protocol or the envvar.
    * bare `host:port` endpoints are assumed to be gRPC and are not supported for HTTP
    * `http://` and `https://` are assumed to be HTTP unless --protocol is set to `grpc`.
    * loopback addresses without an https:// prefix are assumed to be unencrypted
+
+### Header and Attribute formatting
+
+Headers and attributes allow for `key=value,k=v` style formatting. Internally both
+otel-cli and pflag use Go's `encoding/csv` to parse these values. Therefore, if you want
+to pass commas in a value, follow CSV quoting rules and quote the whole k=v pair.
+Double quotes need to be escaped so the shell doesn't interpolate them. Once that's done,
+embedding commas will work fine.
+
+```shell
+otel-cli span --attrs item1=value1,\"item2=value2,value3\",item3=value4
+otel-cli span --attrs 'item1=value1,"item2=value2,value3",item3=value4'
+```
 
 ## Easy local dev
 
