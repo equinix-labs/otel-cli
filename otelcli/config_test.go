@@ -52,8 +52,23 @@ func TestWithBlocking(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestWithNoTlsVerify(t *testing.T) {
-	if DefaultConfig().WithNoTlsVerify(true).NoTlsVerify != true {
+func TestWithTlsNoVerify(t *testing.T) {
+	if DefaultConfig().WithTlsNoVerify(true).TlsNoVerify != true {
+		t.Fail()
+	}
+}
+func TestWithTlsCACert(t *testing.T) {
+	if DefaultConfig().WithTlsCACert("/a/b/c").TlsCACert != "/a/b/c" {
+		t.Fail()
+	}
+}
+func TestWithTlsClientKey(t *testing.T) {
+	if DefaultConfig().WithTlsClientKey("/c/b/a").TlsClientKey != "/c/b/a" {
+		t.Fail()
+	}
+}
+func TestWithTlsClientCert(t *testing.T) {
+	if DefaultConfig().WithTlsClientCert("/b/c/a").TlsClientCert != "/b/c/a" {
 		t.Fail()
 	}
 }

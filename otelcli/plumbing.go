@@ -105,15 +105,15 @@ func initTracer() (context.Context, func()) {
 func tlsConfig() *tls.Config {
 	tlsConfig := &tls.Config{}
 
-	if config.NoTlsVerify {
+	if config.TlsNoVerify {
 		diagnostics.InsecureSkipVerify = true
 		tlsConfig.InsecureSkipVerify = true
 	}
 
 	// puts the provided CA certificate into the root pool
 	// when not provided, Go TLS will automatically load the system CA pool
-	if config.CACert != "" {
-		data, err := os.ReadFile(config.CACert)
+	if config.TlsCACert != "" {
+		data, err := os.ReadFile(config.TlsCACert)
 		if err != nil {
 			softFail("failed to load CA certificate: %s", err)
 		}
@@ -124,23 +124,23 @@ func tlsConfig() *tls.Config {
 	}
 
 	// client certificate authentication
-	if config.ClientCert != "" && config.ClientKey != "" {
-		clientPEM, err := os.ReadFile(config.ClientCert)
+	if config.TlsClientCert != "" && config.TlsClientKey != "" {
+		clientPEM, err := os.ReadFile(config.TlsClientCert)
 		if err != nil {
-			softFail("failed to read client certificate file %s: %s", config.ClientCert, err)
+			softFail("failed to read client certificate file %s: %s", config.TlsClientCert, err)
 		}
-		clientKeyPEM, err := os.ReadFile(config.ClientKey)
+		clientKeyPEM, err := os.ReadFile(config.TlsClientKey)
 		if err != nil {
-			softFail("failed to read client key file %s: %s", config.ClientKey, err)
+			softFail("failed to read client key file %s: %s", config.TlsClientKey, err)
 		}
 		certPair, err := tls.X509KeyPair(clientPEM, clientKeyPEM)
 		if err != nil {
 			softFail("failed to parse client cert pair: %s", err)
 		}
 		tlsConfig.Certificates = []tls.Certificate{certPair}
-	} else if config.ClientCert != "" {
+	} else if config.TlsClientCert != "" {
 		softFail("client cert and key must be specified together")
-	} else if config.ClientKey != "" {
+	} else if config.TlsClientKey != "" {
 		softFail("client cert and key must be specified together")
 	}
 

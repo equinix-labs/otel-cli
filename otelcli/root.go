@@ -67,12 +67,12 @@ func addClientParams(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", defaults.Blocking, "block on connecting to the OTLP server before proceeding")
 
 	cmd.Flags().BoolVar(&config.Insecure, "insecure", defaults.Insecure, "allow connecting to cleartext endpoints")
-	cmd.Flags().StringVar(&config.CACert, "tls-ca-cert", defaults.CACert, "a file containing the certificate authority bundle")
-	cmd.Flags().StringVar(&config.ClientCert, "tls-client-cert", defaults.ClientCert, "a file containing the client certificate")
-	cmd.Flags().StringVar(&config.ClientKey, "tls-client-key", defaults.ClientKey, "a file containing the client certificate key")
-	cmd.Flags().BoolVar(&config.NoTlsVerify, "tls-no-verify", defaults.NoTlsVerify, "insecure! disables verification of the server certificate and name, mostly for self-signed CAs")
+	cmd.Flags().StringVar(&config.TlsCACert, "tls-ca-cert", defaults.TlsCACert, "a file containing the certificate authority bundle")
+	cmd.Flags().StringVar(&config.TlsClientCert, "tls-client-cert", defaults.TlsClientCert, "a file containing the client certificate")
+	cmd.Flags().StringVar(&config.TlsClientKey, "tls-client-key", defaults.TlsClientKey, "a file containing the client certificate key")
+	cmd.Flags().BoolVar(&config.TlsNoVerify, "tls-no-verify", defaults.TlsNoVerify, "insecure! disables verification of the server certificate and name, mostly for self-signed CAs")
 	// --no-tls-verify is deprecated, will remove before 1.0
-	cmd.Flags().BoolVar(&config.NoTlsVerify, "no-tls-verify", defaults.NoTlsVerify, "(deprecated) same as --tls-no-verify")
+	cmd.Flags().BoolVar(&config.TlsNoVerify, "no-tls-verify", defaults.TlsNoVerify, "(deprecated) same as --tls-no-verify")
 
 	// OTEL_CLI trace propagation options
 	cmd.Flags().BoolVar(&config.TraceparentRequired, "tp-required", defaults.TraceparentRequired, "when set to true, fail and log if a traceparent can't be picked up from TRACEPARENT ennvar or a carrier file")

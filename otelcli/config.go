@@ -29,7 +29,10 @@ func DefaultConfig() Config {
 		Headers:                      map[string]string{},
 		Insecure:                     false,
 		Blocking:                     false,
-		NoTlsVerify:                  false,
+		TlsNoVerify:                  false,
+		TlsCACert:                    "",
+		TlsClientKey:                 "",
+		TlsClientCert:                "",
 		ServiceName:                  "otel-cli",
 		SpanName:                     "todo-generate-default-span-names",
 		Kind:                         "client",
@@ -59,18 +62,18 @@ func DefaultConfig() Config {
 // This is used as a singleton as "config" and accessed from many other files.
 // Data structure is public so that it can serialize to json easily.
 type Config struct {
-	Endpoint    string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
-	Protocol    string            `json:"protocol" env:"OTEL_EXPORTER_OTLP_PROTOCOL,OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
-	Timeout     string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
-	Headers     map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
-	Insecure    bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
-	Blocking    bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
-	NoTlsVerify bool              `json:"no_tls_verify" env:"OTEL_CLI_NO_TLS_VERIFY"`
+	Endpoint string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
+	Protocol string            `json:"protocol" env:"OTEL_EXPORTER_OTLP_PROTOCOL,OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
+	Timeout  string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
+	Headers  map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
+	Insecure bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
+	Blocking bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
 
-	// json keys match the otel collector yaml
-	CACert     string `json:"ca_file" env:"OTEL_EXPORTER_OTLP_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE"`
-	ClientKey  string `json:"cert_file" env:"OTEL_EXPORTER_OTLP_CLIENT_KEY,OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY"`
-	ClientCert string `json:"key_file" env:"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE"`
+	TlsCACert     string `json:"tls_ca_cert" env:"OTEL_EXPORTER_OTLP_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE"`
+	TlsClientKey  string `json:"tls_client_key" env:"OTEL_EXPORTER_OTLP_CLIENT_KEY,OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY"`
+	TlsClientCert string `json:"tls_client_cert" env:"OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CLIENT_CERTIFICATE"`
+	// OTEL_CLI_NO_TLS_VERIFY is deprecated and will be removed for 1.0
+	TlsNoVerify bool `json:"tls_no_verify" env:"OTEL_CLI_TLS_NO_VERIFY,OTEL_CLI_NO_TLS_VERIFY"`
 
 	ServiceName       string            `json:"service_name" env:"OTEL_CLI_SERVICE_NAME,OTEL_SERVICE_NAME"`
 	SpanName          string            `json:"span_name" env:"OTEL_CLI_SPAN_NAME"`
@@ -188,7 +191,10 @@ func (c Config) ToStringMap() map[string]string {
 		"headers":                     flattenStringMap(c.Headers, "{}"),
 		"insecure":                    strconv.FormatBool(c.Insecure),
 		"blocking":                    strconv.FormatBool(c.Blocking),
-		"no_tls_verify":               strconv.FormatBool(c.NoTlsVerify),
+		"tls_no_verify":               strconv.FormatBool(c.TlsNoVerify),
+		"tls_ca_cert":                 c.TlsCACert,
+		"tls_client_key":              c.TlsClientKey,
+		"tls_client_cert":             c.TlsClientCert,
 		"service_name":                c.ServiceName,
 		"span_name":                   c.SpanName,
 		"span_kind":                   c.Kind,
@@ -249,9 +255,27 @@ func (c Config) WithBlocking(with bool) Config {
 	return c
 }
 
-// WithNoTlsVerify returns the config with NoTlsVerify set to the provided value.
-func (c Config) WithNoTlsVerify(with bool) Config {
-	c.NoTlsVerify = with
+// WithTlsNoVerify returns the config with NoTlsVerify set to the provided value.
+func (c Config) WithTlsNoVerify(with bool) Config {
+	c.TlsNoVerify = with
+	return c
+}
+
+// WithTlsCACert returns the config with TlsCACert set to the provided value.
+func (c Config) WithTlsCACert(with string) Config {
+	c.TlsCACert = with
+	return c
+}
+
+// WithTlsClientKey returns the config with NoTlsClientKey set to the provided value.
+func (c Config) WithTlsClientKey(with string) Config {
+	c.TlsClientKey = with
+	return c
+}
+
+// WithTlsClientCert returns the config with NoTlsClientCert set to the provided value.
+func (c Config) WithTlsClientCert(with string) Config {
+	c.TlsClientCert = with
 	return c
 }
 
