@@ -136,6 +136,19 @@ http endpoint, set the protocol with --protocol or the envvar.
    * `http://` and `https://` are assumed to be HTTP unless --protocol is set to `grpc`.
    * loopback addresses without an https:// prefix are assumed to be unencrypted
 
+### Header and Attribute formatting
+
+Headers and attributes allow for `key=value,k=v` style formatting. Internally both
+otel-cli and pflag use Go's `encoding/csv` to parse these values. Therefore, if you want
+to pass commas in a value, follow CSV quoting rules and quote the whole k=v pair.
+Double quotes need to be escaped so the shell doesn't interpolate them. Once that's done,
+embedding commas will work fine.
+
+```shell
+otel-cli span --attrs item1=value1,\"item2=value2,value3\",item3=value4
+otel-cli span --attrs 'item1=value1,"item2=value2,value3",item3=value4'
+```
+
 ## Easy local dev
 
 We want working on otel-cli to be easy, so we've provided a few different ways to get
