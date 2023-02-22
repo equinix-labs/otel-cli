@@ -48,3 +48,33 @@ commands and can check data in it.
 `tls_for_test.go` implements an ephemeral certificate authority that is created
 and destroyed on each run. The rest of the test harness injects the CA and certs
 created into the tests, allowing for full-system testing.
+
+A Fixture can be configured to run "in the background". In this case, the harness
+will behave as if you ran the command `./otel-cli &` and let following fixtures
+run on top of it. This is mostly used to test `otel-cli span background`, which
+exists primarily to run as a backgrounded job in a shell script. When background
+jobs are in use, be careful with test names as they are used as a key to manage
+the process.
+
+## Adding Tests
+
+For a new area of functionality, you'll want to add a Suite. A Suite is mostly
+for organization of tests, but is also used to manage state when testing background
+jobs. A Fixture is made of two parts: an otel-cli command configuration, and a
+data structure of expected results. The harness presents otel-cli with the exact
+ARGV specified in `Config.CliArgs`, and a clean environment with only the envvars
+provided in the `Env` stringmap. The output from otel-cli is captured with stdout
+and stderr combined. This can be tested against as well.
+
+When otel-cli reads an environment variable it clears it, to prevent opentelemetry-go
+from double-processing it. This is why envvars set in `Config.Env` don't show up
+in `Results.Env`.
+
+It is often wise to pass `"--fail", "--verbose"` to CliArgs for debugging and it's
+fine to leave them on permanently. Without them otel-cli will be silent about
+failures and you'll get a confusing test output.
+
+Most of the time it's best to copy an existing Suite or Fixture and adjust it to
+the case you're trying to test. Please try to clean out any unneeded config when
+you do this so the tests are easy to understand. It's not bad to to test a little
+extra surface area, just try to keep things readable.
