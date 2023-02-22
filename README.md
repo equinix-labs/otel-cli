@@ -111,7 +111,7 @@ then config file, then environment variables.
 | --config             | OTEL_CLI_CONFIG_FILE          | config_file              | config.json    |
 | --verbose            | OTEL_CLI_VERBOSE              | verbose                  | false          |
 | --fail               | OTEL_CLI_FAIL                 | fail                     | false          |
-| --service            | OTEL_CLI_SERVICE_NAME         | service_name             | myapp          |
+| --service            | OTEL_SERVICE_NAME             | service_name             | myapp          |
 | --kind               | OTEL_CLI_TRACE_KIND           | span_kind                | server         |
 | --status-code        | OTEL_CLI_STATUS_CODE          | span_status_code         | error          |
 | --status-description | OTEL_CLI_STATUS_DESCRIPTION   | span_status_description  | cancelled      |
