@@ -29,7 +29,7 @@ the glue code, since that's mostly what otel-cli is. Each of Cobra,
 `encoding/json`, and opentelemetry-go are thorougly unit and battle tested. So,
 otel-cli tests a build in a functional test harness.
 
-Tests are defined in `data_for_test.go` in Go data structures. Suites are a a
+Tests are defined in `data_for_test.go` in Go data structures. Suites are a
 group of Fixtures that go together. Mostly Suites are necessary for the
 backgrounding feature, to test e.g. `otel-cli span background`, and to organize
 tests by functionality, etc.. Fixtures configure everything for an otel-cli
