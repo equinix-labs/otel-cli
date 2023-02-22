@@ -23,34 +23,35 @@ const spanBgSockfilename = "otel-cli-background.sock"
 // DefaultConfig returns a Config with all defaults set.
 func DefaultConfig() Config {
 	return Config{
-		Endpoint:               "",
-		Protocol:               "",
-		Timeout:                "1s",
-		Headers:                map[string]string{},
-		Insecure:               false,
-		Blocking:               false,
-		NoTlsVerify:            false,
-		ServiceName:            "otel-cli",
-		SpanName:               "todo-generate-default-span-names",
-		Kind:                   "client",
-		Attributes:             map[string]string{},
-		TraceparentCarrierFile: "",
-		TraceparentIgnoreEnv:   false,
-		TraceparentPrint:       false,
-		TraceparentPrintExport: false,
-		TraceparentRequired:    false,
-		BackgroundParentPollMs: 10,
-		BackgroundSockdir:      "",
-		BackgroundWait:         false,
-		SpanStartTime:          "now",
-		SpanEndTime:            "now",
-		EventName:              "todo-generate-default-event-names",
-		EventTime:              "now",
-		CfgFile:                "",
-		Verbose:                false,
-		Fail:                   false,
-		StatusCode:             "unset",
-		StatusDescription:      "",
+		Endpoint:                     "",
+		Protocol:                     "",
+		Timeout:                      "1s",
+		Headers:                      map[string]string{},
+		Insecure:                     false,
+		Blocking:                     false,
+		NoTlsVerify:                  false,
+		ServiceName:                  "otel-cli",
+		SpanName:                     "todo-generate-default-span-names",
+		Kind:                         "client",
+		Attributes:                   map[string]string{},
+		TraceparentCarrierFile:       "",
+		TraceparentIgnoreEnv:         false,
+		TraceparentPrint:             false,
+		TraceparentPrintExport:       false,
+		TraceparentRequired:          false,
+		BackgroundParentPollMs:       10,
+		BackgroundSockdir:            "",
+		BackgroundWait:               false,
+		BackgroundSkipParentPidCheck: false,
+		SpanStartTime:                "now",
+		SpanEndTime:                  "now",
+		EventName:                    "todo-generate-default-event-names",
+		EventTime:                    "now",
+		CfgFile:                      "",
+		Verbose:                      false,
+		Fail:                         false,
+		StatusCode:                   "unset",
+		StatusDescription:            "",
 	}
 }
 
@@ -84,9 +85,10 @@ type Config struct {
 	TraceparentPrintExport bool   `json:"traceparent_print_export" env:"OTEL_CLI_EXPORT_TRACEPARENT"`
 	TraceparentRequired    bool   `json:"traceparent_required" env:"OTEL_CLI_TRACEPARENT_REQUIRED"`
 
-	BackgroundParentPollMs int    `json:"background_parent_poll_ms" env:""`
-	BackgroundSockdir      string `json:"background_socket_directory" env:""`
-	BackgroundWait         bool   `json:"background_wait" env:""`
+	BackgroundParentPollMs       int    `json:"background_parent_poll_ms" env:""`
+	BackgroundSockdir            string `json:"background_socket_directory" env:""`
+	BackgroundWait               bool   `json:"background_wait" env:""`
+	BackgroundSkipParentPidCheck bool   `json:"background_skip_parent_pid_check"`
 
 	SpanStartTime string `json:"span_start_time" env:""`
 	SpanEndTime   string `json:"span_end_time" env:""`
@@ -201,6 +203,7 @@ func (c Config) ToStringMap() map[string]string {
 		"background_parent_poll_ms":   strconv.Itoa(c.BackgroundParentPollMs),
 		"background_socket_directory": c.BackgroundSockdir,
 		"background_wait":             strconv.FormatBool(c.BackgroundWait),
+		"background_skip_pid_check":   strconv.FormatBool(c.BackgroundSkipParentPidCheck),
 		"span_start_time":             c.SpanStartTime,
 		"span_end_time":               c.SpanEndTime,
 		"event_name":                  c.EventName,
@@ -333,6 +336,12 @@ func (c Config) WithBackgroundSockdir(with string) Config {
 // WithBackgroundWait returns the config with BackgroundWait set to the provided value.
 func (c Config) WithBackgroundWait(with bool) Config {
 	c.BackgroundWait = with
+	return c
+}
+
+// WithBackgroundSkipParentPidCheck returns the config with BackgroundSkipParentPidCheck set to the provided value.
+func (c Config) WithBackgroundSkipParentPidCheck(with bool) Config {
+	c.BackgroundSkipParentPidCheck = with
 	return c
 }
 
