@@ -7,10 +7,10 @@
    "otlp_blocking" : false,
 
    "insecure" : true,
-   "no_tls_verify" : true,
-   "ca_file": "/dev/null",
-   "cert_file": "/dev/null",
-   "key_file": "/dev/null",
+   "tls_no_verify" : true,
+   "tls_ca_cert": "/dev/null",
+   "tls_client_key": "/dev/null",
+   "tls_client_cert": "/dev/null",
 
    "service_name" : "configured_in_config_file",
 

@@ -121,7 +121,10 @@ then config file, then environment variables.
 | --tp-ignore-env      | OTEL_CLI_IGNORE_ENV           | traceparent_ignore_env   | false          |
 | --tp-print           | OTEL_CLI_PRINT_TRACEPARENT    | traceparent_print        | false          |
 | --tp-export          | OTEL_CLI_EXPORT_TRACEPARENT   | traceparent_print_export | false          |
-| --no-tls-verify      | OTEL_CLI_NO_TLS_VERIFY        | no_tls_verify            | false          |
+| --tls-no-verify      | OTEL_CLI_TLS_NO_VERIFY                | tls_no_verify    | false          |
+| --tls-ca-cert        | OTEL_EXPORTER_OTLP_CERTIFICATE        | tls_ca_cert      |                |
+| --tls-client-key     | OTEL_EXPORTER_OTLP_CLIENT_KEY         | tls_client_key   |                |
+| --tls-client-cert    | OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE | tls_client_cert  |                |
 
 [Valid timeout units](https://pkg.go.dev/time#ParseDuration) are "ns", "us"/"µs", "ms", "s", "m", "h".
 

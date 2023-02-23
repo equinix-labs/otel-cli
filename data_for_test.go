@@ -152,6 +152,7 @@ var suites = []FixtureSuite{
 					"status",
 					"--endpoint", "https://{{endpoint}}",
 					"--protocol", "grpc",
+					// TODO: switch to --tls-no-verify before 1.0, for now keep testing it
 					"--verbose", "--fail", "--no-tls-verify",
 				},
 				TestTimeoutMs:    1000,
@@ -163,7 +164,7 @@ var suites = []FixtureSuite{
 					WithEndpoint("https://{{endpoint}}").
 					WithProtocol("grpc").
 					WithVerbose(true).
-					WithNoTlsVerify(true),
+					WithTlsNoVerify(true),
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:        true,
 					NumArgs:            8,
@@ -185,7 +186,7 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
 				Config: otelcli.DefaultConfig().
-					WithNoTlsVerify(true).
+					WithTlsNoVerify(true).
 					WithEndpoint("https://{{endpoint}}"),
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
@@ -205,9 +206,9 @@ var suites = []FixtureSuite{
 					"--endpoint", "https://{{endpoint}}",
 					"--protocol", "grpc",
 					"--verbose", "--fail",
-					"--tls-ca-cert", "{{cacert}}",
-					"--tls-client-cert", "{{client_cert}}",
-					"--tls-client-key", "{{client_key}}",
+					"--tls-ca-cert", "{{tls_ca_cert}}",
+					"--tls-client-cert", "{{tls_client_cert}}",
+					"--tls-client-key", "{{tls_client_key}}",
 				},
 				TestTimeoutMs:        1000,
 				ServerTLSEnabled:     true,
@@ -217,6 +218,9 @@ var suites = []FixtureSuite{
 				Config: otelcli.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}").
 					WithProtocol("grpc").
+					WithTlsCACert("{{tls_ca_cert}}").
+					WithTlsClientKey("{{tls_client_key}}").
+					WithTlsClientCert("{{tls_client_cert}}").
 					WithVerbose(true),
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:        true,
@@ -236,9 +240,9 @@ var suites = []FixtureSuite{
 					"status",
 					"--endpoint", "https://{{endpoint}}",
 					"--verbose", "--fail",
-					"--tls-ca-cert", "{{cacert}}",
-					"--tls-client-cert", "{{client_cert}}",
-					"--tls-client-key", "{{client_key}}",
+					"--tls-ca-cert", "{{tls_ca_cert}}",
+					"--tls-client-cert", "{{tls_client_cert}}",
+					"--tls-client-key", "{{tls_client_key}}",
 				},
 				TestTimeoutMs:        2000,
 				ServerTLSEnabled:     true,
@@ -247,6 +251,9 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otelcli.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}").
+					WithTlsCACert("{{tls_ca_cert}}").
+					WithTlsClientKey("{{tls_client_key}}").
+					WithTlsClientCert("{{tls_client_cert}}").
 					WithVerbose(true),
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
@@ -354,7 +361,10 @@ var suites = []FixtureSuite{
 					WithHeaders(map[string]string{"header1": "header1-value"}).
 					WithInsecure(true).
 					WithBlocking(false).
-					WithNoTlsVerify(true).
+					WithTlsNoVerify(true).
+					WithTlsCACert("/dev/null").
+					WithTlsClientKey("/dev/null").
+					WithTlsClientCert("/dev/null").
 					WithServiceName("configured_in_config_file").
 					WithSpanName("config_file_span").
 					WithKind("server").

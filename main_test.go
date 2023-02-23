@@ -494,23 +494,24 @@ func mkEnviron(endpoint string, env map[string]string, tlsData tlsHelpers) []str
 }
 
 // injectMapVars iterates over the map and updates the values, replacing all instances
-// of {{endpoint}}, {{cacert}}, {{client_cert}}, and {{client_key}} with test values.
+// of {{endpoint}}, {{tls_ca_cert}}, {{tls_client_cert}}, and {{tls_client_key}} with
+// test values.
 func injectMapVars(endpoint string, target map[string]string, tlsData tlsHelpers) {
 	for k, v := range target {
 		target[k] = injectVars(v, endpoint, tlsData)
 	}
 }
 
-// injectVars replaces all instances of {{endpoint}}, {{cacert}}, {{client_cert}}, and
-// {{client_key}} with test values.
+// injectVars replaces all instances of {{endpoint}}, {{tls_ca_cert}},
+// {{tls_client_cert}}, and {{tls_client_key}} with test values.
 // This is needed because the otlpserver is configured to listen on :0 which has it
 // grab a random port. Once that's generated we need to inject it into all the values
 // so the test comparisons work as expected. Similarly for TLS testing, a temp CA and
 // certs are created and need to be injected.
 func injectVars(in, endpoint string, tlsData tlsHelpers) string {
 	out := strings.ReplaceAll(in, "{{endpoint}}", endpoint)
-	out = strings.ReplaceAll(out, "{{cacert}}", tlsData.caFile)
-	out = strings.ReplaceAll(out, "{{client_cert}}", tlsData.clientFile)
-	out = strings.ReplaceAll(out, "{{client_key}}", tlsData.clientPrivKeyFile)
+	out = strings.ReplaceAll(out, "{{tls_ca_cert}}", tlsData.caFile)
+	out = strings.ReplaceAll(out, "{{tls_client_cert}}", tlsData.clientFile)
+	out = strings.ReplaceAll(out, "{{tls_client_key}}", tlsData.clientPrivKeyFile)
 	return out
 }
