@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel/trace"
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 func TestCliAttrsToOtel(t *testing.T) {
@@ -165,23 +165,23 @@ func TestOtelSpanStatus(t *testing.T) {
 
 	for _, testcase := range []struct {
 		name string
-		want v1.Status_StatusCode
+		want tracepb.Status_StatusCode
 	}{
 		{
 			name: "unset",
-			want: v1.Status_STATUS_CODE_UNSET,
+			want: tracepb.Status_STATUS_CODE_UNSET,
 		},
 		{
 			name: "ok",
-			want: v1.Status_STATUS_CODE_OK,
+			want: tracepb.Status_STATUS_CODE_OK,
 		},
 		{
 			name: "error",
-			want: v1.Status_STATUS_CODE_ERROR,
+			want: tracepb.Status_STATUS_CODE_ERROR,
 		},
 		{
 			name: "cromulent",
-			want: v1.Status_STATUS_CODE_UNSET,
+			want: tracepb.Status_STATUS_CODE_UNSET,
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
