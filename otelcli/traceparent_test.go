@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -22,7 +21,7 @@ func TestLoadTraceparent(t *testing.T) {
 
 	// load from file only
 	testFileTp := "00-f61fc53f926e07a9c3893b1a722e1b65-7a2d6a804f3de137-01"
-	file, err := ioutil.TempFile(t.TempDir(), "go-test-otel-cli")
+	file, err := os.CreateTemp(t.TempDir(), "go-test-otel-cli")
 	if err != nil {
 		t.Fatalf("unable to create tempfile for testing: %s", err)
 	}
@@ -59,7 +58,7 @@ func TestWriteTraceparentToFile(t *testing.T) {
 	tp := parseTraceparent(testTp)
 
 	// create a tempfile for messing with
-	file, err := ioutil.TempFile(t.TempDir(), "go-test-otel-cli")
+	file, err := os.CreateTemp(t.TempDir(), "go-test-otel-cli")
 	if err != nil {
 		t.Fatalf("unable to create tempfile for testing: %s", err)
 	}
