@@ -4,100 +4,86 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 
-	"go.opentelemetry.io/otel"
-	otlpgrpc "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	otlphttp "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
 
-// initTracer sets up the OpenTelemetry plumbing so it's ready to use.
-// Returns a context and a func() that encapuslates clean shutdown.
-func initTracer() (context.Context, func()) {
-	ctx := context.Background()
-
-	otel.SetErrorHandler(diagnostics)
-
-	// when no endpoint is set, do not set up plumbing. everything will still
-	// run but in non-recording mode, and otel-cli is effectively disabled
-	// and will not time out trying to connect out
-	if config.Endpoint == "" {
-		return ctx, func() {}
+// SendSpan connects to the OTLP server, sends the span, and disconnects.
+func SendSpan(ctx context.Context, span tracepb.Span) error {
+	if !config.IsRecording() {
+		return nil
 	}
 
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
-		softFail("invalid protocol setting %q", config.Protocol)
+		err := fmt.Errorf("invalid protocol setting %q", config.Protocol)
+		diagnostics.OtelError = err.Error()
+		return err
 	}
 
-	var exporter sdktrace.SpanExporter // allows overwrite in --test mode
-	var err error
-
-	// The OTel spec does not support grpc:// or any way to deterministically demand
-	// gRPC via the endpoint URI, preferring OTEL_EXPORTER_PROTOCOL to do so. This is
-	// awkward for otel-cli so we break with the spec. otel-cli will only resolve
-	// http(s):// to HTTP protocols, defaults bare host:port to gRPC, and supports
-	// grpc:// to definitely use gRPC to connect out.
+	var client otlptrace.Client
 	if config.Protocol != "grpc" &&
 		(strings.HasPrefix(config.Protocol, "http/") ||
 			strings.HasPrefix(config.Endpoint, "http://") ||
 			strings.HasPrefix(config.Endpoint, "https://")) {
-		exporter, err = otlphttp.New(ctx, httpOptions()...)
-		if err != nil {
-			softFail("failed to configure OTLP/HTTP exporter: %s", err)
-		}
+		client = otlptracehttp.NewClient(httpOptions()...)
 	} else {
-		exporter, err = otlpgrpc.New(ctx, grpcOptions()...)
-		if err != nil {
-			softFail("failed to configure OTLP/GRPC exporter: %s", err)
-		}
+		client = otlptracegrpc.NewClient(grpcOptions()...)
 	}
 
-	// set the service name that will show up in tracing UIs
-	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName))
-	res, err := resource.New(ctx, resAttrs)
+	err := client.Start(ctx)
 	if err != nil {
-		softFail("failed to create OpenTelemetry service name resource: %s", err)
+		diagnostics.OtelError = err.Error()
+		return err
 	}
 
-	// SSP sends all completed spans to the exporter immediately and that is
-	// exactly what we want/need in this app
-	// https://github.com/open-telemetry/opentelemetry-go/blob/main/sdk/trace/simple_span_processor.go
-	ssp := sdktrace.NewSimpleSpanProcessor(exporter)
-
-	// ParentBased/AlwaysSample Sampler is the default and that's fine for this
-	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithResource(res),
-		sdktrace.WithSpanProcessor(ssp),
-	)
-
-	// inject the tracer into the otel globals (and this starts the background stuff, I think)
-	otel.SetTracerProvider(tracerProvider)
-
-	// set up the W3C trace context as the global propagator
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	// callers need to defer this to make sure all the data gets flushed out
-	return ctx, func() {
-		err = tracerProvider.Shutdown(ctx)
-		if err != nil {
-			softFail("shutdown of OpenTelemetry tracerProvider failed: %s", err)
-		}
-
-		err = exporter.Shutdown(ctx)
-		if err != nil {
-			softFail("shutdown of OpenTelemetry OTLP exporter failed: %s", err)
-		}
+	rsps := []*tracepb.ResourceSpans{
+		{
+			Resource: &resourcepb.Resource{
+				Attributes: resourceAttributes(ctx),
+			},
+			ScopeSpans: []*tracepb.ScopeSpans{{
+				Scope: &commonpb.InstrumentationScope{
+					Name:                   "github.com/equinix-labs/otel-cli",
+					Version:                rootCmd.Version, // TODO: plumb this through config
+					Attributes:             []*commonpb.KeyValue{},
+					DroppedAttributesCount: 0,
+				},
+				Spans:     []*tracepb.Span{&span},
+				SchemaUrl: semconv.SchemaURL,
+			}},
+			SchemaUrl: semconv.SchemaURL,
+		},
 	}
+
+	err = client.UploadTraces(ctx, rsps)
+	if err != nil {
+		diagnostics.OtelError = err.Error()
+		return err
+	}
+
+	err = client.Stop(ctx)
+	if err != nil {
+		diagnostics.OtelError = err.Error()
+		return err
+	}
+
+	return nil
 }
 
 // tlsConfig evaluates otel-cli configuration and returns a tls.Config
@@ -148,8 +134,8 @@ func tlsConfig() *tls.Config {
 }
 
 // grpcOptions convets config settings to an otlpgrpc.Option list.
-func grpcOptions() []otlpgrpc.Option {
-	grpcOpts := []otlpgrpc.Option{}
+func grpcOptions() []otlptracegrpc.Option {
+	grpcOpts := []otlptracegrpc.Option{}
 
 	// per comment in initTracer(), grpc:// is specific to otel-cli
 	if strings.HasPrefix(config.Endpoint, "grpc://") ||
@@ -159,14 +145,14 @@ func grpcOptions() []otlpgrpc.Option {
 		if err != nil {
 			softFail("error parsing provided gRPC URI '%s': %s", config.Endpoint, err)
 		}
-		grpcOpts = append(grpcOpts, otlpgrpc.WithEndpoint(ep.Hostname()+":"+ep.Port()))
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithEndpoint(ep.Hostname()+":"+ep.Port()))
 	} else {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithEndpoint(config.Endpoint))
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithEndpoint(config.Endpoint))
 	}
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
 	if timeout := parseCliTimeout(); timeout > 0 {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithTimeout(timeout))
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithTimeout(timeout))
 	}
 
 	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
@@ -175,15 +161,15 @@ func grpcOptions() []otlpgrpc.Option {
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithInsecure())
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig())))
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig())))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
 	if len(config.Headers) > 0 {
 		// fortunately WithHeaders can accept the string map as-is
-		grpcOpts = append(grpcOpts, otlpgrpc.WithHeaders(config.Headers))
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithHeaders(config.Headers))
 	}
 
 	// OTLP examples usually show this with the grpc.WithBlock() dial option to
@@ -191,14 +177,14 @@ func grpcOptions() []otlpgrpc.Option {
 	// instead, rely on the shutdown methods to make sure everything is flushed
 	// by the time the program exits.
 	if config.Blocking {
-		grpcOpts = append(grpcOpts, otlpgrpc.WithDialOption(grpc.WithBlock()))
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithDialOption(grpc.WithBlock()))
 	}
 
 	return grpcOpts
 }
 
 // httpOptions converts config to an otlphttp.Option list.
-func httpOptions() []otlphttp.Option {
+func httpOptions() []otlptracehttp.Option {
 	endpointURL, err := url.Parse(config.Endpoint)
 	if err != nil {
 		softFail("error parsing provided HTTP URI '%s': %s", config.Endpoint, err)
@@ -212,7 +198,7 @@ func httpOptions() []otlphttp.Option {
 			endpointHostAndPort += ":80"
 		}
 	}
-	httpOpts := []otlphttp.Option{otlphttp.WithEndpoint(endpointHostAndPort)}
+	httpOpts := []otlptracehttp.Option{otlptracehttp.WithEndpoint(endpointHostAndPort)}
 
 	if endpointURL.Path == "" {
 		// Per spec, /v1/traces is the default:
@@ -220,29 +206,29 @@ func httpOptions() []otlphttp.Option {
 		endpointURL.Path = "/v1/traces"
 	}
 
-	httpOpts = append(httpOpts, otlphttp.WithURLPath(endpointURL.Path))
+	httpOpts = append(httpOpts, otlptracehttp.WithURLPath(endpointURL.Path))
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
 	if timeout := parseCliTimeout(); timeout > 0 {
-		httpOpts = append(httpOpts, otlphttp.WithTimeout(timeout))
+		httpOpts = append(httpOpts, otlptracehttp.WithTimeout(timeout))
 	}
 
-	// otlphttp does the right thing and forces us to say WithInsecure to disable
+	// otlptracehttp does the right thing and forces us to say WithInsecure to disable
 	// encryption, but I expect most users of this program to point at a localhost
 	// endpoint that might not have any encryption available, or setting it up
 	// raises the bar of entry too high.  The compromise is to automatically flip
 	// this flag to true when endpoint contains an an obvious "localhost",
 	// "127.0.0.x", or "::1" address.
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
-		httpOpts = append(httpOpts, otlphttp.WithInsecure())
+		httpOpts = append(httpOpts, otlptracehttp.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		httpOpts = append(httpOpts, otlphttp.WithTLSClientConfig(tlsConfig()))
+		httpOpts = append(httpOpts, otlptracehttp.WithTLSClientConfig(tlsConfig()))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
 	if len(config.Headers) > 0 {
 		// fortunately WithHeaders can accept the string map as-is
-		httpOpts = append(httpOpts, otlphttp.WithHeaders(config.Headers))
+		httpOpts = append(httpOpts, otlptracehttp.WithHeaders(config.Headers))
 	}
 
 	return httpOpts
@@ -302,4 +288,43 @@ func isLoopbackAddr(endpoint string) bool {
 func isInsecureSchema(endpoint string) bool {
 	return strings.HasPrefix(endpoint, "http://") ||
 		strings.HasPrefix(endpoint, "unix://")
+}
+
+// resourceAttributes calls the OTel SDK to get automatic resource attrs and
+// returns them converted to []*commonpb.KeyValue for use with protobuf.
+func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
+	// set the service name that will show up in tracing UIs
+	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName))
+	res, err := resource.New(ctx, resAttrs)
+	if err != nil {
+		softFail("failed to create OpenTelemetry service name resource: %s", err)
+	}
+
+	attrs := []*commonpb.KeyValue{}
+
+	for _, attr := range res.Attributes() {
+		av := new(commonpb.AnyValue)
+
+		// does not implement slice types... should be fine?
+		switch attr.Value.Type() {
+		case attribute.BOOL:
+			av.Value = &commonpb.AnyValue_BoolValue{BoolValue: attr.Value.AsBool()}
+		case attribute.INT64:
+			av.Value = &commonpb.AnyValue_IntValue{IntValue: attr.Value.AsInt64()}
+		case attribute.FLOAT64:
+			av.Value = &commonpb.AnyValue_DoubleValue{DoubleValue: attr.Value.AsFloat64()}
+		case attribute.STRING:
+			av.Value = &commonpb.AnyValue_StringValue{StringValue: attr.Value.AsString()}
+		default:
+			softFail("BUG: unable to convert resource attribute, please file an issue")
+		}
+
+		ckv := commonpb.KeyValue{
+			Key:   string(attr.Key),
+			Value: av,
+		}
+		attrs = append(attrs, &ckv)
+	}
+
+	return attrs
 }

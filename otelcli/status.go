@@ -1,6 +1,8 @@
 package otelcli
 
 import (
+	"context"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"os"
@@ -8,8 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var statusCmd = &cobra.Command{
@@ -38,15 +39,14 @@ func init() {
 }
 
 func doStatus(cmd *cobra.Command, args []string) {
-	ctx, shutdown := initTracer()
-	defer shutdown()
+	exitCode := 0
 
 	// TODO: this always canaries as it is, gotta find the right flags
 	// to try to stall sending at the end so as much as possible of the otel
 	// code still executes
-	tracer := otel.Tracer("otel-cli/status")
-	ctx, span := tracer.Start(ctx, "otel-cli status")
-	diagnostics.IsRecording = span.IsRecording()
+	span := NewProtobufSpanWithConfig(config)
+	span.Name = "otel-cli status"
+	span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
 
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
@@ -65,19 +65,24 @@ func doStatus(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// grab the SpanContext for printing things, end the span, then shut down
-	// otel before moving on to print things
-	sc := trace.SpanContextFromContext(ctx)
-	span.End()
+	// send the span out before printing anything
+	err := SendSpan(context.Background(), span)
+	if err != nil {
+		if config.Fail {
+			log.Fatalf("%s", err)
+		} else {
+			softLog("%s", err)
+		}
+	}
+	tp := traceparentFromSpan(span)
 
 	outData := StatusOutput{
 		Config: config,
 		Env:    env,
 		SpanData: map[string]string{
-			"trace_id":    sc.TraceID().String(),
-			"span_id":     sc.SpanID().String(),
-			"trace_flags": sc.TraceFlags().String(),
-			"is_sampled":  strconv.FormatBool(sc.IsSampled()),
+			"trace_id":   hex.EncodeToString(span.TraceId),
+			"span_id":    hex.EncodeToString(span.SpanId),
+			"is_sampled": strconv.FormatBool(tp.Sampling),
 		},
 		Diagnostics: diagnostics,
 	}
@@ -89,4 +94,6 @@ func doStatus(cmd *cobra.Command, args []string) {
 
 	os.Stdout.Write(js)
 	os.Stdout.WriteString("\n")
+
+	os.Exit(exitCode)
 }

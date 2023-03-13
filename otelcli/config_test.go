@@ -25,6 +25,18 @@ func TestConfig_ToStringMap(t *testing.T) {
 	}
 }
 
+func TestIsRecording(t *testing.T) {
+	c := DefaultConfig()
+	if c.IsRecording() {
+		t.Fail()
+	}
+	c.Endpoint = "https://localhost:4318"
+
+	if !c.IsRecording() {
+		t.Fail()
+	}
+}
+
 func TestWithEndpoint(t *testing.T) {
 	if DefaultConfig().WithEndpoint("foobar").Endpoint != "foobar" {
 		t.Fail()

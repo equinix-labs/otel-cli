@@ -6,9 +6,6 @@ import (
 	"regexp"
 
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // spanCmd represents the span command
@@ -52,45 +49,7 @@ func init() {
 }
 
 func doSpan(cmd *cobra.Command, args []string) {
-	ctx, span, shutdown := startSpan()
-	defer shutdown()
-	endSpan(span)
-	propagateOtelCliSpan(ctx, span, os.Stdout)
-}
-
-// startSpan processes the optional --start option, starts a span, and returns a
-// context, the span, and a deferrable function for clean shutdown (it ends the
-// span).
-func startSpan() (context.Context, trace.Span, func()) {
-	t := parseTime(config.SpanStartTime, "start")
-	startOpts := []trace.SpanStartOption{
-		trace.WithSpanKind(otelSpanKind(config.Kind)),
-		trace.WithTimestamp(t),
-	}
-
-	ctx, shutdown := initTracer()
-	ctx = loadTraceparent(ctx, config.TraceparentCarrierFile)
-	tracer := otel.Tracer("otel-cli/span")
-
-	ctx, span := tracer.Start(ctx, config.SpanName, startOpts...)
-	span.SetAttributes(cliAttrsToOtel(config.Attributes)...) // applies CLI attributes to the span
-
-	spanStatus := otelSpanStatus(config.StatusCode)
-
-	// Only set status description when an error status.
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/480a19d702470563d32a870932be5ddae798079c/specification/trace/api.md#set-status
-	if spanStatus == codes.Error {
-		span.SetStatus(spanStatus, config.StatusDescription)
-	} else {
-		span.SetStatus(spanStatus, "")
-	}
-
-	return ctx, span, shutdown
-}
-
-// endSpan takes a span, checks for a --end command-line option, and ends the span.
-func endSpan(span trace.Span) {
-	t := parseTime(config.SpanEndTime, "end")
-	endOpts := []trace.SpanEndOption{trace.WithTimestamp(t)}
-	span.End(endOpts...)
+	span := NewProtobufSpanWithConfig(config)
+	SendSpan(context.Background(), span)
+	propagateTraceparent(span, os.Stdout)
 }

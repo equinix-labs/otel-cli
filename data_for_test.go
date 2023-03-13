@@ -747,6 +747,7 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					OtelError:         "invalid protocol setting \"roflcopter\"\n",
 				},
 				Spans: 0,
 			},

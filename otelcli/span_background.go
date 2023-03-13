@@ -1,15 +1,16 @@
 package otelcli
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // spanBgCmd represents the span background command
@@ -65,6 +66,8 @@ func spanBgSockfile() string {
 }
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
+	started := time.Now()
+
 	// special case --wait, createBgClient() will wait for the socket to show up
 	// then connect and send a no-op RPC. by this time e.g. --tp-carrier should
 	// be all done and everything is ready to go without race conditions
@@ -78,13 +81,12 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	ctx, span, shutdown := startSpan() // from span.go
-	defer shutdown()
+	span := NewProtobufSpanWithConfig(config)
 
 	// span background is a bit different from span/exec in that it might be
 	// hanging out while other spans are created, so it does the traceparent
 	// propagation before the server starts, instead of after
-	propagateOtelCliSpan(ctx, span, os.Stdout)
+	propagateTraceparent(span, os.Stdout)
 
 	bgs := createBgServer(spanBgSockfile(), span)
 
@@ -109,7 +111,8 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 				// check if the parent process has changed, exit when it does
 				cppid := os.Getppid()
 				if cppid != ppid {
-					spanBgEndEvent("parent_exited", span)
+					rt := time.Since(started)
+					spanBgEndEvent(&span, "parent_exited", rt)
 					bgs.Shutdown()
 				}
 			}
@@ -121,7 +124,8 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	if timeout := parseCliTimeout(); timeout > 0 {
 		go func() {
 			time.Sleep(timeout)
-			spanBgEndEvent("timeout", span)
+			rt := time.Since(started)
+			spanBgEndEvent(&span, "timeout", rt)
 			bgs.Shutdown()
 		}()
 	}
@@ -129,14 +133,22 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	// will block until bgs.Shutdown()
 	bgs.Run()
 
-	endSpan(span)
+	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
+	err := SendSpan(context.Background(), span)
+	if err != nil {
+		softFail("Sending span failed: %s", err)
+	}
 }
 
 // spanBgEndEvent adds an event with the provided name, to the provided span
 // with uptime.milliseconds and timeout.seconds attributes.
-func spanBgEndEvent(name string, span trace.Span) {
-	attrs := trace.WithAttributes([]attribute.KeyValue{
-		{Key: attribute.Key("timeout.duration"), Value: attribute.StringValue(config.Timeout)},
-	}...)
-	span.AddEvent(name, attrs)
+func spanBgEndEvent(span *tracepb.Span, name string, elapsed time.Duration) {
+	event := NewProtobufSpanEvent()
+	event.Name = name
+	event.Attributes = cliAttrsToOtelPb(map[string]string{
+		"config.timeout":      config.Timeout,
+		"otel-cli.runtime_ms": strconv.FormatInt(elapsed.Milliseconds(), 10),
+	})
+
+	span.Events = append(span.Events, &event)
 }

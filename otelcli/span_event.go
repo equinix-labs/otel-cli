@@ -57,7 +57,8 @@ func doSpanEvent(cmd *cobra.Command, args []string) {
 		softFail("error while calling background server rpc BgSpan.AddEvent: %s", err)
 	}
 
+	tp := parseTraceparent(res.Traceparent)
 	if config.TraceparentPrint {
-		printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+		printSpanData(os.Stdout, tp)
 	}
 }

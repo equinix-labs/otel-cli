@@ -1,7 +1,7 @@
 package otelcli
 
 import (
-	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/rpc"
@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel/trace"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // BgSpan is what is returned to all RPC clients and its methods are exported.
@@ -19,7 +19,7 @@ type BgSpan struct {
 	SpanID      string `json:"span_id"`
 	Traceparent string `json:"traceparent"`
 	Error       string `json:"error"`
-	span        trace.Span
+	span        *tracepb.Span
 	shutdown    func()
 }
 
@@ -35,10 +35,9 @@ type BgEnd struct{}
 
 // AddEvent takes a BgSpanEvent from the client and attaches an event to the span.
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
-	reply.TraceID = bs.TraceID
-	reply.SpanID = bs.SpanID
-	ctx := trace.ContextWithSpan(context.Background(), bs.span)
-	reply.Traceparent = getTraceparent(ctx)
+	reply.TraceID = hex.EncodeToString(bs.span.TraceId)
+	reply.SpanID = hex.EncodeToString(bs.span.SpanId)
+	reply.Traceparent = traceparentFromSpan(*bs.span).Encode()
 
 	ts, err := time.Parse(time.RFC3339Nano, bse.Timestamp)
 	if err != nil {
@@ -46,13 +45,12 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 		return err
 	}
 
-	otelOpts := []trace.EventOption{
-		trace.WithTimestamp(ts),
-		// use the cli helper since it already does string map to otel
-		trace.WithAttributes(cliAttrsToOtel(bse.Attributes)...),
-	}
+	event := NewProtobufSpanEvent()
+	event.Name = bse.Name
+	event.TimeUnixNano = uint64(ts.UnixNano())
+	event.Attributes = cliAttrsToOtelPb(bse.Attributes)
 
-	bs.span.AddEvent(bse.Name, otelOpts...)
+	bs.span.Events = append(bs.span.Events, &event)
 
 	return nil
 }
@@ -66,7 +64,7 @@ func (bs BgSpan) Wait(in, reply *struct{}) error {
 // ends the span end exits the background process.
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
 	// TODO: maybe accept an end timestamp?
-	endSpan(bs.span)
+	//endSpan(bs.span)
 	// running the shutdown as a goroutine prevents the client from getting an
 	// error here when the server gets closed. defer didn't do the trick.
 	go bs.shutdown()
@@ -83,7 +81,7 @@ type bgServer struct {
 
 // createBgServer opens a new span background server on a unix socket and
 // returns with the server ready to go. Not expected to block.
-func createBgServer(sockfile string, span trace.Span) *bgServer {
+func createBgServer(sockfile string, span tracepb.Span) *bgServer {
 	var err error
 
 	bgs := bgServer{
@@ -97,9 +95,9 @@ func createBgServer(sockfile string, span trace.Span) *bgServer {
 	}
 
 	bgspan := BgSpan{
-		TraceID:  span.SpanContext().TraceID().String(),
-		SpanID:   span.SpanContext().SpanID().String(),
-		span:     span,
+		TraceID:  hex.EncodeToString(span.TraceId),
+		SpanID:   hex.EncodeToString(span.SpanId),
+		span:     &span,
 		shutdown: func() { bgs.Shutdown() },
 	}
 	// makes methods on BgSpan available over RPC
