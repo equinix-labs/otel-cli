@@ -11,7 +11,6 @@ import (
 	"time"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
-	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -46,7 +45,7 @@ func NewProtobufSpanEvent() tracepb.Span_Event {
 	now := time.Now()
 	return tracepb.Span_Event{
 		TimeUnixNano: uint64(now.UnixNano()),
-		Attributes:   []*v1.KeyValue{},
+		Attributes:   []*commonpb.KeyValue{},
 	}
 }
 
