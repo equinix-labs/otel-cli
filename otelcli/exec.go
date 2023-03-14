@@ -68,8 +68,16 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 
 	// set the traceparent to the current span to be available to the child process
-	tp := traceparentFromSpan(span)
-	child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
+	if config.IsRecording() {
+		tp := traceparentFromSpan(span)
+		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
+		// when not recording, and a traceparent is available, pass it through
+	} else if !config.TraceparentIgnoreEnv {
+		tp := loadTraceparent(config.TraceparentCarrierFile)
+		if tp.initialized {
+			child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
+		}
+	}
 
 	if err := child.Run(); err != nil {
 		span.Status.Code = tracepb.Status_STATUS_CODE_ERROR
