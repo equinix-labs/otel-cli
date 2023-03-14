@@ -457,7 +457,7 @@ var suites = []FixtureSuite{
 	// otel-cli span --print-tp actually prints
 	{
 		{
-			Name: "otel-cli span --print-tp",
+			Name: "otel-cli span --print-tp (non-recording)",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--tp-print"},
 				Env:     map[string]string{"TRACEPARENT": "00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01"},
