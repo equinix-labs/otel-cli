@@ -24,6 +24,7 @@ func init() {
 	traceparentRe = regexp.MustCompile("^([[:xdigit:]]{2})-([[:xdigit:]]{32})-([[:xdigit:]]{16})-([[:xdigit:]]{2})")
 }
 
+// Traceparent represents a parsed W3C traceparent.
 type Traceparent struct {
 	Version     int
 	TraceId     []byte
@@ -32,6 +33,7 @@ type Traceparent struct {
 	initialized bool
 }
 
+// Encode returns the traceparent as a W3C formatted string.
 func (tp Traceparent) Encode() string {
 	var sampling int
 	if tp.Sampling {
@@ -42,20 +44,23 @@ func (tp Traceparent) Encode() string {
 	return fmt.Sprintf("%02d-%s-%s-%02d", tp.Version, traceId, spanId, sampling)
 }
 
+// TraceIdString returns the trace id in string form.
 func (tp Traceparent) TraceIdString() string {
 	return hex.EncodeToString(tp.TraceId)
 }
 
+// SpanIdString returns the span id in string form.
 func (tp Traceparent) SpanIdString() string {
 	return hex.EncodeToString(tp.SpanId)
 }
 
+// traceparentFromSpan builds a Traceparent struct from the provided span.
 func traceparentFromSpan(span tracepb.Span) Traceparent {
 	return Traceparent{
 		Version:     0,
 		TraceId:     span.TraceId,
 		SpanId:      span.SpanId,
-		Sampling:    config.IsRecording(),
+		Sampling:    config.IsRecording(), // TODO: is this the right thing?
 		initialized: true,
 	}
 }
