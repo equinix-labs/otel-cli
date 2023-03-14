@@ -67,15 +67,13 @@ func doExec(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	if !config.TraceparentIgnoreEnv {
-		tp := loadTraceparent(config.TraceparentCarrierFile)
-		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
-	}
+	// set the traceparent to the current span to be available to the child process
+	tp := traceparentFromSpan(span)
+	child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
 
 	if err := child.Run(); err != nil {
 		span.Status.Code = tracepb.Status_STATUS_CODE_ERROR
 		span.Status.Message = fmt.Sprintf("command failed: %s", err)
-		//span.AddEvent("command failed")
 	}
 
 	err := SendSpan(context.Background(), span)
