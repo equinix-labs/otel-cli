@@ -11,9 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/trace"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var detectBrokenRFC3339PrefixRe *regexp.Regexp
@@ -110,42 +108,6 @@ func parseTime(ts, which string) time.Time {
 
 	softFail("Could not parse span %s time %q as any supported format", which, ts)
 	return time.Now() // never happens, just here to make compiler happy
-}
-
-// otelSpanKind takes a supported string span kind and returns the otel
-// constant for it. Returns default of KindUnspecified on no match.
-// TODO: figure out the best way to report invalid values
-func otelSpanKind(kind string) trace.SpanKind {
-	switch kind {
-	case "client":
-		return trace.SpanKindClient
-	case "server":
-		return trace.SpanKindServer
-	case "producer":
-		return trace.SpanKindProducer
-	case "consumer":
-		return trace.SpanKindConsumer
-	case "internal":
-		return trace.SpanKindInternal
-	default:
-		return trace.SpanKindUnspecified
-	}
-}
-
-// otelSpanStatus takes a supported string span status and returns the otel
-// constant for it. Returns default of Unset on no match.
-// TODO: figure out the best way to report invalid values
-func otelSpanStatus(status string) tracepb.Status_StatusCode {
-	switch status {
-	case "unset":
-		return tracepb.Status_STATUS_CODE_UNSET
-	case "ok":
-		return tracepb.Status_STATUS_CODE_OK
-	case "error":
-		return tracepb.Status_STATUS_CODE_ERROR
-	default:
-		return tracepb.Status_STATUS_CODE_UNSET
-	}
 }
 
 // parseCliTimeout parses the cliTimeout global string value to a time.Duration.

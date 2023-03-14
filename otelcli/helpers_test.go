@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"go.opentelemetry.io/otel/trace"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 func TestCliAttrsToOtel(t *testing.T) {
@@ -112,82 +110,6 @@ func TestParseTime(t *testing.T) {
 			out := parseTime(testcase.input, "test")
 			if !out.Equal(testcase.want) {
 				t.Errorf("got wrong time from parseTime: %s", out.Format(time.RFC3339Nano))
-			}
-		})
-	}
-}
-
-func TestOtelSpanKind(t *testing.T) {
-
-	for _, testcase := range []struct {
-		name string
-		want trace.SpanKind
-	}{
-		{
-			name: "client",
-			want: trace.SpanKindClient,
-		},
-		{
-			name: "server",
-			want: trace.SpanKindServer,
-		},
-		{
-			name: "producer",
-			want: trace.SpanKindProducer,
-		},
-		{
-			name: "consumer",
-			want: trace.SpanKindConsumer,
-		},
-		{
-			name: "internal",
-			want: trace.SpanKindInternal,
-		},
-		{
-			name: "invalid",
-			want: trace.SpanKindUnspecified,
-		},
-		{
-			name: "speledwrong",
-			want: trace.SpanKindUnspecified,
-		},
-	} {
-		t.Run(testcase.name, func(t *testing.T) {
-			out := otelSpanKind(testcase.name)
-			if out != testcase.want {
-				t.Errorf("otelSpanKind returned the wrong value, '%q', for '%s'", out, testcase.name)
-			}
-		})
-	}
-}
-
-func TestOtelSpanStatus(t *testing.T) {
-
-	for _, testcase := range []struct {
-		name string
-		want tracepb.Status_StatusCode
-	}{
-		{
-			name: "unset",
-			want: tracepb.Status_STATUS_CODE_UNSET,
-		},
-		{
-			name: "ok",
-			want: tracepb.Status_STATUS_CODE_OK,
-		},
-		{
-			name: "error",
-			want: tracepb.Status_STATUS_CODE_ERROR,
-		},
-		{
-			name: "cromulent",
-			want: tracepb.Status_STATUS_CODE_UNSET,
-		},
-	} {
-		t.Run(testcase.name, func(t *testing.T) {
-			out := otelSpanStatus(testcase.name)
-			if out != testcase.want {
-				t.Errorf("otelSpanStatus returned the wrong value, '%q', for '%s'", out, testcase.name)
 			}
 		})
 	}

@@ -86,7 +86,7 @@ func NewProtobufSpanWithConfig(c Config) tracepb.Span {
 
 	// Only set status description when an error status.
 	// https://github.com/open-telemetry/opentelemetry-specification/blob/480a19d702470563d32a870932be5ddae798079c/specification/trace/api.md#set-status
-	statusCode := otelSpanStatus(c.StatusCode)
+	statusCode := SpanStatusStringToInt(c.StatusCode)
 	if statusCode == tracepb.Status_STATUS_CODE_ERROR {
 		span.Status.Code = statusCode
 		span.Status.Message = c.StatusDescription
@@ -158,5 +158,20 @@ func SpanKindStringToInt(kind string) tracepb.Span_SpanKind {
 		return tracepb.Span_SPAN_KIND_INTERNAL
 	default:
 		return tracepb.Span_SPAN_KIND_UNSPECIFIED
+	}
+}
+
+// SpanStatusStringToInt takes a supported string span status and returns the otel
+// constant for it. Returns default of Unset on no match.
+func SpanStatusStringToInt(status string) tracepb.Status_StatusCode {
+	switch status {
+	case "unset":
+		return tracepb.Status_STATUS_CODE_UNSET
+	case "ok":
+		return tracepb.Status_STATUS_CODE_OK
+	case "error":
+		return tracepb.Status_STATUS_CODE_ERROR
+	default:
+		return tracepb.Status_STATUS_CODE_UNSET
 	}
 }
