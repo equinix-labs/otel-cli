@@ -65,7 +65,7 @@ func TestWriteTraceparentToFile(t *testing.T) {
 	file.Close()
 	defer os.Remove(file.Name()) // not strictly necessary
 
-	tp.saveToFile(file.Name())
+	tp.saveToFile(file.Name(), nil)
 
 	// read the data back, it should just be the traceparent string
 	data, err := os.ReadFile(file.Name())
@@ -114,7 +114,7 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	config.TraceparentPrint = true
 	config.TraceparentPrintExport = true
 	buf = new(bytes.Buffer)
-	printSpanData(buf, parseTraceparent(tp))
+	printSpanData(buf, parseTraceparent(tp), &span)
 	if buf.Len() == 0 {
 		t.Error("expected more than zero bytes but got none")
 	}

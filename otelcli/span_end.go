@@ -41,6 +41,6 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 
 	tp := parseTraceparent(res.Traceparent)
 	if config.TraceparentPrint {
-		printSpanData(os.Stdout, tp)
+		printSpanData(os.Stdout, tp, nil)
 	}
 }

@@ -134,7 +134,7 @@ func loadTraceparentFromFile(filename string) Traceparent {
 
 // saveToFile takes a context and filename and writes the tp from
 // that context into the specified file.
-func (tp Traceparent) saveToFile(filename string) {
+func (tp Traceparent) saveToFile(filename string, span *tracepb.Span) {
 	if filename == "" {
 		return
 	}
@@ -145,23 +145,29 @@ func (tp Traceparent) saveToFile(filename string) {
 	}
 	defer file.Close()
 
-	printSpanData(file, tp)
+	printSpanData(file, tp, span)
 }
 
 // propagateTraceparent saves the traceparent to file if necessary, then prints
 // span info to the console according to command-line args.
 func propagateTraceparent(span tracepb.Span, target io.Writer) {
-	tp := traceparentFromSpan(span)
-	tp.saveToFile(config.TraceparentCarrierFile)
+	var tp Traceparent
+	if config.IsRecording() {
+		tp = traceparentFromSpan(span)
+	} else {
+		// when in non-recording mode, and there is a TP available, propagate that
+		tp = loadTraceparent(config.TraceparentCarrierFile)
+	}
+	tp.saveToFile(config.TraceparentCarrierFile, &span)
 
 	if config.TraceparentPrint {
-		printSpanData(target, tp)
+		printSpanData(target, tp, &span)
 	}
 }
 
 // printSpanData takes the provided strings and prints them in a consitent format,
 // depending on which command line arguments were set.
-func printSpanData(target io.Writer, tp Traceparent) {
+func printSpanData(target io.Writer, tp Traceparent, span *tracepb.Span) {
 	// --tp-export will print "export TRACEPARENT" so it's
 	// one less step to print to a file & source, or eval
 	var exported string
@@ -169,8 +175,19 @@ func printSpanData(target io.Writer, tp Traceparent) {
 		exported = "export "
 	}
 
-	traceId := tp.TraceIdString()
-	spanId := tp.SpanIdString()
+	var traceId, spanId string
+	if span != nil {
+		// when in non-recording mode, the printed trace/span id should be all zeroes
+		// and the input TP passes through
+		// NOTE: this is preserved behavior from before protobuf spans, maybe this isn't
+		// worth the trouble?
+		traceId = hex.EncodeToString(span.TraceId)
+		spanId = hex.EncodeToString(span.SpanId)
+	} else {
+		// in recording mode these will match the TP
+		traceId = tp.TraceIdString()
+		spanId = tp.SpanIdString()
+	}
 	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp.Encode())
 }
 
