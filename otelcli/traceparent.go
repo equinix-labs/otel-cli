@@ -37,8 +37,8 @@ func (tp Traceparent) Encode() string {
 	if tp.Sampling {
 		sampling = 1
 	}
-	traceId := hex.EncodeToString(tp.TraceId)
-	spanId := hex.EncodeToString(tp.SpanId)
+	traceId := tp.TraceIdString()
+	spanId := tp.SpanIdString()
 	return fmt.Sprintf("%02d-%s-%s-%02d", tp.Version, traceId, spanId, sampling)
 }
 
@@ -169,8 +169,8 @@ func printSpanData(target io.Writer, tp Traceparent) {
 		exported = "export "
 	}
 
-	traceId := hex.EncodeToString(tp.TraceId)
-	spanId := hex.EncodeToString(tp.SpanId)
+	traceId := tp.TraceIdString()
+	spanId := tp.SpanIdString()
 	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp.Encode())
 }
 
