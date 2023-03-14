@@ -35,7 +35,7 @@
    "traceparent_ignore_env" : true,
    "traceparent_print" : true,
    "traceparent_print_export" : true,
-   "traceparent_required" : true,
+   "traceparent_required" : false,
 
    "verbose" : true,
    "fail" : true

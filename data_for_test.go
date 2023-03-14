@@ -375,7 +375,7 @@ var suites = []FixtureSuite{
 					WithTraceparentIgnoreEnv(true).
 					WithTraceparentPrint(true).
 					WithTraceparentPrintExport(true).
-					WithTraceparentRequired(true).
+					WithTraceparentRequired(false).
 					WithBackgroundParentPollMs(100).
 					WithBackgroundSockdir("/tmp").
 					WithBackgroundWait(true).
