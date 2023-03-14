@@ -42,6 +42,14 @@ func (tp Traceparent) Encode() string {
 	return fmt.Sprintf("%02d-%s-%s-%02d", tp.Version, traceId, spanId, sampling)
 }
 
+func (tp Traceparent) TraceIdString() string {
+	return hex.EncodeToString(tp.TraceId)
+}
+
+func (tp Traceparent) SpanIdString() string {
+	return hex.EncodeToString(tp.SpanId)
+}
+
 func traceparentFromSpan(span tracepb.Span) Traceparent {
 	return Traceparent{
 		Version:     0,

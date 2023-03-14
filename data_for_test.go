@@ -320,7 +320,7 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
-					OtelError:         `traces export: Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
+					OtelError:         `Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
 				},
 				Spans: 0,
 			},
