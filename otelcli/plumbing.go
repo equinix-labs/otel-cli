@@ -294,8 +294,17 @@ func isInsecureSchema(endpoint string) bool {
 // returns them converted to []*commonpb.KeyValue for use with protobuf.
 func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 	// set the service name that will show up in tracing UIs
-	resAttrs := resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName))
-	res, err := resource.New(ctx, resAttrs)
+	resOpts := []resource.Option{
+		resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName)),
+		resource.WithFromEnv(), // maybe switch to manually loading this envvar?
+		// TODO: make these autodetectors configurable
+		//resource.WithHost(),
+		//resource.WithOS(),
+		//resource.WithProcess(),
+		//resource.WithContainer(),
+	}
+
+	res, err := resource.New(ctx, resOpts...)
 	if err != nil {
 		softFail("failed to create OpenTelemetry service name resource: %s", err)
 	}
