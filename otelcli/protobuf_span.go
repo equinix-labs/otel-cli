@@ -18,8 +18,8 @@ import (
 func NewProtobufSpan() tracepb.Span {
 	now := time.Now()
 	span := tracepb.Span{
-		TraceId:                generateTraceId(),
-		SpanId:                 generateSpanId(),
+		TraceId:                emptyTraceId,
+		SpanId:                 emptySpanId,
 		TraceState:             "",
 		ParentSpanId:           []byte{},
 		Name:                   "BUG IN OTEL-CLI: unset",
@@ -55,6 +55,8 @@ func NewProtobufSpanEvent() tracepb.Span_Event {
 // from the provided config struct.
 func NewProtobufSpanWithConfig(c Config) tracepb.Span {
 	span := NewProtobufSpan()
+	span.TraceId = generateTraceId(c)
+	span.SpanId = generateSpanId(c)
 	span.Name = c.SpanName
 	span.Kind = SpanKindStringToInt(c.Kind)
 	span.Attributes = cliAttrsToOtelPb(c.Attributes)
@@ -96,8 +98,8 @@ func NewProtobufSpanWithConfig(c Config) tracepb.Span {
 }
 
 // generateTraceId generates a random 16 byte trace id
-func generateTraceId() []byte {
-	if config.IsRecording() {
+func generateTraceId(c Config) []byte {
+	if c.IsRecording() {
 		buf := make([]byte, 16)
 		_, err := rand.Read(buf)
 		if err != nil {
@@ -110,8 +112,8 @@ func generateTraceId() []byte {
 }
 
 // generateSpanId generates a random 8 byte span id
-func generateSpanId() []byte {
-	if config.IsRecording() {
+func generateSpanId(c Config) []byte {
+	if c.IsRecording() {
 		buf := make([]byte, 8)
 		_, err := rand.Read(buf)
 		if err != nil {

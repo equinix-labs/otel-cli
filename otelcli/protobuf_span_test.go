@@ -1,6 +1,7 @@
 package otelcli
 
 import (
+	"bytes"
 	"strconv"
 	"testing"
 
@@ -51,10 +52,42 @@ func TestNewProtobufSpanWithConfig(t *testing.T) {
 	}
 }
 
-func TestgenerateTraceId(t *testing.T) {
-}
-func TestgenerateSpanId(t *testing.T) {
+func TestGenerateTraceId(t *testing.T) {
+	c := DefaultConfig()
+	// non-recording
+	tid := generateTraceId(c)
 
+	if !bytes.Equal(tid, emptyTraceId) {
+		t.Error("generated trace id must always be zeroes in non-recording mode")
+	}
+
+	tid = generateTraceId(c.WithEndpoint("localhost:4317"))
+	if bytes.Equal(tid, emptyTraceId) {
+		t.Error("generated trace id must not be zeroes in recording mode")
+	}
+
+	if len(tid) != 16 {
+		t.Error("generated trace id must be 16 bytes")
+	}
+}
+
+func TestGenerateSpanId(t *testing.T) {
+	c := DefaultConfig()
+	// non-recording
+	sid := generateSpanId(c)
+
+	if !bytes.Equal(sid, emptySpanId) {
+		t.Error("generated span id must always be zeroes in non-recording mode")
+	}
+
+	sid = generateSpanId(c.WithEndpoint("localhost:4317"))
+	if bytes.Equal(sid, emptySpanId) {
+		t.Error("generated span id must not be zeroes in recording mode")
+	}
+
+	if len(sid) != 8 {
+		t.Error("generated span id must be 8 bytes")
+	}
 }
 
 func TestSpanKindStringToInt(t *testing.T) {
