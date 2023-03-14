@@ -70,9 +70,14 @@ func NewProtobufSpanWithConfig(c Config) tracepb.Span {
 		span.EndTimeUnixNano = uint64(now.UnixNano())
 	}
 
-	// TODO: switch to setting the parent span
-	if tp := loadTraceparent(c.TraceparentCarrierFile); tp.initialized {
-		span.ParentSpanId = tp.SpanId
+	if config.IsRecording() {
+		if tp := loadTraceparent(c.TraceparentCarrierFile); tp.initialized {
+			span.TraceId = tp.TraceId
+			span.ParentSpanId = tp.SpanId
+		}
+	} else {
+		span.TraceId = emptyTraceId
+		span.SpanId = emptySpanId
 	}
 
 	// Only set status description when an error status.
