@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -61,8 +62,17 @@ func doExec(cmd *cobra.Command, args []string) {
 		Value: attribute.StringValue(commandString),
 	})
 
-	// should this also work on Windows? for now, assume not
-	child := exec.Command("/bin/sh", "-c", commandString)
+	// use cmd.exe to launch PowerShell on Windows
+	var shell string
+	if runtime.GOOS == "windows" {
+		shell = "cmd.exe"
+		commandString = "/C powershell " + commandString
+	} else {
+		shell = "/bin/sh"
+	}
+
+	child := exec.Command(shell, "-c", commandString)
+
 	// attach all stdio to the parent's handles
 	child.Stdin = os.Stdin
 	child.Stdout = os.Stdout
