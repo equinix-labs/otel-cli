@@ -219,6 +219,18 @@ func (c Config) ToStringMap() map[string]string {
 	}
 }
 
+// IsRecording returns true if an endpoint is set and otel-cli expects to send real
+// spans. Returns false if unconfigured and going to run inert.
+func (c Config) IsRecording() bool {
+	if c.Endpoint == "" {
+		diagnostics.IsRecording = false
+		return false
+	}
+
+	diagnostics.IsRecording = true
+	return true
+}
+
 // WithEndpoint returns the config with Endpoint set to the provided value.
 func (c Config) WithEndpoint(with string) Config {
 	c.Endpoint = with

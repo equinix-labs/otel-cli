@@ -1,10 +1,8 @@
 package otelcli
 
 import (
-	"context"
 	"encoding/csv"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"regexp"
@@ -13,9 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
 var detectBrokenRFC3339PrefixRe *regexp.Regexp
@@ -24,33 +20,34 @@ func init() {
 	detectBrokenRFC3339PrefixRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} `)
 }
 
-// cliAttrsToOtel takes a map of string:string, such as that from --attrs
-// and returns them in an []attribute.KeyValue.
-func cliAttrsToOtel(attributes map[string]string) []attribute.KeyValue {
-	otAttrs := []attribute.KeyValue{}
+// cliAttrsToOtelPb takes a map of string:string, such as that from --attrs
+// and returns them in an []*commonpb.KeyValue
+func cliAttrsToOtelPb(attributes map[string]string) []*commonpb.KeyValue {
+	out := []*commonpb.KeyValue{}
+
 	for k, v := range attributes {
+		av := new(commonpb.AnyValue)
 
 		// try to parse as numbers, and fall through to string
-		var av attribute.Value
 		if i, err := strconv.ParseInt(v, 0, 64); err == nil {
-			av = attribute.Int64Value(i)
+			av.Value = &commonpb.AnyValue_IntValue{IntValue: i}
 		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
-			av = attribute.Float64Value(f)
+			av.Value = &commonpb.AnyValue_DoubleValue{DoubleValue: f}
 		} else if b, err := strconv.ParseBool(v); err == nil {
-			av = attribute.BoolValue(b)
+			av.Value = &commonpb.AnyValue_BoolValue{BoolValue: b}
 		} else {
-			av = attribute.StringValue(v)
+			av.Value = &commonpb.AnyValue_StringValue{StringValue: v}
 		}
 
-		akv := attribute.KeyValue{
-			Key:   attribute.Key(k),
+		akv := commonpb.KeyValue{
+			Key:   k,
 			Value: av,
 		}
 
-		otAttrs = append(otAttrs, akv)
+		out = append(out, &akv)
 	}
 
-	return otAttrs
+	return out
 }
 
 // parseTime tries to parse Unix epoch, then RFC3339, both with/without nanoseconds
@@ -111,71 +108,6 @@ func parseTime(ts, which string) time.Time {
 
 	softFail("Could not parse span %s time %q as any supported format", which, ts)
 	return time.Now() // never happens, just here to make compiler happy
-}
-
-// otelSpanKind takes a supported string span kind and returns the otel
-// constant for it. Returns default of KindUnspecified on no match.
-// TODO: figure out the best way to report invalid values
-func otelSpanKind(kind string) trace.SpanKind {
-	switch kind {
-	case "client":
-		return trace.SpanKindClient
-	case "server":
-		return trace.SpanKindServer
-	case "producer":
-		return trace.SpanKindProducer
-	case "consumer":
-		return trace.SpanKindConsumer
-	case "internal":
-		return trace.SpanKindInternal
-	default:
-		return trace.SpanKindUnspecified
-	}
-}
-
-// otelSpanStatus takes a supported string span status and returns the otel
-// constant for it. Returns default of Unset on no match.
-// TODO: figure out the best way to report invalid values
-func otelSpanStatus(status string) codes.Code {
-	switch status {
-	case "unset":
-		return codes.Unset
-	case "ok":
-		return codes.Ok
-	case "error":
-		return codes.Error
-	default:
-		return codes.Unset
-	}
-}
-
-// propagateOtelCliSpan saves the traceparent to file if necessary, then prints
-// span info to the console according to command-line args.
-func propagateOtelCliSpan(ctx context.Context, span trace.Span, target io.Writer) {
-	saveTraceparentToFile(ctx, config.TraceparentCarrierFile)
-
-	if config.TraceparentPrint {
-		sc := trace.SpanContextFromContext(ctx)
-		traceId := sc.TraceID().String()
-		spanId := sc.SpanID().String()
-
-		tp := getTraceparent(ctx)
-		printSpanData(target, traceId, spanId, tp)
-	}
-}
-
-// printSpanData takes the provided strings and prints them in a consitent format,
-// depending on which command line arguments were set.
-func printSpanData(target io.Writer, traceId, spanId, tp string) {
-
-	// --tp-export will print "export TRACEPARENT" so it's
-	// one less step to print to a file & source, or eval
-	var exported string
-	if config.TraceparentPrintExport {
-		exported = "export "
-	}
-
-	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp)
 }
 
 // parseCliTimeout parses the cliTimeout global string value to a time.Duration.

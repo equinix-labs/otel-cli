@@ -39,7 +39,8 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 	}
 	shutdown()
 
+	tp := parseTraceparent(res.Traceparent)
 	if config.TraceparentPrint {
-		printSpanData(os.Stdout, res.TraceID, res.SpanID, res.Traceparent)
+		printSpanData(os.Stdout, tp, nil)
 	}
 }

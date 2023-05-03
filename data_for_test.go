@@ -320,7 +320,7 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
-					OtelError:         `traces export: Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
+					OtelError:         `Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
 				},
 				Spans: 0,
 			},
@@ -375,7 +375,7 @@ var suites = []FixtureSuite{
 					WithTraceparentIgnoreEnv(true).
 					WithTraceparentPrint(true).
 					WithTraceparentPrintExport(true).
-					WithTraceparentRequired(true).
+					WithTraceparentRequired(false).
 					WithBackgroundParentPollMs(100).
 					WithBackgroundSockdir("/tmp").
 					WithBackgroundWait(true).
@@ -457,7 +457,7 @@ var suites = []FixtureSuite{
 	// otel-cli span --print-tp actually prints
 	{
 		{
-			Name: "otel-cli span --print-tp",
+			Name: "otel-cli span --print-tp (non-recording)",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--tp-print"},
 				Env:     map[string]string{"TRACEPARENT": "00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01"},
@@ -747,6 +747,7 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					OtelError:         "invalid protocol setting \"roflcopter\"\n",
 				},
 				Spans: 0,
 			},
