@@ -89,6 +89,9 @@ func TestOtelCli(t *testing.T) {
 				continue fixtures
 			}
 
+			// inject the TlsData into the fixture
+			fixture.TlsData = tlsData
+
 			// when a fixture is foregrounded all it does is signal the background fixture
 			// to finish doing its then, waits for it to finish, then continues on
 			if fixture.Config.Foreground {
@@ -112,7 +115,7 @@ func TestOtelCli(t *testing.T) {
 			fixtureWait := make(chan struct{})
 			fixtureDone := make(chan struct{})
 
-			go runFixture(t, fixture, fixtureWait, fixtureDone, tlsData)
+			go runFixture(t, fixture, fixtureWait, fixtureDone)
 
 			if fixture.Config.Background {
 				// save off the channels for flow control
@@ -130,16 +133,19 @@ func TestOtelCli(t *testing.T) {
 
 // runFixture runs the OTLP server & command, waits for signal, checks
 // results, then signals it's done.
-func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}, tlsData tlsHelpers) {
+func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}) {
 	// sets up an OTLP server, runs otel-cli, packages data up in these return vals
-	endpoint, results, span, events := runOtelCli(t, fixture, tlsData)
+	endpoint, results := runOtelCli(t, fixture)
 	<-wait
-	checkAll(t, fixture, endpoint, results, span, events, tlsData)
+
+	// inject the runtime endpoint into the fixture
+	fixture.Endpoint = endpoint
+	checkAll(t, fixture, results)
 	done <- struct{}{}
 }
 
 // checkAll gathers up all the check* funcs below into one function.
-func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, span otlpserver.CliEvent, events otlpserver.CliEventList, tlsData tlsHelpers) {
+func checkAll(t *testing.T, fixture Fixture, results Results) {
 	// check timeout and process status expectations
 	checkProcess(t, fixture, results)
 
@@ -147,24 +153,26 @@ func checkAll(t *testing.T, fixture Fixture, endpoint string, results Results, s
 	checkSpanCount(t, fixture, results)
 
 	// compares the data in each recorded span against expectations in the fixture
-	checkSpanData(t, fixture, endpoint, span, events, tlsData)
+	checkSpanData(t, fixture, results)
 
 	// many of the basic plumbing tests use status so it has its own set of checks
 	// but these shouldn't run for testing the other subcommands
 	if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" && !fixture.Expect.CommandFailed {
-		checkStatusData(t, fixture, endpoint, results, tlsData)
+		checkStatusData(t, fixture, results)
 	} else {
 		// checking the text output only makes sense for non-status paths
-		checkOutput(t, fixture, endpoint, results, tlsData)
+		checkOutput(t, fixture, results)
 	}
+
+	checkFuncs(t, fixture, results)
 }
 
 // compare the number of spans recorded by the test server against the
 // number of expected spans in the fixture, if specified. If no expected
 // span count is specified, this check always passes.
 func checkSpanCount(t *testing.T, fixture Fixture, results Results) {
-	if results.Spans != fixture.Expect.Spans {
-		t.Errorf("[%s] span count was %d but expected %d", fixture.Name, results.Spans, fixture.Expect.Spans)
+	if results.SpanCount != fixture.Expect.SpanCount {
+		t.Errorf("[%s] span count was %d but expected %d", fixture.Name, results.SpanCount, fixture.Expect.SpanCount)
 	}
 }
 
@@ -182,8 +190,8 @@ func checkProcess(t *testing.T, fixture Fixture, results Results) {
 
 // checkOutput looks that otel-cli output stored in the results and compares against
 // the fixture expectation (with {{endpoint}} replaced).
-func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results, tlsData tlsHelpers) {
-	wantOutput := injectVars(fixture.Expect.CliOutput, endpoint, tlsData)
+func checkOutput(t *testing.T, fixture Fixture, results Results) {
+	wantOutput := injectVars(fixture.Expect.CliOutput, fixture.Endpoint, fixture.TlsData)
 	gotOutput := results.CliOutput
 	if fixture.Expect.CliOutputRe != nil {
 		gotOutput = fixture.Expect.CliOutputRe.ReplaceAllString(gotOutput, "")
@@ -198,9 +206,9 @@ func checkOutput(t *testing.T, fixture Fixture, endpoint string, results Results
 
 // checkStatusData compares the sections of otel-cli status output against
 // fixture data, substituting {{endpoint}} into fixture data as needed.
-func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Results, tlsData tlsHelpers) {
+func checkStatusData(t *testing.T, fixture Fixture, results Results) {
 	// check the env
-	injectMapVars(endpoint, fixture.Expect.Env, tlsData)
+	injectMapVars(fixture.Endpoint, fixture.Expect.Env, fixture.TlsData)
 	if diff := cmp.Diff(fixture.Expect.Env, results.Env); diff != "" {
 		t.Errorf("env data did not match fixture in %q (-want +got):\n%s", fixture.Name, diff)
 	}
@@ -208,7 +216,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 	// check diagnostics, use string maps so the diff output is easy to compare to json
 	wantDiag := fixture.Expect.Diagnostics.ToStringMap()
 	gotDiag := results.Diagnostics.ToStringMap()
-	injectMapVars(endpoint, wantDiag, tlsData)
+	injectMapVars(fixture.Endpoint, wantDiag, fixture.TlsData)
 	// there's almost always going to be cli_args in practice, so if the fixture has
 	// an empty string, just ignore that key
 	if wantDiag["cli_args"] == "" {
@@ -229,7 +237,7 @@ func checkStatusData(t *testing.T, fixture Fixture, endpoint string, results Res
 			wantConf[k] = gotConf[k]
 		}
 	}
-	injectMapVars(endpoint, wantConf, tlsData)
+	injectMapVars(fixture.Endpoint, wantConf, fixture.TlsData)
 	if diff := cmp.Diff(wantConf, gotConf); diff != "" {
 		t.Errorf("[%s] config data did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
@@ -250,10 +258,10 @@ var spanRegexChecks = map[string]*regexp.Regexp{
 
 // checkSpanData compares the data in spans received from otel-cli against the
 // fixture data.
-func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserver.CliEvent, events otlpserver.CliEventList, tlsData tlsHelpers) {
+func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 	// check the expected span data against what was received by the OTLP server
-	gotSpan := span.ToStringMap()
-	injectMapVars(endpoint, gotSpan, tlsData)
+	gotSpan := results.Span.ToStringMap()
+	injectMapVars(fixture.Endpoint, gotSpan, fixture.TlsData)
 	// remove keys that aren't supported for comparison (for now)
 	delete(gotSpan, "is_populated")
 	delete(gotSpan, "library")
@@ -292,23 +300,29 @@ func checkSpanData(t *testing.T, fixture Fixture, endpoint string, span otlpserv
 	}
 
 	// do a diff on a generated map that sets values to * when the * check succeeded
-	injectMapVars(endpoint, wantSpan, tlsData)
+	injectMapVars(fixture.Endpoint, wantSpan, fixture.TlsData)
 	if diff := cmp.Diff(wantSpan, gotSpan); diff != "" {
 		t.Errorf("[%s] otel span info did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
 }
 
+// checkFuncs runs through the list of funcs in the fixture to do
+// complex checking on data, each func is passed all the metadata and can
+// do what it needs that the other checks don't.
+func checkFuncs(t *testing.T, fixture Fixture, results Results) {
+
+}
+
 // runOtelCli runs the a server and otel-cli together and captures their
 // output as data to return for further testing.
-func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Results, otlpserver.CliEvent, otlpserver.CliEventList) {
+func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 	started := time.Now()
 
 	results := Results{
-		SpanData: map[string]string{},
-		Env:      map[string]string{},
+		SpanData:   map[string]string{},
+		Env:        map[string]string{},
+		SpanEvents: otlpserver.CliEventList{},
 	}
-	var retSpan otlpserver.CliEvent
-	var retEvents otlpserver.CliEventList
 
 	// these channels need to be buffered or the callback will hang trying to send
 	rcvSpan := make(chan otlpserver.CliEvent, 100) // 100 spans is enough for anybody
@@ -319,11 +333,11 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 		rcvSpan <- span
 		rcvEvents <- events
 
-		results.Spans++
-		results.Events += len(events)
+		results.SpanCount++
+		results.EventCount += len(events)
 
 		// true tells the server we're done and it can exit its loop
-		return results.Spans >= fixture.Expect.Spans
+		return results.SpanCount >= fixture.Expect.SpanCount
 	}
 
 	var cs otlpserver.OtlpServer
@@ -356,7 +370,7 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 	var listener net.Listener
 	var err error
 	if fixture.Config.ServerTLSEnabled {
-		tlsConf := *tlsData.serverTLSConf
+		tlsConf := *fixture.TlsData.serverTLSConf
 		if fixture.Config.ServerTLSAuthEnabled {
 			tlsConf.ClientAuth = tls.RequireAndVerifyClientCert
 		}
@@ -368,7 +382,7 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 	if err != nil {
 		// t.Fatalf is not allowed since we run this in a goroutine
 		t.Errorf("[%s] failed to listen on OTLP endpoint %q: %s", fixture.Name, endpoint, err)
-		return endpoint, results, retSpan, retEvents
+		return endpoint, results
 	}
 	t.Logf("[%s] starting OTLP server on %q", fixture.Name, endpoint)
 
@@ -391,11 +405,11 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 	args := []string{}
 	if len(fixture.Config.CliArgs) > 0 {
 		for _, v := range fixture.Config.CliArgs {
-			args = append(args, injectVars(v, endpoint, tlsData))
+			args = append(args, injectVars(v, endpoint, fixture.TlsData))
 		}
 	}
 	statusCmd := exec.Command("./otel-cli", args...)
-	statusCmd.Env = mkEnviron(endpoint, fixture.Config.Env, tlsData)
+	statusCmd.Env = mkEnviron(endpoint, fixture.Config.Env, fixture.TlsData)
 
 	cancelProcessTimeout := make(chan struct{}, 1)
 	go func() {
@@ -434,7 +448,7 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 		if err != nil {
 			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Name, err)
 			t.Logf("[%s] output received: %q", fixture.Name, cliOut)
-			return endpoint, results, retSpan, retEvents
+			return endpoint, results
 		}
 
 		// remove PATH from the output but only if it's exactly what we set on exec
@@ -446,8 +460,8 @@ func runOtelCli(t *testing.T, fixture Fixture, tlsData tlsHelpers) (string, Resu
 	}
 
 	// when no spans are expected, return without reading from the channels
-	if fixture.Expect.Spans == 0 {
-		return endpoint, results, retSpan, retEvents
+	if fixture.Expect.SpanCount == 0 {
+		return endpoint, results
 	}
 
 	// grab the spans & events from the server off the channels it writes to
@@ -458,15 +472,15 @@ gather:
 		select {
 		case <-time.After(remainingTimeout):
 			break gather
-		case retSpan = <-rcvSpan:
+		case results.Span = <-rcvSpan:
 			// events is always populated at the same time as the span is sent
 			// and will always send at least an empty list
-			retEvents = <-rcvEvents
+			results.SpanEvents = <-rcvEvents
 
 			// with this approach, any mismatch in spans produced and expected results
 			// in a timeout with the above time.After
 			gatheredSpans++
-			if gatheredSpans == results.Spans {
+			if gatheredSpans == results.SpanCount {
 				// TODO: it would be slightly nicer to use plural.Selectf instead of 'span(s)'
 				t.Logf("[%s] test gathered %d span(s)", fixture.Name, gatheredSpans)
 				break gather
@@ -474,11 +488,11 @@ gather:
 		}
 	}
 
-	return endpoint, results, retSpan, retEvents
+	return endpoint, results
 }
 
 // mkEnviron converts a string map to a list of k=v strings and tacks on PATH.
-func mkEnviron(endpoint string, env map[string]string, tlsData tlsHelpers) []string {
+func mkEnviron(endpoint string, env map[string]string, tlsData TlsSettings) []string {
 	mapped := make([]string, len(env)+1)
 	var i int
 	for k, v := range env {
@@ -496,7 +510,7 @@ func mkEnviron(endpoint string, env map[string]string, tlsData tlsHelpers) []str
 // injectMapVars iterates over the map and updates the values, replacing all instances
 // of {{endpoint}}, {{tls_ca_cert}}, {{tls_client_cert}}, and {{tls_client_key}} with
 // test values.
-func injectMapVars(endpoint string, target map[string]string, tlsData tlsHelpers) {
+func injectMapVars(endpoint string, target map[string]string, tlsData TlsSettings) {
 	for k, v := range target {
 		target[k] = injectVars(v, endpoint, tlsData)
 	}
@@ -508,7 +522,7 @@ func injectMapVars(endpoint string, target map[string]string, tlsData tlsHelpers
 // grab a random port. Once that's generated we need to inject it into all the values
 // so the test comparisons work as expected. Similarly for TLS testing, a temp CA and
 // certs are created and need to be injected.
-func injectVars(in, endpoint string, tlsData tlsHelpers) string {
+func injectVars(in, endpoint string, tlsData TlsSettings) string {
 	out := strings.ReplaceAll(in, "{{endpoint}}", endpoint)
 	out = strings.ReplaceAll(out, "{{tls_ca_cert}}", tlsData.caFile)
 	out = strings.ReplaceAll(out, "{{tls_client_cert}}", tlsData.clientFile)
