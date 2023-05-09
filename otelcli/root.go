@@ -42,6 +42,8 @@ func init() {
 
 // addCommonParams adds the --config and --endpoint params to the command.
 func addCommonParams(cmd *cobra.Command) {
+	defaults := DefaultConfig()
+
 	// --config / -c a JSON configuration file
 	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "JSON configuration file")
 	// --endpoint an endpoint to send otlp output to
@@ -61,7 +63,9 @@ func addCommonParams(cmd *cobra.Command) {
 // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/sdk-environment-variables.md
 // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md
 func addClientParams(cmd *cobra.Command) {
+	defaults := DefaultConfig()
 	config.Headers = make(map[string]string)
+
 	// OTEL_EXPORTER standard env and variable params
 	cmd.Flags().StringToStringVar(&config.Headers, "otlp-headers", defaults.Headers, "a comma-sparated list of key=value headers to send on OTLP connection")
 	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", defaults.Blocking, "block on connecting to the OTLP server before proceeding")
@@ -83,6 +87,7 @@ func addClientParams(cmd *cobra.Command) {
 }
 
 func addSpanParams(cmd *cobra.Command) {
+	defaults := DefaultConfig()
 	// --name / -s
 	cmd.Flags().StringVarP(&config.SpanName, "name", "n", defaults.SpanName, "set the name of the span")
 	// --service / -n
@@ -96,6 +101,7 @@ func addSpanParams(cmd *cobra.Command) {
 }
 
 func addAttrParams(cmd *cobra.Command) {
+	defaults := DefaultConfig()
 	// --attrs key=value,foo=bar
 	config.Attributes = make(map[string]string)
 	cmd.Flags().StringToStringVarP(&config.Attributes, "attrs", "a", defaults.Attributes, "a comma-separated list of key=value attributes")

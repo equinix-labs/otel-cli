@@ -96,7 +96,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
-	err := SendSpan(context.Background(), span)
+	err := SendSpan(context.Background(), config, span)
 	if err != nil {
 		softFail("unable to send span: %s", err)
 	}

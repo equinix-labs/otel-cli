@@ -66,7 +66,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	}
 
 	// send the span out before printing anything
-	err := SendSpan(context.Background(), span)
+	err := SendSpan(context.Background(), config, span)
 	if err != nil {
 		if config.Fail {
 			log.Fatalf("%s", err)

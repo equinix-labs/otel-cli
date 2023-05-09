@@ -150,7 +150,7 @@ func (bgs *bgServer) Shutdown() {
 func createBgClient() (*rpc.Client, func()) {
 	sockfile := spanBgSockfile()
 	started := time.Now()
-	timeout := parseCliTimeout()
+	timeout := parseCliTimeout(config)
 
 	// wait for the socket file to show up, polling every 25ms until it does or timeout
 	for {
