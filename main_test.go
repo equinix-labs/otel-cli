@@ -62,9 +62,6 @@ func TestOtelCli(t *testing.T) {
 			if _, ok := fixture.Config.Env["PATH"]; ok {
 				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Name)
 			}
-			/* if fixture.CheckFuncs == nil {
-				fixture.CheckFuncs = []CheckFunc{}
-			} */
 		}
 	}
 
