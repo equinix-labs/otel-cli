@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-type tlsHelpers struct {
+type TlsSettings struct {
 	caFile            string
 	caPrivKeyFile     string
 	serverFile        string
@@ -36,9 +36,9 @@ type tlsHelpers struct {
 	certpool          *x509.CertPool
 }
 
-func generateTLSData(t *testing.T) tlsHelpers {
+func generateTLSData(t *testing.T) TlsSettings {
 	var err error
-	var out tlsHelpers
+	var out TlsSettings
 
 	expire := time.Now().Add(time.Hour)
 
@@ -161,7 +161,7 @@ func generateTLSData(t *testing.T) tlsHelpers {
 	return out
 }
 
-func (t tlsHelpers) cleanup() {
+func (t TlsSettings) cleanup() {
 	os.Remove(t.caFile)
 	os.Remove(t.caPrivKeyFile)
 	os.Remove(t.clientFile)

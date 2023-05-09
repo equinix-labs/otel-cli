@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -93,6 +94,7 @@ func doExec(cmd *cobra.Command, args []string) {
 		span.Status.Code = tracepb.Status_STATUS_CODE_ERROR
 		span.Status.Message = fmt.Sprintf("command failed: %s", err)
 	}
+	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
 	err := SendSpan(context.Background(), span)
 	if err != nil {

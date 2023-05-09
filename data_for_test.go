@@ -9,8 +9,10 @@ package main_test
 
 import (
 	"regexp"
+	"testing"
 
 	"github.com/equinix-labs/otel-cli/otelcli"
+	"github.com/equinix-labs/otel-cli/otlpserver"
 )
 
 type serverProtocol int
@@ -19,6 +21,10 @@ const (
 	grpcProtocol serverProtocol = iota
 	httpProtocol
 )
+
+// CheckFunc is a function that gets called after the test is run to do
+// custom checking of values.
+type CheckFunc func(t *testing.T, fixture Fixture, results Results)
 
 type FixtureConfig struct {
 	CliArgs []string
@@ -55,17 +61,22 @@ type Results struct {
 	// these are specific to tests...
 	CliOutput     string         // merged stdout and stderr
 	CliOutputRe   *regexp.Regexp // regular expression to clean the output before comparison
-	Spans         int            // number of spans received
-	Events        int            // number of events received
+	SpanCount     int            // number of spans received
+	EventCount    int            // number of events received
 	TimedOut      bool           // true when test timed out
 	CommandFailed bool           // otel-cli failed / was killed
+	Span          otlpserver.CliEvent
+	SpanEvents    otlpserver.CliEventList
 }
 
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
-	Name   string
-	Config FixtureConfig
-	Expect Results
+	Name       string
+	Config     FixtureConfig
+	Endpoint   string
+	TlsData    TlsSettings
+	Expect     Results
+	CheckFuncs []CheckFunc
 }
 
 // FixtureSuite is a list of Fixtures that run serially.
@@ -113,7 +124,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		}, {
 			Name: "minimum configuration (recording, http)",
@@ -138,7 +149,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 	},
@@ -172,7 +183,7 @@ var suites = []FixtureSuite{
 					InsecureSkipVerify: true,
 					ParsedTimeoutMs:    1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		{
@@ -194,7 +205,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		{
@@ -229,7 +240,7 @@ var suites = []FixtureSuite{
 					InsecureSkipVerify: true,
 					ParsedTimeoutMs:    1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		{
@@ -261,7 +272,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 	},
@@ -322,7 +333,25 @@ var suites = []FixtureSuite{
 					ParsedTimeoutMs:   1000,
 					OtelError:         `Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
 				},
-				Spans: 0,
+				SpanCount: 0,
+			},
+		},
+		{
+			Name: "otel-cli exec sets span start time earlier than end time",
+			Config: FixtureConfig{
+				CliArgs: []string{"exec", "--endpoint", "{{endpoint}}", "sleep", "0.05"},
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
+			},
+			CheckFuncs: []CheckFunc{
+				func(t *testing.T, f Fixture, r Results) {
+					elapsed := r.Span.End.Sub(r.Span.Start)
+					if elapsed.Milliseconds() < 50 {
+						t.Errorf("elapsed test time not long enough. Expected ~50ms, got %d ms", elapsed.Milliseconds())
+					}
+				},
 			},
 		},
 	},
@@ -349,7 +378,7 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				Spans: 1,
+				SpanCount: 1,
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:     true,
 					NumArgs:         3,
@@ -406,7 +435,7 @@ var suites = []FixtureSuite{
 					"span_id":  "*",
 					"trace_id": "*",
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		// OTEL_RESOURCE_ATTRIBUTES and OTEL_CLI_SERVICE_NAME should get merged into
@@ -431,7 +460,7 @@ var suites = []FixtureSuite{
 					"attributes":         "abc=123,cafe=deadbeef",
 					"service_attributes": "foo.bar=baz,service.name=test-service-abc123",
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		// OTEL_SERVICE_NAME
@@ -450,7 +479,7 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"service_attributes": "service.name=test-service-123abc",
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 	},
@@ -545,8 +574,8 @@ var suites = []FixtureSuite{
 					"trace_id":   "*",
 					"attributes": `abc=def`, // weird format because of limitation in OTLP server
 				},
-				Spans:  1,
-				Events: 1,
+				SpanCount:  1,
+				EventCount: 1,
 			},
 		},
 		{
@@ -589,7 +618,7 @@ var suites = []FixtureSuite{
 					"trace_id": "edededededededededededededed9000",
 				},
 				CliOutput: "hello world\n",
-				Spans:     1,
+				SpanCount: 1,
 			},
 		},
 	},
@@ -609,7 +638,7 @@ var suites = []FixtureSuite{
 					"trace_id": "*",
 				},
 				CliOutput: "hello world\n",
-				Spans:     2,
+				SpanCount: 2,
 			},
 		},
 	},
@@ -634,7 +663,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		{
@@ -655,7 +684,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		{
@@ -675,7 +704,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 0,
+				SpanCount: 0,
 			},
 		},
 		// OTEL_EXPORTER_OTLP_PROTOCOL
@@ -701,7 +730,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		{
@@ -725,7 +754,7 @@ var suites = []FixtureSuite{
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
 				},
-				Spans: 1,
+				SpanCount: 1,
 			},
 		},
 		{
@@ -749,7 +778,7 @@ var suites = []FixtureSuite{
 					ParsedTimeoutMs:   1000,
 					OtelError:         "invalid protocol setting \"roflcopter\"\n",
 				},
-				Spans: 0,
+				SpanCount: 0,
 			},
 		},
 	},
