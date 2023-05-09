@@ -25,6 +25,8 @@ type CliEvent struct {
 	ElapsedMs         int64             `json:"elapsed_ms"`
 	Attributes        map[string]string `json:"attributes"`
 	ServiceAttributes map[string]string `json:"service_attributes"`
+	StatusCode        int32
+	StatusDescription string
 	// for a span this is the start nanos, for an event it's just the timestamp
 	// mostly here for sorting CliEventList but could be any uint64
 	Nanos uint64 `json:"nanos"`
@@ -62,6 +64,8 @@ func (ce CliEvent) ToStringMap() map[string]string {
 		"end":                etime,
 		"attributes":         mapToKVString(ce.Attributes),
 		"service_attributes": mapToKVString(ce.ServiceAttributes),
+		"status_code":        strconv.FormatInt(int64(ce.StatusCode), 10),
+		"status_description": ce.StatusDescription,
 		"is_populated":       strconv.FormatBool(ce.IsPopulated),
 		"server_meta":        mapToKVString(ce.ServerMeta),
 	}
@@ -88,6 +92,8 @@ func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.Resou
 		Attributes:        make(map[string]string),
 		ServiceAttributes: make(map[string]string),
 		Nanos:             span.GetStartTimeUnixNano(),
+		StatusCode:        int32(span.GetStatus().Code),
+		StatusDescription: span.GetStatus().Message,
 		IsPopulated:       true,
 		ServerMeta:        make(map[string]string),
 	}
