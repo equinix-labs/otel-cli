@@ -24,7 +24,7 @@ const (
 
 // CheckFunc is a function that gets called after the test is run to do
 // custom checking of values.
-type CheckFunc func(t *testing.T, fixture Fixture, results Results) bool
+type CheckFunc func(t *testing.T, fixture Fixture, results Results)
 
 type FixtureConfig struct {
 	CliArgs []string
@@ -71,11 +71,12 @@ type Results struct {
 
 // Fixture represents a test fixture for otel-cli.
 type Fixture struct {
-	Name     string
-	Config   FixtureConfig
-	Endpoint string
-	TlsData  TlsSettings
-	Expect   Results
+	Name       string
+	Config     FixtureConfig
+	Endpoint   string
+	TlsData    TlsSettings
+	Expect     Results
+	CheckFuncs []CheckFunc
 }
 
 // FixtureSuite is a list of Fixtures that run serially.
@@ -338,11 +339,19 @@ var suites = []FixtureSuite{
 		{
 			Name: "otel-cli exec sets span start time earlier than end time",
 			Config: FixtureConfig{
-				CliArgs: []string{"exec", "--endpoint", "{{endpoint}}", "sleep", "0.1"},
+				CliArgs: []string{"exec", "--endpoint", "{{endpoint}}", "sleep", "0.05"},
 			},
 			Expect: Results{
 				SpanCount: 1,
 				Config:    otelcli.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
+			},
+			CheckFuncs: []CheckFunc{
+				func(t *testing.T, f Fixture, r Results) {
+					elapsed := r.Span.End.Sub(r.Span.Start)
+					if elapsed.Milliseconds() < 50 {
+						t.Errorf("elapsed test time not long enough. Expected ~50ms, got %d ms", elapsed.Milliseconds())
+					}
+				},
 			},
 		},
 	},

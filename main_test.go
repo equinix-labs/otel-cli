@@ -62,6 +62,9 @@ func TestOtelCli(t *testing.T) {
 			if _, ok := fixture.Config.Env["PATH"]; ok {
 				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Name)
 			}
+			/* if fixture.CheckFuncs == nil {
+				fixture.CheckFuncs = []CheckFunc{}
+			} */
 		}
 	}
 
@@ -307,10 +310,11 @@ func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 }
 
 // checkFuncs runs through the list of funcs in the fixture to do
-// complex checking on data, each func is passed all the metadata and can
-// do what it needs that the other checks don't.
+// complex checking on data. Funcs should call t.Errorf, etc. as needed.
 func checkFuncs(t *testing.T, fixture Fixture, results Results) {
-
+	for _, f := range fixture.CheckFuncs {
+		f(t, fixture, results)
+	}
 }
 
 // runOtelCli runs the a server and otel-cli together and captures their
