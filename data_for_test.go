@@ -586,6 +586,17 @@ var suites = []FixtureSuite{
 				SpanCount:  1,
 				EventCount: 1,
 			},
+			// this validates options sent to otel-cli span end
+			CheckFuncs: []CheckFunc{
+				func(t *testing.T, f Fixture, r Results) {
+					if r.Span.StatusCode != 2 {
+						t.Errorf("expected 2 for span status code, but got %d", r.Span.StatusCode)
+					}
+					if r.Span.StatusDescription != "I can't do that Dave." {
+						t.Errorf("got wrong string for status description: %q", r.Span.StatusDescription)
+					}
+				},
+			},
 		},
 		{
 			Name: "otel-cli span event",
@@ -597,7 +608,13 @@ var suites = []FixtureSuite{
 		{
 			Name: "otel-cli span end",
 			Config: FixtureConfig{
-				CliArgs: []string{"span", "end", "--sockdir", "."},
+				CliArgs: []string{
+					"span", "end",
+					"--sockdir", ".",
+					// these are validated by checkfuncs defined above ^^
+					"--status-code", "error",
+					"--status-description", "I can't do that Dave.",
+				},
 			},
 			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
