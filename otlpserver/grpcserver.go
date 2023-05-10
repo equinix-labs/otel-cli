@@ -84,7 +84,7 @@ func (gs *GrpcServer) StopWait() {
 
 // Export implements the gRPC server interface for exporting messages.
 func (gs *GrpcServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
-	done := otelToCliEvent(gs.callback, req, map[string]string{"proto": "grpc"})
+	done := wrapIncomingSpan(gs.callback, req, map[string]string{"proto": "grpc"})
 	if done {
 		go gs.StopWait()
 	}

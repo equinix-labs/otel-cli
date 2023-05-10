@@ -8,23 +8,26 @@ import (
 	"time"
 
 	colv1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // CliEvent is a span or event decoded & copied for human consumption. It's roughly
 // an OpenTelemetry trace unwrapped just enough to be usable in tools like otel-cli.
+// The ProtoSpan and ProtoEvent fields hold pointers to the original protobuf span/event.
 type CliEvent struct {
-	TraceID           string            `json:"trace_id"`
-	SpanID            string            `json:"span_id"`
-	Parent            string            `json:"parent_span_id"`
-	Scope             string            `json:"scope"`
-	Name              string            `json:"name"`
-	Kind              string            `json:"kind"`
-	Start             time.Time         `json:"start"`
-	End               time.Time         `json:"end"`
-	ElapsedMs         int64             `json:"elapsed_ms"`
-	Attributes        map[string]string `json:"attributes"`
-	ServiceAttributes map[string]string `json:"service_attributes"`
+	ProtoSpan         *tracepb.Span       `json:"-"`
+	ProtoEvent        *tracepb.Span_Event `json:"-"`
+	TraceID           string              `json:"trace_id"`
+	SpanID            string              `json:"span_id"`
+	Parent            string              `json:"parent_span_id"`
+	Scope             string              `json:"scope"`
+	Name              string              `json:"name"`
+	Kind              string              `json:"kind"`
+	Start             time.Time           `json:"start"`
+	End               time.Time           `json:"end"`
+	ElapsedMs         int64               `json:"elapsed_ms"`
+	Attributes        map[string]string   `json:"attributes"`
+	ServiceAttributes map[string]string   `json:"service_attributes"`
 	// for a span this is the start nanos, for an event it's just the timestamp
 	// mostly here for sorting CliEventList but could be any uint64
 	Nanos uint64 `json:"nanos"`
@@ -75,8 +78,9 @@ func (cel CliEventList) Swap(i, j int)      { cel[i], cel[j] = cel[j], cel[i] }
 func (cel CliEventList) Less(i, j int) bool { return cel[i].Nanos < cel[j].Nanos }
 
 // NewCliEventFromSpan converts a raw grpc span into a CliEvent.
-func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.ResourceSpans, serverMeta map[string]string) CliEvent {
+func NewCliEventFromSpan(span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, rss *tracepb.ResourceSpans, serverMeta map[string]string) CliEvent {
 	e := CliEvent{
+		ProtoSpan:         span,
 		TraceID:           hex.EncodeToString(span.GetTraceId()),
 		SpanID:            hex.EncodeToString(span.GetSpanId()),
 		Parent:            hex.EncodeToString(span.GetParentSpanId()),
@@ -98,15 +102,15 @@ func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.Resou
 	}
 
 	switch span.GetKind() {
-	case v1.Span_SPAN_KIND_CLIENT:
+	case tracepb.Span_SPAN_KIND_CLIENT:
 		e.Kind = "client"
-	case v1.Span_SPAN_KIND_SERVER:
+	case tracepb.Span_SPAN_KIND_SERVER:
 		e.Kind = "server"
-	case v1.Span_SPAN_KIND_PRODUCER:
+	case tracepb.Span_SPAN_KIND_PRODUCER:
 		e.Kind = "producer"
-	case v1.Span_SPAN_KIND_CONSUMER:
+	case tracepb.Span_SPAN_KIND_CONSUMER:
 		e.Kind = "consumer"
-	case v1.Span_SPAN_KIND_INTERNAL:
+	case tracepb.Span_SPAN_KIND_INTERNAL:
 		e.Kind = "internal"
 	default:
 		e.Kind = "unspecified"
@@ -133,9 +137,11 @@ func NewCliEventFromSpan(span *v1.Span, scopeSpans *v1.ScopeSpans, rss *v1.Resou
 
 // NewCliEventFromSpanEvent takes a span event, span, and ils and returns an event
 // with all the span event info filled in.
-func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.ScopeSpans, serverMeta map[string]string) CliEvent {
+func NewCliEventFromSpanEvent(se *tracepb.Span_Event, span *tracepb.Span, scopeSpans *tracepb.ScopeSpans, serverMeta map[string]string) CliEvent {
 	// start with the span, rewrite it for the event
 	e := CliEvent{
+		ProtoSpan:   span,
+		ProtoEvent:  se,
 		TraceID:     hex.EncodeToString(span.GetTraceId()),
 		SpanID:      hex.EncodeToString(span.GetSpanId()),
 		Parent:      hex.EncodeToString(span.GetSpanId()),
@@ -163,16 +169,13 @@ func NewCliEventFromSpanEvent(se *v1.Span_Event, span *v1.Span, scopeSpans *v1.S
 	return e
 }
 
-// otelToCliEvent takes an otel trace request data structure and converts
-// it to CliEvents, calling the provided callback for each span in the
-// request.
-func otelToCliEvent(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta map[string]string) bool {
+// wrapIncomingSpan takes an otel trace request data structure and wraps it.
+func wrapIncomingSpan(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta map[string]string) bool {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
 		scopeSpans := resource.GetScopeSpans()
 		for _, ss := range scopeSpans {
 			for _, span := range ss.GetSpans() {
-				// convert protobuf spans to something easier for humans to consume
 				ces := NewCliEventFromSpan(span, ss, resource, serverMeta)
 				events := CliEventList{}
 				for _, se := range span.GetEvents() {
