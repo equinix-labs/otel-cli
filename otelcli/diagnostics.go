@@ -21,6 +21,7 @@ type Diagnostics struct {
 	ParsedTimeoutMs    int64    `json:"parsed_timeout_ms"`
 	OtelError          string   `json:"otel_error"`
 	ExecExitCode       int      `json:"exec_exit_code"`
+	config             Config
 }
 
 // Handle complies with the otel error handler interface to capture errors
@@ -30,7 +31,7 @@ type Diagnostics struct {
 func (Diagnostics) Handle(err error) {
 	diagnostics.OtelError = err.Error() // write to the global
 
-	if config.Fail {
+	if diagnostics.config.Fail {
 		softFail("OpenTelemetry error: %s", err)
 	} else {
 		softLog("OpenTelemetry error: %s", err)

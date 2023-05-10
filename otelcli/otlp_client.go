@@ -25,7 +25,7 @@ import (
 )
 
 // SendSpan connects to the OTLP server, sends the span, and disconnects.
-func SendSpan(ctx context.Context, span tracepb.Span) error {
+func SendSpan(ctx context.Context, config Config, span tracepb.Span) error {
 	if !config.IsRecording() {
 		return nil
 	}
@@ -41,9 +41,9 @@ func SendSpan(ctx context.Context, span tracepb.Span) error {
 		(strings.HasPrefix(config.Protocol, "http/") ||
 			strings.HasPrefix(config.Endpoint, "http://") ||
 			strings.HasPrefix(config.Endpoint, "https://")) {
-		client = otlptracehttp.NewClient(httpOptions()...)
+		client = otlptracehttp.NewClient(httpOptions(config)...)
 	} else {
-		client = otlptracegrpc.NewClient(grpcOptions()...)
+		client = otlptracegrpc.NewClient(grpcOptions(config)...)
 	}
 
 	err := client.Start(ctx)
@@ -88,7 +88,7 @@ func SendSpan(ctx context.Context, span tracepb.Span) error {
 
 // tlsConfig evaluates otel-cli configuration and returns a tls.Config
 // that can be used by grpc or https.
-func tlsConfig() *tls.Config {
+func tlsConfig(config Config) *tls.Config {
 	tlsConfig := &tls.Config{}
 
 	if config.TlsNoVerify {
@@ -134,7 +134,7 @@ func tlsConfig() *tls.Config {
 }
 
 // grpcOptions convets config settings to an otlpgrpc.Option list.
-func grpcOptions() []otlptracegrpc.Option {
+func grpcOptions(config Config) []otlptracegrpc.Option {
 	grpcOpts := []otlptracegrpc.Option{}
 
 	// per comment in initTracer(), grpc:// is specific to otel-cli
@@ -151,7 +151,7 @@ func grpcOptions() []otlptracegrpc.Option {
 	}
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
-	if timeout := parseCliTimeout(); timeout > 0 {
+	if timeout := parseCliTimeout(config); timeout > 0 {
 		grpcOpts = append(grpcOpts, otlptracegrpc.WithTimeout(timeout))
 	}
 
@@ -163,7 +163,7 @@ func grpcOptions() []otlptracegrpc.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, otlptracegrpc.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig())))
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig(config))))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
@@ -184,7 +184,7 @@ func grpcOptions() []otlptracegrpc.Option {
 }
 
 // httpOptions converts config to an otlphttp.Option list.
-func httpOptions() []otlptracehttp.Option {
+func httpOptions(config Config) []otlptracehttp.Option {
 	endpointURL, err := url.Parse(config.Endpoint)
 	if err != nil {
 		softFail("error parsing provided HTTP URI '%s': %s", config.Endpoint, err)
@@ -209,7 +209,7 @@ func httpOptions() []otlptracehttp.Option {
 	httpOpts = append(httpOpts, otlptracehttp.WithURLPath(endpointURL.Path))
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
-	if timeout := parseCliTimeout(); timeout > 0 {
+	if timeout := parseCliTimeout(config); timeout > 0 {
 		httpOpts = append(httpOpts, otlptracehttp.WithTimeout(timeout))
 	}
 
@@ -222,7 +222,7 @@ func httpOptions() []otlptracehttp.Option {
 	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
 		httpOpts = append(httpOpts, otlptracehttp.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
-		httpOpts = append(httpOpts, otlptracehttp.WithTLSClientConfig(tlsConfig()))
+		httpOpts = append(httpOpts, otlptracehttp.WithTLSClientConfig(tlsConfig(config)))
 	}
 
 	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints

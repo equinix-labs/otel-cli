@@ -145,8 +145,8 @@ func TestParseCliTime(t *testing.T) {
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
-			config = Config{Timeout: testcase.input}
-			got := parseCliTimeout()
+			config := DefaultConfig().WithTimeout(testcase.input)
+			got := parseCliTimeout(config)
 			if got != testcase.expected {
 				ed := testcase.expected.String()
 				gd := got.String()

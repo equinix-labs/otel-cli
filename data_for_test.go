@@ -336,10 +336,19 @@ var suites = []FixtureSuite{
 				SpanCount: 0,
 			},
 		},
+	},
+	// regression tests
+	{
 		{
-			Name: "otel-cli exec sets span start time earlier than end time",
+			// The span end time was missing when #175 merged, which showed up
+			// as 0ms spans. CheckFuncs was added to make this possible. This
+			// test runs sleep for 10ms and checks the duration of the span is
+			// at least 10ms.
+			Name: "#189 otel-cli exec sets span start time earlier than end time",
 			Config: FixtureConfig{
-				CliArgs: []string{"exec", "--endpoint", "{{endpoint}}", "sleep", "0.05"},
+				// note: relies on system sleep command supporting floats
+				// note: 10ms is hardcoded in a few places for this test and commentary
+				CliArgs: []string{"exec", "--endpoint", "{{endpoint}}", "sleep", "0.01"},
 			},
 			Expect: Results{
 				SpanCount: 1,
@@ -348,8 +357,8 @@ var suites = []FixtureSuite{
 			CheckFuncs: []CheckFunc{
 				func(t *testing.T, f Fixture, r Results) {
 					elapsed := r.Span.End.Sub(r.Span.Start)
-					if elapsed.Milliseconds() < 50 {
-						t.Errorf("elapsed test time not long enough. Expected ~50ms, got %d ms", elapsed.Milliseconds())
+					if elapsed.Milliseconds() < 10 {
+						t.Errorf("elapsed test time not long enough. Expected 10ms, got %d ms", elapsed.Milliseconds())
 					}
 				},
 			},

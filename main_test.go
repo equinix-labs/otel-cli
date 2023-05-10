@@ -62,9 +62,6 @@ func TestOtelCli(t *testing.T) {
 			if _, ok := fixture.Config.Env["PATH"]; ok {
 				t.Fatalf("fixture in file %s is not allowed to modify or test envvar PATH", fixture.Name)
 			}
-			/* if fixture.CheckFuncs == nil {
-				fixture.CheckFuncs = []CheckFunc{}
-			} */
 		}
 	}
 
@@ -246,19 +243,6 @@ func checkStatusData(t *testing.T, fixture Fixture, results Results) {
 	}
 }
 
-// spanRegexChecks is a map of field names and regexes for basic presence
-// and validity checking of span data fields with expected set to "*"
-var spanRegexChecks = map[string]*regexp.Regexp{
-	"trace_id":   regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
-	"span_id":    regexp.MustCompile(`^[0-9a-fA-F]{16}$`),
-	"name":       regexp.MustCompile(`^\w+$`),
-	"parent":     regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
-	"kind":       regexp.MustCompile(`^\w+$`), // TODO: can validate more here
-	"start":      regexp.MustCompile(`^\d+$`),
-	"end":        regexp.MustCompile(`^\d+$`),
-	"attributes": regexp.MustCompile(`\w+=.+`), // not great but should validate at least one k=v
-}
-
 // checkSpanData compares the data in spans received from otel-cli against the
 // fixture data.
 func checkSpanData(t *testing.T, fixture Fixture, results Results) {
@@ -275,6 +259,19 @@ func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 		if _, ok := gotSpan[what]; !ok {
 			t.Errorf("[%s] expected span to have key %q but it is not present", fixture.Name, what)
 		}
+	}
+
+	// spanRegexChecks is a map of field names and regexes for basic presence
+	// and validity checking of span data fields with expected set to "*"
+	spanRegexChecks := map[string]*regexp.Regexp{
+		"trace_id":   regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
+		"span_id":    regexp.MustCompile(`^[0-9a-fA-F]{16}$`),
+		"name":       regexp.MustCompile(`^\w+$`),
+		"parent":     regexp.MustCompile(`^[0-9a-fA-F]{32}$`),
+		"kind":       regexp.MustCompile(`^\w+$`), // TODO: can validate more here
+		"start":      regexp.MustCompile(`^\d+$`),
+		"end":        regexp.MustCompile(`^\d+$`),
+		"attributes": regexp.MustCompile(`\w+=.+`), // not great but should validate at least one k=v
 	}
 
 	// go over all the keys in the received span and check against expected values

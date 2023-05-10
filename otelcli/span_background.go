@@ -38,9 +38,7 @@ timeout, (catchable) signals, or deliberate exit.
 }
 
 func init() {
-	// this used to be a global const but now it's in Config
-	// TODO: does it make sense to make this configurable? 10ms might be too frequent...
-	config.BackgroundParentPollMs = 10
+	defaults := DefaultConfig()
 
 	spanCmd.AddCommand(spanBgCmd)
 	spanBgCmd.Flags().SortFlags = false
@@ -50,6 +48,7 @@ func init() {
 	// at the end to get an easy span
 	spanBgCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
 
+	spanBgCmd.Flags().IntVar(&config.BackgroundParentPollMs, "parent-poll", defaults.BackgroundParentPollMs, "number of milliseconds to wait between checking for whether the parent process exited")
 	spanBgCmd.Flags().BoolVar(&config.BackgroundWait, "wait", defaults.BackgroundWait, "wait for background to be fully started and then return")
 	spanBgCmd.Flags().BoolVar(&config.BackgroundSkipParentPidCheck, "skip-pid-check", defaults.BackgroundSkipParentPidCheck, "disable checking parent pid")
 
@@ -121,7 +120,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 
 	// start the timeout goroutine, this is a little late but the server
 	// has to be up for this to make much sense
-	if timeout := parseCliTimeout(); timeout > 0 {
+	if timeout := parseCliTimeout(config); timeout > 0 {
 		go func() {
 			time.Sleep(timeout)
 			rt := time.Since(started)
@@ -134,7 +133,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	bgs.Run()
 
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
-	err := SendSpan(context.Background(), span)
+	err := SendSpan(context.Background(), config, span)
 	if err != nil {
 		softFail("Sending span failed: %s", err)
 	}

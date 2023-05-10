@@ -31,6 +31,8 @@ Example:
 var epochNanoTimeRE *regexp.Regexp
 
 func init() {
+	defaults := DefaultConfig()
+
 	rootCmd.AddCommand(spanCmd)
 	spanCmd.Flags().SortFlags = false
 
@@ -50,6 +52,6 @@ func init() {
 
 func doSpan(cmd *cobra.Command, args []string) {
 	span := NewProtobufSpanWithConfig(config)
-	SendSpan(context.Background(), span)
+	SendSpan(context.Background(), config, span)
 	propagateTraceparent(span, os.Stdout)
 }

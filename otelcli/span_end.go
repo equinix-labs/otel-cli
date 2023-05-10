@@ -20,6 +20,7 @@ See: otel-cli span background
 }
 
 func init() {
+	defaults := DefaultConfig()
 	spanCmd.AddCommand(spanEndCmd)
 	spanEndCmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
 	// TODO

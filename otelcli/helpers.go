@@ -113,7 +113,7 @@ func parseTime(ts, which string) time.Time {
 // parseCliTimeout parses the cliTimeout global string value to a time.Duration.
 // When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
 // It logs an error and returns time.Duration(0) if the string is empty or unparseable.
-func parseCliTimeout() time.Duration {
+func parseCliTimeout(config Config) time.Duration {
 	var out time.Duration
 	if config.Timeout == "" {
 		out = time.Duration(0)

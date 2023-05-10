@@ -11,11 +11,8 @@ import (
 )
 
 // config is the global configuraiton used by all of otel-cli.
-// It is written to by Cobra and Viper.
+// global so that Cobra can access it
 var config Config
-
-// defaults is a Config set to default values used by Cobra
-var defaults = DefaultConfig()
 
 const defaultOtlpEndpoint = "grpc://localhost:4317"
 const spanBgSockfilename = "otel-cli-background.sock"
@@ -106,11 +103,11 @@ type Config struct {
 // LoadFile reads the file specified by -c/--config and overwrites the
 // current config values with any found in the file.
 func (c *Config) LoadFile() error {
-	if config.CfgFile == "" {
+	if c.CfgFile == "" {
 		return nil
 	}
 
-	js, err := os.ReadFile(config.CfgFile)
+	js, err := os.ReadFile(c.CfgFile)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read file '%s'", c.CfgFile)
 	}

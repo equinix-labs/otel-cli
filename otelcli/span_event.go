@@ -27,6 +27,8 @@ See: otel-cli span background
 }
 
 func init() {
+	defaults := DefaultConfig()
+
 	spanCmd.AddCommand(spanEventCmd)
 	spanEventCmd.Flags().SortFlags = false
 
