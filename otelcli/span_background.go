@@ -87,7 +87,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	// propagation before the server starts, instead of after
 	propagateTraceparent(span, os.Stdout)
 
-	bgs := createBgServer(spanBgSockfile(), span)
+	bgs := createBgServer(spanBgSockfile(), &span)
 
 	// set up signal handlers to cleanly exit on SIGINT/SIGTERM etc
 	signals := make(chan os.Signal)

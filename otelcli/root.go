@@ -99,6 +99,13 @@ func addSpanParams(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&config.ServiceName, "service", "s", defaults.ServiceName, "set the name of the application sent on the traces")
 	// --kind / -k
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", defaults.Kind, "set the trace kind, e.g. internal, server, client, producer, consumer")
+
+	addSpanStatusParams(cmd)
+}
+
+func addSpanStatusParams(cmd *cobra.Command) {
+	defaults := DefaultConfig()
+
 	// --status-code / -sc
 	cmd.Flags().StringVar(&config.StatusCode, "status-code", defaults.StatusCode, "set the span status code, e.g. unset|ok|error")
 	// --status-description / -sd

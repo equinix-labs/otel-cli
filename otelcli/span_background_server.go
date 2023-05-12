@@ -31,7 +31,10 @@ type BgSpanEvent struct {
 }
 
 // BgEnd is an empty struct that can be sent to call End().
-type BgEnd struct{}
+type BgEnd struct {
+	StatusCode string `json:"status_code"`
+	StatusDesc string `json:"status_description"`
+}
 
 // AddEvent takes a BgSpanEvent from the client and attaches an event to the span.
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
@@ -63,8 +66,10 @@ func (bs BgSpan) Wait(in, reply *struct{}) error {
 // End takes a BgEnd (empty) struct, replies with the usual trace info, then
 // ends the span end exits the background process.
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
-	// TODO: maybe accept an end timestamp?
-	//endSpan(bs.span)
+	// handle --status-code and --status-description args to span end
+	c := config.WithStatusCode(in.StatusCode).WithStatusDescription(in.StatusDesc)
+	SetSpanStatus(bs.span, c)
+
 	// running the shutdown as a goroutine prevents the client from getting an
 	// error here when the server gets closed. defer didn't do the trick.
 	go bs.shutdown()
@@ -81,7 +86,7 @@ type bgServer struct {
 
 // createBgServer opens a new span background server on a unix socket and
 // returns with the server ready to go. Not expected to block.
-func createBgServer(sockfile string, span tracepb.Span) *bgServer {
+func createBgServer(sockfile string, span *tracepb.Span) *bgServer {
 	var err error
 
 	bgs := bgServer{
@@ -97,7 +102,7 @@ func createBgServer(sockfile string, span tracepb.Span) *bgServer {
 	bgspan := BgSpan{
 		TraceID:  hex.EncodeToString(span.TraceId),
 		SpanID:   hex.EncodeToString(span.SpanId),
-		span:     &span,
+		span:     span,
 		shutdown: func() { bgs.Shutdown() },
 	}
 	// makes methods on BgSpan available over RPC

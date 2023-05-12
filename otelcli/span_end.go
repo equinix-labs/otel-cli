@@ -27,12 +27,20 @@ func init() {
 	//spanEndCmd.Flags().StringVar(&config.Timeout, "timeout", defaults.Timeout, "timeout for otel-cli operations, all timeouts in otel-cli use this value")
 	spanEndCmd.Flags().StringVar(&config.BackgroundSockdir, "sockdir", defaults.BackgroundSockdir, "a directory where a socket can be placed safely")
 	spanEndCmd.MarkFlagRequired("sockdir")
+
+	spanEndCmd.Flags().StringVar(&config.SpanEndTime, "end", defaults.SpanEndTime, "an Unix epoch or RFC3339 timestamp for the end of the span")
+
+	addSpanStatusParams(spanEndCmd)
 }
 
 func doSpanEnd(cmd *cobra.Command, args []string) {
 	client, shutdown := createBgClient()
 
-	rpcArgs := BgEnd{}
+	rpcArgs := BgEnd{
+		StatusCode: config.StatusCode,
+		StatusDesc: config.StatusDescription,
+	}
+
 	res := BgSpan{}
 	err := client.Call("BgSpan.End", rpcArgs, &res)
 	if err != nil {

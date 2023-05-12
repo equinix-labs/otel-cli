@@ -86,15 +86,21 @@ func NewProtobufSpanWithConfig(c Config) tracepb.Span {
 		span.SpanId = emptySpanId
 	}
 
-	// Only set status description when an error status.
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/480a19d702470563d32a870932be5ddae798079c/specification/trace/api.md#set-status
+	SetSpanStatus(&span, c)
+
+	return span
+}
+
+// SetSpanStatus checks for status code error in the config and sets the
+// span's 2 values as appropriate.
+// Only set status description when an error status.
+// https://github.com/open-telemetry/opentelemetry-specification/blob/480a19d702470563d32a870932be5ddae798079c/specification/trace/api.md#set-status
+func SetSpanStatus(span *tracepb.Span, c Config) {
 	statusCode := SpanStatusStringToInt(c.StatusCode)
-	if statusCode == tracepb.Status_STATUS_CODE_ERROR {
+	if statusCode != tracepb.Status_STATUS_CODE_UNSET {
 		span.Status.Code = statusCode
 		span.Status.Message = c.StatusDescription
 	}
-
-	return span
 }
 
 // generateTraceId generates a random 16 byte trace id
