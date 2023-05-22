@@ -72,7 +72,9 @@ func doExec(cmd *cobra.Command, args []string) {
 	child.Env = []string{}
 
 	// grab everything BUT the TRACEPARENT envvar
-	for _, env := range os.Environ() {
+	// read the cached env from config, because os.Environ() has to be modified
+	// to work around OTel libs reading envvars directly
+	for _, env := range config.envBackup {
 		if !strings.HasPrefix(env, "TRACEPARENT=") {
 			child.Env = append(child.Env, env)
 		}

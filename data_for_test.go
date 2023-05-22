@@ -363,6 +363,34 @@ var suites = []FixtureSuite{
 				},
 			},
 		},
+		{
+			Name: "#181 OTEL_ envvars should persist through to otel-cli exec",
+			Config: FixtureConfig{
+				CliArgs: []string{"status"},
+				Env: map[string]string{
+					"OTEL_FAKE_VARIABLE":             "fake value",
+					"OTEL_EXPORTER_OTLP_ENDPOINT":    "{{endpoint}}",
+					"OTEL_EXPORTER_OTLP_CERTIFICATE": "{{tls_ca_cert}}",
+					"X_WHATEVER":                     "whatever",
+				},
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}").WithTlsCACert("{{tls_ca_cert}}"),
+				Env: map[string]string{
+					"OTEL_FAKE_VARIABLE":             "fake value",
+					"OTEL_EXPORTER_OTLP_ENDPOINT":    "{{endpoint}}",
+					"OTEL_EXPORTER_OTLP_CERTIFICATE": "{{tls_ca_cert}}",
+					"X_WHATEVER":                     "whatever",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					NumArgs:           1,
+					ParsedTimeoutMs:   1000,
+				},
+			},
+		},
 	},
 	// otel-cli span with no OTLP config should do and print nothing
 	{
@@ -392,6 +420,9 @@ var suites = []FixtureSuite{
 					IsRecording:     true,
 					NumArgs:         3,
 					ParsedTimeoutMs: 1000,
+				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
 				},
 				Config: otelcli.DefaultConfig().
 					WithEndpoint("{{endpoint}}"). // tells the test framework to ignore/overwrite
@@ -750,6 +781,9 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"server_meta": "proto=grpc",
 				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
@@ -773,6 +807,9 @@ var suites = []FixtureSuite{
 				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
 				SpanData: map[string]string{
 					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
+				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
