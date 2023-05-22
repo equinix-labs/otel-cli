@@ -8,23 +8,10 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "otel-cli",
-	Short: "CLI for creating and sending OpenTelemetry spans and events.",
-	Long:  `A command-line interface for generating OpenTelemetry data on the command line.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if err := config.LoadFile(); err != nil {
-			softFail("Error while loading configuration file %s: %s", config.CfgFile, err)
-		}
-		if err := config.LoadEnv(os.Getenv); err != nil {
-			// will need to specify --fail --verbose flags to see these errors
-			softFail("Error while loading environment variables: %s", err)
-		}
-
-		// plug a copy of the completed config into diagnostics
-		// so the otel error handler can check --fail/--verbose config
-		// this should go away after rewriting the otel exporter
-		diagnostics.config = config
-	},
+	Use:              "otel-cli",
+	Short:            "CLI for creating and sending OpenTelemetry spans and events.",
+	Long:             `A command-line interface for generating OpenTelemetry data on the command line.`,
+	PersistentPreRun: ConfigPreRun,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -43,6 +30,28 @@ func init() {
 	if len(os.Args) > 1 {
 		diagnostics.CliArgs = os.Args[1:]
 	}
+}
+
+// ConfigPreRun is called by Cobra right after reading CLI args, and will load
+// the config file, then environment.
+func ConfigPreRun(cmd *cobra.Command, args []string) {
+	// because the OTel collector client code directly reads envvars, the OTEL_
+	// variables are deleted during config.LoadEnv(). This breaks expectations
+	// for otel-cli exec users, so we save a copy to pass to exec
+	config.envBackup = os.Environ()
+
+	if err := config.LoadFile(); err != nil {
+		softFail("Error while loading configuration file %s: %s", config.CfgFile, err)
+	}
+	if err := config.LoadEnv(os.Getenv); err != nil {
+		// will need to specify --fail --verbose flags to see these errors
+		softFail("Error while loading environment variables: %s", err)
+	}
+
+	// plug a copy of the completed config into diagnostics
+	// so the otel error handler can check --fail/--verbose config
+	// this should go away after rewriting the otel exporter
+	diagnostics.config = config
 }
 
 // addCommonParams adds the --config and --endpoint params to the command.
