@@ -98,6 +98,9 @@ type Config struct {
 	CfgFile string `json:"config_file" env:"OTEL_CLI_CONFIG_FILE"`
 	Verbose bool   `json:"verbose" env:"OTEL_CLI_VERBOSE"`
 	Fail    bool   `json:"fail" env:"OTEL_CLI_FAIL"`
+
+	// private things for internals
+	envBackup []string // used to back up envvars for otel-cli exec
 }
 
 // LoadFile reads the file specified by -c/--config and overwrites the
