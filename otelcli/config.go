@@ -80,8 +80,8 @@ type Config struct {
 	Attributes        map[string]string `json:"span_attributes" env:"OTEL_CLI_ATTRIBUTES"`
 	StatusCode        string            `json:"span_status_code" env:"OTEL_CLI_STATUS_CODE"`
 	StatusDescription string            `json:"span_status_description" env:"OTEL_CLI_STATUS_DESCRIPTION"`
-	ForceSpanId       string            `json:"span_id" env:"OTEL_CLI_FORCE_SPAN_ID"`
-	ForceTraceId      string            `json:"trace_id" env:"OTEL_CLI_FORCE_TRACE_ID"`
+	ForceSpanId       string            `json:"force_span_id" env:"OTEL_CLI_FORCE_SPAN_ID"`
+	ForceTraceId      string            `json:"force_trace_id" env:"OTEL_CLI_FORCE_TRACE_ID"`
 
 	TraceparentCarrierFile string `json:"traceparent_carrier_file" env:"OTEL_CLI_CARRIER_FILE"`
 	TraceparentIgnoreEnv   bool   `json:"traceparent_ignore_env" env:"OTEL_CLI_IGNORE_ENV"`
