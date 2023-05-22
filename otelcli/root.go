@@ -109,6 +109,10 @@ func addSpanParams(cmd *cobra.Command) {
 	// --kind / -k
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", defaults.Kind, "set the trace kind, e.g. internal, server, client, producer, consumer")
 
+	// expert options: --force-trace-id, --force-span-id allow setting custom trace & span ids
+	cmd.Flags().StringVar(&config.ForceTraceId, "force-trace-id", defaults.ForceTraceId, "expert: force the trace id to be the one provided in hex")
+	cmd.Flags().StringVar(&config.ForceSpanId, "force-span-id", defaults.ForceSpanId, "expert: force the span id to be the one provided in hex")
+
 	addSpanStatusParams(cmd)
 }
 
