@@ -846,7 +846,7 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
-	// --trace-id and --span-id allow setting/forcing custom trace & span ids
+	// --force-trace-id and --force-span-id allow setting/forcing custom trace & span ids
 	{
 		{
 			Name: "forced trace & span ids",
