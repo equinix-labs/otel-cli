@@ -36,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	addCommonParams(statusCmd)
 	addClientParams(statusCmd)
+	addSpanParams(statusCmd)
 }
 
 func doStatus(cmd *cobra.Command, args []string) {
