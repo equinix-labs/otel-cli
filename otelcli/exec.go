@@ -1,11 +1,12 @@
 package otelcli
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -42,25 +43,21 @@ func init() {
 }
 
 func doExec(cmd *cobra.Command, args []string) {
-	// joining the string here is kinda gross... but should be fine
-	// there might be a better way in Cobra, maybe require passing it after a '--'?
-	commandString := strings.Join(args, " ")
-
 	// put the command in the attributes, before creating the span so it gets picked up
-	config.Attributes["command"] = commandString
+	config.Attributes["command"] = args[0]
+	config.Attributes["arguments"] = ""
 
-	span := NewProtobufSpanWithConfig(config)
+	var child *exec.Cmd
+	if len(args) > 1 {
+		// CSV-join the arguments to send as an attribute
+		buf := bytes.NewBuffer([]byte{})
+		csv.NewWriter(buf).WriteAll([][]string{args[1:]})
+		config.Attributes["arguments"] = buf.String()
 
-	// use cmd.exe to launch PowerShell on Windows
-	var shell string
-	if runtime.GOOS == "windows" {
-		shell = "cmd.exe"
-		commandString = "/C powershell " + commandString
+		child = exec.Command(args[0], args[1:]...)
 	} else {
-		shell = "/bin/sh"
+		child = exec.Command(args[0])
 	}
-
-	child := exec.Command(shell, "-c", commandString)
 
 	// attach all stdio to the parent's handles
 	child.Stdin = os.Stdin
@@ -77,6 +74,8 @@ func doExec(cmd *cobra.Command, args []string) {
 			child.Env = append(child.Env, env)
 		}
 	}
+
+	span := NewProtobufSpanWithConfig(config)
 
 	// set the traceparent to the current span to be available to the child process
 	if config.IsRecording() {

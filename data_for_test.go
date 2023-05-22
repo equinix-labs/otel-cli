@@ -631,7 +631,8 @@ var suites = []FixtureSuite{
 		{
 			Name: "otel-cli span exec echo",
 			Config: FixtureConfig{
-				CliArgs: []string{"exec", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server", "echo hello world"},
+				// intentionally calling a command with no args bc it's a special case in exec.go
+				CliArgs: []string{"exec", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server", "echo"},
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
 					"TRACEPARENT":                 "00-edededededededededededededed9000-edededededededed-01",
@@ -643,7 +644,7 @@ var suites = []FixtureSuite{
 					"span_id":  "*",
 					"trace_id": "edededededededededededededed9000",
 				},
-				CliOutput: "hello world\n",
+				CliOutput: "\n",
 				SpanCount: 1,
 			},
 		},
@@ -655,7 +656,7 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{
 					"exec", "--name", "outer", "--endpoint", "{{endpoint}}", "--fail", "--verbose", "--",
-					"./otel-cli", "exec", "--name", "inner", "--endpoint", "{{endpoint}}", "--tp-required", "--fail", "--verbose", "echo hello world"},
+					"./otel-cli", "exec", "--name", "inner", "--endpoint", "{{endpoint}}", "--tp-required", "--fail", "--verbose", "echo", "hello world"},
 			},
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
