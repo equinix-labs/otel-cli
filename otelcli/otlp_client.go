@@ -110,7 +110,7 @@ func parseEndpoint(config Config) (*url.URL, string) {
 	parts := strings.Split(endpoint, ":")
 	// bare hostname? can only be grpc, prepend
 	if len(parts) == 1 {
-		epUrl, err = url.Parse("grpc://" + endpoint)
+		epUrl, err = url.Parse("grpc://" + endpoint + ":4317")
 		if err != nil {
 			softFail("error parsing (assumed) gRPC bare host address '%s': %s", endpoint, err)
 		}
