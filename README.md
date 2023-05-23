@@ -100,31 +100,34 @@ mode and not attempt to contact any servers.
 All three modes of config can be mixed. Command line args are loaded first,
 then config file, then environment variables.
 
-| CLI argument         | environment variable          | config file key          | example value  |
-| -------------------- | ----------------------------- | ------------------------ | -------------- |
-| --endpoint           | OTEL_EXPORTER_OTLP_ENDPOINT   | endpoint                 | localhost:4317 |
-| --protocol           | OTEL_EXPORTER_OTLP_PROTOCOL   | protocol                 | http/protobuf  |
-| --insecure           | OTEL_EXPORTER_OTLP_INSECURE   | insecure                 | false          |
-| --timeout            | OTEL_EXPORTER_OTLP_TIMEOUT    | timeout                  | 1s             |
-| --otlp-headers       | OTEL_EXPORTER_OTLP_HEADERS    | otlp_headers             | k=v,a=b        |
-| --otlp-blocking      | OTEL_EXPORTER_OTLP_BLOCKING   | otlp_blocking            | false          |
-| --config             | OTEL_CLI_CONFIG_FILE          | config_file              | config.json    |
-| --verbose            | OTEL_CLI_VERBOSE              | verbose                  | false          |
-| --fail               | OTEL_CLI_FAIL                 | fail                     | false          |
-| --service            | OTEL_SERVICE_NAME             | service_name             | myapp          |
-| --kind               | OTEL_CLI_TRACE_KIND           | span_kind                | server         |
-| --status-code        | OTEL_CLI_STATUS_CODE          | span_status_code         | error          |
-| --status-description | OTEL_CLI_STATUS_DESCRIPTION   | span_status_description  | cancelled      |
-| --attrs              | OTEL_CLI_ATTRIBUTES           | span_attributes          | k=v,a=b        |
-| --tp-required        | OTEL_CLI_TRACEPARENT_REQUIRED | traceparent_required     | false          |
-| --tp-carrier         | OTEL_CLI_CARRIER_FILE         | traceparent_carrier_file | filename.txt   |
-| --tp-ignore-env      | OTEL_CLI_IGNORE_ENV           | traceparent_ignore_env   | false          |
-| --tp-print           | OTEL_CLI_PRINT_TRACEPARENT    | traceparent_print        | false          |
-| --tp-export          | OTEL_CLI_EXPORT_TRACEPARENT   | traceparent_print_export | false          |
-| --tls-no-verify      | OTEL_CLI_TLS_NO_VERIFY                | tls_no_verify    | false          |
-| --tls-ca-cert        | OTEL_EXPORTER_OTLP_CERTIFICATE        | tls_ca_cert      |                |
-| --tls-client-key     | OTEL_EXPORTER_OTLP_CLIENT_KEY         | tls_client_key   |                |
-| --tls-client-cert    | OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE | tls_client_cert  |                |
+| CLI argument         | environment variable                  | config file key          | example value  |
+| -------------------- | ------------------------------------- | ------------------------ | -------------- |
+| --endpoint           | OTEL_EXPORTER_OTLP_ENDPOINT           | endpoint                 | localhost:4317       |
+| --traces-endpoint    | OTEL_EXPORTER_OTLP_TRACES_ENDPOINT    | traces_endpoint          | https://localhost:4318/v1/traces |
+| --protocol           | OTEL_EXPORTER_OTLP_PROTOCOL           | protocol                 | http/protobuf  |
+| --insecure           | OTEL_EXPORTER_OTLP_INSECURE           | insecure                 | false          |
+| --timeout            | OTEL_EXPORTER_OTLP_TIMEOUT            | timeout                  | 1s             |
+| --otlp-headers       | OTEL_EXPORTER_OTLP_HEADERS            | otlp_headers             | k=v,a=b        |
+| --otlp-blocking      | OTEL_EXPORTER_OTLP_BLOCKING           | otlp_blocking            | false          |
+| --config             | OTEL_CLI_CONFIG_FILE                  | config_file              | config.json    |
+| --verbose            | OTEL_CLI_VERBOSE                      | verbose                  | false          |
+| --fail               | OTEL_CLI_FAIL                         | fail                     | false          |
+| --service            | OTEL_SERVICE_NAME                     | service_name             | myapp          |
+| --kind               | OTEL_CLI_TRACE_KIND                   | span_kind                | server         |
+| --status-code        | OTEL_CLI_STATUS_CODE                  | span_status_code         | error          |
+| --status-description | OTEL_CLI_STATUS_DESCRIPTION           | span_status_description  | cancelled      |
+| --attrs              | OTEL_CLI_ATTRIBUTES                   | span_attributes          | k=v,a=b        |
+| --force-trace-id     | OTEL_CLI_FORCE_TRACE_ID               | force_trace_id           | 00112233445566778899aabbccddeeff |
+| --force-span-id      | OTEL_CLI_FORCE_SPAN_ID                | force_span_id            | beefcafefacedead |
+| --tp-required        | OTEL_CLI_TRACEPARENT_REQUIRED         | traceparent_required     | false          |
+| --tp-carrier         | OTEL_CLI_CARRIER_FILE                 | traceparent_carrier_file | filename.txt   |
+| --tp-ignore-env      | OTEL_CLI_IGNORE_ENV                   | traceparent_ignore_env   | false          |
+| --tp-print           | OTEL_CLI_PRINT_TRACEPARENT            | traceparent_print        | false          |
+| --tp-export          | OTEL_CLI_EXPORT_TRACEPARENT           | traceparent_print_export | false          |
+| --tls-no-verify      | OTEL_CLI_TLS_NO_VERIFY                | tls_no_verify    | false                  |
+| --tls-ca-cert        | OTEL_EXPORTER_OTLP_CERTIFICATE        | tls_ca_cert      | /ca/ca.pem             |
+| --tls-client-key     | OTEL_EXPORTER_OTLP_CLIENT_KEY         | tls_client_key   | /keys/client-key.pem   |
+| --tls-client-cert    | OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE | tls_client_cert  | /keys/client-cert.pem  |
 
 [Valid timeout units](https://pkg.go.dev/time#ParseDuration) are "ns", "us"/"µs", "ms", "s", "m", "h".
 
