@@ -8,7 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"regexp"
+	"path"
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -36,14 +36,16 @@ func SendSpan(ctx context.Context, config Config, span tracepb.Span) error {
 		return err
 	}
 
+	endpointURL, _ := parseEndpoint(config)
+
 	var client otlptrace.Client
 	if config.Protocol != "grpc" &&
 		(strings.HasPrefix(config.Protocol, "http/") ||
-			strings.HasPrefix(config.Endpoint, "http://") ||
-			strings.HasPrefix(config.Endpoint, "https://")) {
-		client = otlptracehttp.NewClient(httpOptions(config)...)
+			endpointURL.Scheme == "http" ||
+			endpointURL.Scheme == "https") {
+		client = otlptracehttp.NewClient(httpOptions(endpointURL, config)...)
 	} else {
-		client = otlptracegrpc.NewClient(grpcOptions(config)...)
+		client = otlptracegrpc.NewClient(grpcOptions(endpointURL, config)...)
 	}
 
 	err := client.Start(ctx)
@@ -84,6 +86,60 @@ func SendSpan(ctx context.Context, config Config, span tracepb.Span) error {
 	}
 
 	return nil
+}
+
+// parseEndpoint takes the endpoint or signal endpoint, augments as needed
+// (e.g. bare host:port for gRPC) and then parses as a URL.
+// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md#endpoint-urls-for-otlphttp
+func parseEndpoint(config Config) (*url.URL, string) {
+	var endpoint, source string
+	var epUrl *url.URL
+	var err error
+
+	// signal-specific configs get precedence over general endpoint per OTel spec
+	if config.TracesEndpoint != "" {
+		endpoint = config.TracesEndpoint
+		source = "signal"
+	} else if config.Endpoint != "" {
+		endpoint = config.Endpoint
+		source = "general"
+	} else {
+		softFail("no endpoint configuration available")
+	}
+
+	parts := strings.Split(endpoint, ":")
+	// bare hostname? can only be grpc, prepend
+	if len(parts) == 1 {
+		epUrl, err = url.Parse("grpc://" + endpoint)
+		if err != nil {
+			softFail("error parsing (assumed) gRPC bare host address '%s': %s", endpoint, err)
+		}
+	} else if len(parts) > 1 { // could be URI or host:port
+		// actual URIs
+		// grpc:// is only an otel-cli thing, maybe should drop it?
+		if parts[0] == "grpc" || parts[0] == "http" || parts[0] == "https" {
+			epUrl, err = url.Parse(endpoint)
+			if err != nil {
+				softFail("error parsing provided %s URI '%s': %s", source, endpoint, err)
+			}
+		} else {
+			// gRPC host:port
+			epUrl, err = url.Parse("grpc://" + endpoint)
+			if err != nil {
+				softFail("error parsing (assumed) gRPC host:port address '%s': %s", endpoint, err)
+			}
+		}
+	}
+
+	// Per spec, /v1/traces is the default, appended to any url passed
+	// to the general endpoint
+	if strings.HasPrefix(epUrl.Scheme, "http") && source != "signal" && !strings.HasSuffix(epUrl.Path, "/v1/traces") {
+		epUrl.Path = path.Join(epUrl.Path, "/v1/traces")
+	}
+
+	diagnostics.EndpointSource = source
+	diagnostics.Endpoint = epUrl.String()
+	return epUrl, source
 }
 
 // tlsConfig evaluates otel-cli configuration and returns a tls.Config
@@ -134,21 +190,12 @@ func tlsConfig(config Config) *tls.Config {
 }
 
 // grpcOptions convets config settings to an otlpgrpc.Option list.
-func grpcOptions(config Config) []otlptracegrpc.Option {
-	grpcOpts := []otlptracegrpc.Option{}
-
-	// per comment in initTracer(), grpc:// is specific to otel-cli
-	if strings.HasPrefix(config.Endpoint, "grpc://") ||
-		strings.HasPrefix(config.Endpoint, "http://") ||
-		strings.HasPrefix(config.Endpoint, "https://") {
-		ep, err := url.Parse(config.Endpoint)
-		if err != nil {
-			softFail("error parsing provided gRPC URI '%s': %s", config.Endpoint, err)
-		}
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithEndpoint(ep.Hostname()+":"+ep.Port()))
-	} else {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithEndpoint(config.Endpoint))
+func grpcOptions(endpointURL *url.URL, config Config) []otlptracegrpc.Option {
+	host := endpointURL.Hostname()
+	if endpointURL.Port() != "" {
+		host = host + ":" + endpointURL.Port()
 	}
+	grpcOpts := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(host)}
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
 	if timeout := parseCliTimeout(config); timeout > 0 {
@@ -160,7 +207,7 @@ func grpcOptions(config Config) []otlptracegrpc.Option {
 	// have any encryption available, or setting it up raises the bar of entry too high.
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
+	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, otlptracegrpc.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
 		grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig(config))))
@@ -184,12 +231,7 @@ func grpcOptions(config Config) []otlptracegrpc.Option {
 }
 
 // httpOptions converts config to an otlphttp.Option list.
-func httpOptions(config Config) []otlptracehttp.Option {
-	endpointURL, err := url.Parse(config.Endpoint)
-	if err != nil {
-		softFail("error parsing provided HTTP URI '%s': %s", config.Endpoint, err)
-	}
-
+func httpOptions(endpointURL *url.URL, config Config) []otlptracehttp.Option {
 	var endpointHostAndPort = endpointURL.Host
 	if endpointURL.Port() == "" {
 		if endpointURL.Scheme == "https" {
@@ -198,15 +240,13 @@ func httpOptions(config Config) []otlptracehttp.Option {
 			endpointHostAndPort += ":80"
 		}
 	}
-	httpOpts := []otlptracehttp.Option{otlptracehttp.WithEndpoint(endpointHostAndPort)}
 
-	if endpointURL.Path == "" {
-		// Per spec, /v1/traces is the default:
-		// (https://github.com/open-telemetry/opentelemetry-specification/blob/c14f5416605cb1bfce6e6e1984cbbeceb1bf35a2/specification/protocol/exporter.md#endpoint-urls-for-otlphttp)
-		endpointURL.Path = "/v1/traces"
+	// otlptracehttp expects endpoint to be just a host:port pair
+	// it constructs a URL from endpoint, path, and scheme (via Insecure flag)
+	httpOpts := []otlptracehttp.Option{
+		otlptracehttp.WithEndpoint(endpointHostAndPort),
+		otlptracehttp.WithURLPath(endpointURL.Path),
 	}
-
-	httpOpts = append(httpOpts, otlptracehttp.WithURLPath(endpointURL.Path))
 
 	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
 	if timeout := parseCliTimeout(config); timeout > 0 {
@@ -219,7 +259,7 @@ func httpOptions(config Config) []otlptracehttp.Option {
 	// raises the bar of entry too high.  The compromise is to automatically flip
 	// this flag to true when endpoint contains an an obvious "localhost",
 	// "127.0.0.x", or "::1" address.
-	if config.Insecure || (isLoopbackAddr(config.Endpoint) && !strings.HasPrefix(config.Endpoint, "https")) {
+	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
 		httpOpts = append(httpOpts, otlptracehttp.WithInsecure())
 	} else if !isInsecureSchema(config.Endpoint) {
 		httpOpts = append(httpOpts, otlptracehttp.WithTLSClientConfig(tlsConfig(config)))
@@ -234,32 +274,13 @@ func httpOptions(config Config) []otlptracehttp.Option {
 	return httpOpts
 }
 
-// isLoopbackAddr takes a dial string, looks up the address, then returns true
+// isLoopbackAddr takes a url.URL, looks up the address, then returns true
 // if it points at either a v4 or v6 loopback address.
 // As I understood the OTLP spec, only host:port or an HTTP URL are acceptable.
 // This function is _not_ meant to validate the endpoint, that will happen when
 // otel-go attempts to connect to the endpoint.
-func isLoopbackAddr(endpoint string) bool {
-	hpRe := regexp.MustCompile(`^[\w\.-]+:\d+$`)
-	uriRe := regexp.MustCompile(`^(grpc|http|https):`)
-
-	endpoint = strings.TrimSpace(endpoint)
-
-	var hostname string
-	if hpRe.MatchString(endpoint) {
-		parts := strings.SplitN(endpoint, ":", 2)
-		hostname = parts[0]
-	} else if uriRe.MatchString(endpoint) {
-		u, err := url.Parse(endpoint)
-		if err != nil {
-			softFail("error parsing provided URI '%s': %s", endpoint, err)
-		}
-		hostname = u.Hostname()
-	} else if strings.HasPrefix(endpoint, "unix://") {
-		return false
-	} else {
-		softFail("'%s' is not a valid endpoint, must be host:port or a URI", endpoint)
-	}
+func isLoopbackAddr(u *url.URL) bool {
+	hostname := u.Hostname()
 
 	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
 		diagnostics.DetectedLocalhost = true
