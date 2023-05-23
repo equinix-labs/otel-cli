@@ -15,7 +15,7 @@ func TestParseEndpoint(t *testing.T) {
 		// gRPC, general, bare host
 		{
 			config:       DefaultConfig().WithEndpoint("localhost"),
-			wantEndpoint: "grpc://localhost",
+			wantEndpoint: "grpc://localhost:4317",
 			wantSource:   "general",
 		},
 		// gRPC, general, should be bare host:port
@@ -51,7 +51,7 @@ func TestParseEndpoint(t *testing.T) {
 		// gRPC, signal, should come through with just the grpc:// added
 		{
 			config:       DefaultConfig().WithTracesEndpoint("localhost"),
-			wantEndpoint: "grpc://localhost",
+			wantEndpoint: "grpc://localhost:4317",
 			wantSource:   "signal",
 		},
 		// http, signal, should come through unmodified
