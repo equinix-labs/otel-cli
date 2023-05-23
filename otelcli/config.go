@@ -61,12 +61,13 @@ func DefaultConfig() Config {
 // This is used as a singleton as "config" and accessed from many other files.
 // Data structure is public so that it can serialize to json easily.
 type Config struct {
-	Endpoint string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
-	Protocol string            `json:"protocol" env:"OTEL_EXPORTER_OTLP_PROTOCOL,OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
-	Timeout  string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
-	Headers  map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
-	Insecure bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
-	Blocking bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
+	Endpoint       string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+	TracesEndpoint string            `json:"traces_endpoint" env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
+	Protocol       string            `json:"protocol" env:"OTEL_EXPORTER_OTLP_PROTOCOL,OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
+	Timeout        string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
+	Headers        map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
+	Insecure       bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
+	Blocking       bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
 
 	TlsCACert     string `json:"tls_ca_cert" env:"OTEL_EXPORTER_OTLP_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE"`
 	TlsClientKey  string `json:"tls_client_key" env:"OTEL_EXPORTER_OTLP_CLIENT_KEY,OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY"`
@@ -226,7 +227,7 @@ func (c Config) ToStringMap() map[string]string {
 // IsRecording returns true if an endpoint is set and otel-cli expects to send real
 // spans. Returns false if unconfigured and going to run inert.
 func (c Config) IsRecording() bool {
-	if c.Endpoint == "" {
+	if c.Endpoint == "" && c.TracesEndpoint == "" {
 		diagnostics.IsRecording = false
 		return false
 	}
@@ -238,6 +239,12 @@ func (c Config) IsRecording() bool {
 // WithEndpoint returns the config with Endpoint set to the provided value.
 func (c Config) WithEndpoint(with string) Config {
 	c.Endpoint = with
+	return c
+}
+
+// WithTracesEndpoint returns the config with TracesEndpoint set to the provided value.
+func (c Config) WithTracesEndpoint(with string) Config {
+	c.TracesEndpoint = with
 	return c
 }
 
