@@ -846,4 +846,32 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
+	// --force-trace-id and --force-span-id allow setting/forcing custom trace & span ids
+	{
+		{
+			Name: "forced trace & span ids",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"status",
+					"--endpoint", "{{endpoint}}",
+					"--force-trace-id", "00112233445566778899aabbccddeeff",
+					"--force-span-id", "beefcafefacedead",
+				},
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				SpanData: map[string]string{
+					"trace_id": "00112233445566778899aabbccddeeff",
+					"span_id":  "beefcafefacedead",
+				},
+				SpanCount: 1,
+				Diagnostics: otelcli.Diagnostics{
+					NumArgs:           7,
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+				},
+			},
+		},
+	},
 }

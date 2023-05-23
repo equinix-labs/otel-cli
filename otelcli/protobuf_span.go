@@ -8,6 +8,7 @@ package otelcli
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -81,9 +82,19 @@ func NewProtobufSpanWithConfig(c Config) tracepb.Span {
 			span.TraceId = tp.TraceId
 			span.ParentSpanId = tp.SpanId
 		}
+
 	} else {
 		span.TraceId = emptyTraceId
 		span.SpanId = emptySpanId
+	}
+
+	// --force-trace-id and --force-span-id let the user set their own trace & span ids
+	// these work in non-recording mode and will stomp trace id from the traceparent
+	if config.ForceTraceId != "" {
+		span.TraceId = parseHex(config.ForceTraceId, 16)
+	}
+	if config.ForceSpanId != "" {
+		span.SpanId = parseHex(config.ForceSpanId, 8)
 	}
 
 	SetSpanStatus(&span, c)
@@ -129,6 +140,19 @@ func generateSpanId(c Config) []byte {
 	} else {
 		return emptySpanId
 	}
+}
+
+// parseHex parses hex into a []byte of length provided. Errors if the input is
+// not valid hex or the converted hex is not the right number of bytes.
+func parseHex(in string, expectedLen int) []byte {
+	out, err := hex.DecodeString(in)
+	if err != nil {
+		softFail("error parsing hex string %q: %s", in, err)
+	}
+	if len(out) != expectedLen {
+		softFail("hex string %q is the wrong length, expected %d bytes but got %d", in, expectedLen, len(out))
+	}
+	return out
 }
 
 // SpanKindIntToString takes an integer/constant protobuf span kind value
