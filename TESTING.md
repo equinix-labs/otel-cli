@@ -66,10 +66,6 @@ ARGV specified in `Config.CliArgs`, and a clean environment with only the envvar
 provided in the `Env` stringmap. The output from otel-cli is captured with stdout
 and stderr combined. This can be tested against as well.
 
-When otel-cli reads an environment variable it clears it, to prevent opentelemetry-go
-from double-processing it. This is why envvars set in `Config.Env` don't show up
-in `Results.Env`.
-
 It is often wise to pass `"--fail", "--verbose"` to CliArgs for debugging and it's
 fine to leave them on permanently. Without them otel-cli will be silent about
 failures and you'll get a confusing test output.
