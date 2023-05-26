@@ -62,6 +62,8 @@ func addCommonParams(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "JSON configuration file")
 	// --endpoint an endpoint to send otlp output to
 	cmd.Flags().StringVar(&config.Endpoint, "endpoint", defaults.Endpoint, "host and port for the desired OTLP/gRPC or OTLP/HTTP endpoint (use http:// or https:// for OTLP/HTTP)")
+	// --traces-endpoint sets the endpoint for the traces signal
+	cmd.Flags().StringVar(&config.TracesEndpoint, "traces-endpoint", defaults.TracesEndpoint, "HTTP(s) URL for traces")
 	// --protocol allows setting the OTLP protocol instead of relying on auto-detection from URI
 	cmd.Flags().StringVar(&config.Protocol, "protocol", defaults.Protocol, "desired OTLP protocol: grpc or http/protobuf")
 	// --timeout a default timeout to use in all otel-cli operations (default 1s)
