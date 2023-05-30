@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -105,7 +106,8 @@ type Config struct {
 	Fail    bool   `json:"fail" env:"OTEL_CLI_FAIL"`
 
 	// private things for internals
-	envBackup []string // used to back up envvars for otel-cli exec
+	startupTime time.Time // used to compute deadlines for timeouts
+	envBackup   []string  // used to back up envvars for otel-cli exec
 }
 
 // LoadFile reads the file specified by -c/--config and overwrites the

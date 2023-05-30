@@ -2,12 +2,12 @@ package otelcli
 
 import (
 	"bytes"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -43,6 +43,8 @@ func init() {
 }
 
 func doExec(cmd *cobra.Command, args []string) {
+	ctx, client := StartClient(config)
+
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
 	config.Attributes["arguments"] = ""
@@ -91,13 +93,46 @@ func doExec(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	if err := child.Run(); err != nil {
+	// it's super unlikely the timeout will run concurrently but it's possible...
+	mut := sync.Mutex{}
+	var timedOut bool // to avoid overwriting the status message on child.Wait()
+	lockedError := func(msg string, isTimeout bool) {
+		mut.Lock()
+		defer mut.Unlock()
+		softLog(msg)
+		timedOut = isTimeout
 		span.Status.Code = tracepb.Status_STATUS_CODE_ERROR
-		span.Status.Message = fmt.Sprintf("command failed: %s", err)
+		span.Status.Message = msg
+	}
+
+	// HACK: give the process 50ms less than the --timeout value before killing it
+	// most of the time this will work out, but needs a better solution separate
+	// from the PR I'm working on now and noticed this (@tobert, 2023-05-31)
+	timeout := parseCliTimeout(config) - time.Millisecond*50
+
+	done := make(chan struct{}, 1)
+	if err := child.Start(); err != nil {
+		lockedError(fmt.Sprintf("command failed to start: %s", err), false)
+	}
+
+	go func() {
+		select {
+		case <-time.After(timeout):
+			child.Process.Kill()
+			// child.Wait() doesn't error on kill, so set the status now
+			lockedError("timeout: child process was terminated", true)
+		case <-done:
+			return
+		}
+	}()
+
+	if err := child.Wait(); err != nil && !timedOut {
+		lockedError(fmt.Sprintf("command failed: %s", err), false)
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
+	done <- struct{}{}
 
-	err := SendSpan(context.Background(), config, span)
+	err := SendSpan(ctx, client, config, span)
 	if err != nil {
 		softFail("unable to send span: %s", err)
 	}

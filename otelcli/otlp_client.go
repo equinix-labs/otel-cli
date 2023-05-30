@@ -10,48 +10,68 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
-// SendSpan connects to the OTLP server, sends the span, and disconnects.
-func SendSpan(ctx context.Context, config Config, span tracepb.Span) error {
+type OTLPClient interface {
+	Start(context.Context) error
+	UploadTraces(context.Context, []*tracepb.ResourceSpans) error
+	Stop(context.Context) error
+}
+
+func StartClient(config Config) (context.Context, OTLPClient) {
+	ctx := context.Background()
+
 	if !config.IsRecording() {
-		return nil
+		return ctx, nil
 	}
 
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
 		err := fmt.Errorf("invalid protocol setting %q", config.Protocol)
 		diagnostics.OtelError = err.Error()
-		return err
+		softFail(err.Error())
 	}
 
 	endpointURL, _ := parseEndpoint(config)
 
-	var client otlptrace.Client
+	var client otlptrace.Client // TODO: switch to OTLPClient
 	if config.Protocol != "grpc" &&
 		(strings.HasPrefix(config.Protocol, "http/") ||
 			endpointURL.Scheme == "http" ||
 			endpointURL.Scheme == "https") {
 		client = otlptracehttp.NewClient(httpOptions(endpointURL, config)...)
 	} else {
-		client = otlptracegrpc.NewClient(grpcOptions(endpointURL, config)...)
+		//client = otlptracegrpc.NewClient(grpcOptions(endpointURL, config)...)
+		client = NewGrpcClient()
 	}
 
 	err := client.Start(ctx)
 	if err != nil {
 		diagnostics.OtelError = err.Error()
-		return err
+		softFail("Failed to start OTLP client: %s", err)
+	}
+
+	return ctx, client
+}
+
+// SendSpan connects to the OTLP server, sends the span, and disconnects.
+func SendSpan(ctx context.Context, client OTLPClient, config Config, span tracepb.Span) error {
+	if !config.IsRecording() {
+		return nil
 	}
 
 	rsps := []*tracepb.ResourceSpans{
@@ -73,7 +93,7 @@ func SendSpan(ctx context.Context, config Config, span tracepb.Span) error {
 		},
 	}
 
-	err = client.UploadTraces(ctx, rsps)
+	err := client.UploadTraces(ctx, rsps)
 	if err != nil {
 		diagnostics.OtelError = err.Error()
 		return err
@@ -189,18 +209,31 @@ func tlsConfig(config Config) *tls.Config {
 	return tlsConfig
 }
 
-// grpcOptions convets config settings to an otlpgrpc.Option list.
-func grpcOptions(endpointURL *url.URL, config Config) []otlptracegrpc.Option {
+type GrpcClient struct {
+	conn   *grpc.ClientConn
+	client coltracepb.TraceServiceClient
+	config Config
+}
+
+// TODO: pass config into this, for now it's matching the OTel interface
+func NewGrpcClient() *GrpcClient {
+	// passes in the global, this will go away after lifting off the OTel backend
+	return RealNewGrpcClient(config)
+}
+
+func RealNewGrpcClient(config Config) *GrpcClient {
+	c := GrpcClient{config: config}
+	return &c
+}
+
+func (gc *GrpcClient) Start(ctx context.Context) error {
+	endpointURL, _ := parseEndpoint(config)
 	host := endpointURL.Hostname()
 	if endpointURL.Port() != "" {
 		host = host + ":" + endpointURL.Port()
 	}
-	grpcOpts := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(host)}
 
-	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
-	if timeout := parseCliTimeout(config); timeout > 0 {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithTimeout(timeout))
-	}
+	grpcOpts := []grpc.DialOption{}
 
 	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
 	// but I expect most users of this program to point at a localhost endpoint that might not
@@ -208,15 +241,9 @@ func grpcOptions(endpointURL *url.URL, config Config) []otlptracegrpc.Option {
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
 	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithInsecure())
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else if !isInsecureSchema(config.Endpoint) {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig(config))))
-	}
-
-	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(config.Headers) > 0 {
-		// fortunately WithHeaders can accept the string map as-is
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithHeaders(config.Headers))
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig(config))))
 	}
 
 	// OTLP examples usually show this with the grpc.WithBlock() dial option to
@@ -224,10 +251,42 @@ func grpcOptions(endpointURL *url.URL, config Config) []otlptracegrpc.Option {
 	// instead, rely on the shutdown methods to make sure everything is flushed
 	// by the time the program exits.
 	if config.Blocking {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithDialOption(grpc.WithBlock()))
+		grpcOpts = append(grpcOpts, grpc.WithBlock())
 	}
 
-	return grpcOpts
+	var err error
+	ctx, _ = deadlineCtx(ctx, gc.config, gc.config.startupTime)
+	gc.conn, err = grpc.DialContext(ctx, host, grpcOpts...)
+	if err != nil {
+		softFail("could not connect to gRPC/OTLP: %s", err)
+	}
+
+	gc.client = coltracepb.NewTraceServiceClient(gc.conn)
+
+	return nil
+}
+
+func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) error {
+	// add headers onto the request
+	md := metadata.New(config.Headers)
+	grpcOpts := []grpc.CallOption{grpc.HeaderCallOption{HeaderAddr: &md}}
+
+	req := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
+	ctx, cancel := deadlineCtx(ctx, gc.config, gc.config.startupTime)
+	defer cancel()
+	resp, err := gc.client.Export(ctx, &req, grpcOpts...)
+	if err != nil {
+		softFail("Export failed: %s", err)
+	}
+
+	// TODO: do something with this
+	resp.String()
+
+	return nil
+}
+
+func (gc *GrpcClient) Stop(ctx context.Context) error {
+	return gc.conn.Close()
 }
 
 // httpOptions converts config to an otlphttp.Option list.
@@ -272,6 +331,17 @@ func httpOptions(endpointURL *url.URL, config Config) []otlptracehttp.Option {
 	}
 
 	return httpOpts
+}
+
+// deadlineCtx sets timeout on the context if the duration is non-zero.
+// Otherwise it returns the context as-is.
+func deadlineCtx(ctx context.Context, config Config, startupTime time.Time) (context.Context, context.CancelFunc) {
+	if timeout := parseCliTimeout(config); timeout > 0 {
+		deadline := startupTime.Add(timeout)
+		return context.WithDeadline(ctx, deadline)
+	}
+
+	return ctx, func() {}
 }
 
 // isLoopbackAddr takes a url.URL, looks up the address, then returns true

@@ -1,7 +1,6 @@
 package otelcli
 
 import (
-	"context"
 	"os"
 	"os/signal"
 	"path"
@@ -66,6 +65,7 @@ func spanBgSockfile() string {
 
 func doSpanBackground(cmd *cobra.Command, args []string) {
 	started := time.Now()
+	ctx, client := StartClient(config)
 
 	// special case --wait, createBgClient() will wait for the socket to show up
 	// then connect and send a no-op RPC. by this time e.g. --tp-carrier should
@@ -133,7 +133,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	bgs.Run()
 
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
-	err := SendSpan(context.Background(), config, span)
+	err := SendSpan(ctx, client, config, span)
 	if err != nil {
 		softFail("Sending span failed: %s", err)
 	}
