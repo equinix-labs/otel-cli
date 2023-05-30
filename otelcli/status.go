@@ -36,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	addCommonParams(statusCmd)
 	addClientParams(statusCmd)
+	addSpanParams(statusCmd)
 }
 
 func doStatus(cmd *cobra.Command, args []string) {
@@ -49,7 +50,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
 
 	env := make(map[string]string)
-	for _, e := range os.Environ() {
+	for _, e := range config.envBackup {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 {
 			// TODO: this is just enough so I can sleep tonight.

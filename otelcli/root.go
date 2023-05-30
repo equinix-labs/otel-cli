@@ -8,23 +8,10 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "otel-cli",
-	Short: "CLI for creating and sending OpenTelemetry spans and events.",
-	Long:  `A command-line interface for generating OpenTelemetry data on the command line.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		if err := config.LoadFile(); err != nil {
-			softFail("Error while loading configuration file %s: %s", config.CfgFile, err)
-		}
-		if err := config.LoadEnv(os.Getenv); err != nil {
-			// will need to specify --fail --verbose flags to see these errors
-			softFail("Error while loading environment variables: %s", err)
-		}
-
-		// plug a copy of the completed config into diagnostics
-		// so the otel error handler can check --fail/--verbose config
-		// this should go away after rewriting the otel exporter
-		diagnostics.config = config
-	},
+	Use:              "otel-cli",
+	Short:            "CLI for creating and sending OpenTelemetry spans and events.",
+	Long:             `A command-line interface for generating OpenTelemetry data on the command line.`,
+	PersistentPreRun: ConfigPreRun,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,6 +32,28 @@ func init() {
 	}
 }
 
+// ConfigPreRun is called by Cobra right after reading CLI args, and will load
+// the config file, then environment.
+func ConfigPreRun(cmd *cobra.Command, args []string) {
+	// because the OTel collector client code directly reads envvars, the OTEL_
+	// variables are deleted during config.LoadEnv(). This breaks expectations
+	// for otel-cli exec users, so we save a copy to pass to exec
+	config.envBackup = os.Environ()
+
+	if err := config.LoadFile(); err != nil {
+		softFail("Error while loading configuration file %s: %s", config.CfgFile, err)
+	}
+	if err := config.LoadEnv(os.Getenv); err != nil {
+		// will need to specify --fail --verbose flags to see these errors
+		softFail("Error while loading environment variables: %s", err)
+	}
+
+	// plug a copy of the completed config into diagnostics
+	// so the otel error handler can check --fail/--verbose config
+	// this should go away after rewriting the otel exporter
+	diagnostics.config = config
+}
+
 // addCommonParams adds the --config and --endpoint params to the command.
 func addCommonParams(cmd *cobra.Command) {
 	defaults := DefaultConfig()
@@ -53,6 +62,8 @@ func addCommonParams(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "JSON configuration file")
 	// --endpoint an endpoint to send otlp output to
 	cmd.Flags().StringVar(&config.Endpoint, "endpoint", defaults.Endpoint, "host and port for the desired OTLP/gRPC or OTLP/HTTP endpoint (use http:// or https:// for OTLP/HTTP)")
+	// --traces-endpoint sets the endpoint for the traces signal
+	cmd.Flags().StringVar(&config.TracesEndpoint, "traces-endpoint", defaults.TracesEndpoint, "HTTP(s) URL for traces")
 	// --protocol allows setting the OTLP protocol instead of relying on auto-detection from URI
 	cmd.Flags().StringVar(&config.Protocol, "protocol", defaults.Protocol, "desired OTLP protocol: grpc or http/protobuf")
 	// --timeout a default timeout to use in all otel-cli operations (default 1s)
@@ -99,6 +110,10 @@ func addSpanParams(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&config.ServiceName, "service", "s", defaults.ServiceName, "set the name of the application sent on the traces")
 	// --kind / -k
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", defaults.Kind, "set the trace kind, e.g. internal, server, client, producer, consumer")
+
+	// expert options: --force-trace-id, --force-span-id allow setting custom trace & span ids
+	cmd.Flags().StringVar(&config.ForceTraceId, "force-trace-id", defaults.ForceTraceId, "expert: force the trace id to be the one provided in hex")
+	cmd.Flags().StringVar(&config.ForceSpanId, "force-span-id", defaults.ForceSpanId, "expert: force the span id to be the one provided in hex")
 
 	addSpanStatusParams(cmd)
 }

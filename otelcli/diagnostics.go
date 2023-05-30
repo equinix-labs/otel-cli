@@ -19,6 +19,8 @@ type Diagnostics struct {
 	DetectedLocalhost  bool     `json:"detected_localhost"`
 	InsecureSkipVerify bool     `json:"insecure_skip_verify"`
 	ParsedTimeoutMs    int64    `json:"parsed_timeout_ms"`
+	Endpoint           string   `json:"endpoint"` // the computed endpoint, not the raw config val
+	EndpointSource     string   `json:"endpoint_source"`
 	OtelError          string   `json:"otel_error"`
 	ExecExitCode       int      `json:"exec_exit_code"`
 	config             Config
@@ -47,6 +49,8 @@ func (d *Diagnostics) ToStringMap() map[string]string {
 		"number_of_args":     strconv.Itoa(d.NumArgs),
 		"detected_localhost": strconv.FormatBool(d.DetectedLocalhost),
 		"parsed_timeout_ms":  strconv.FormatInt(d.ParsedTimeoutMs, 10),
+		"endpoint":           d.Endpoint,
+		"endpoint_source":    d.EndpointSource,
 		"otel_error":         d.OtelError,
 	}
 }

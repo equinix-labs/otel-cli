@@ -33,6 +33,8 @@ func DefaultConfig() Config {
 		ServiceName:                  "otel-cli",
 		SpanName:                     "todo-generate-default-span-names",
 		Kind:                         "client",
+		ForceTraceId:                 "",
+		ForceSpanId:                  "",
 		Attributes:                   map[string]string{},
 		TraceparentCarrierFile:       "",
 		TraceparentIgnoreEnv:         false,
@@ -59,12 +61,13 @@ func DefaultConfig() Config {
 // This is used as a singleton as "config" and accessed from many other files.
 // Data structure is public so that it can serialize to json easily.
 type Config struct {
-	Endpoint string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT,OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
-	Protocol string            `json:"protocol" env:"OTEL_EXPORTER_OTLP_PROTOCOL,OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
-	Timeout  string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
-	Headers  map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
-	Insecure bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
-	Blocking bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
+	Endpoint       string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+	TracesEndpoint string            `json:"traces_endpoint" env:"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"`
+	Protocol       string            `json:"protocol" env:"OTEL_EXPORTER_OTLP_PROTOCOL,OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"`
+	Timeout        string            `json:"timeout" env:"OTEL_EXPORTER_OTLP_TIMEOUT,OTEL_EXPORTER_OTLP_TRACES_TIMEOUT"`
+	Headers        map[string]string `json:"otlp_headers" env:"OTEL_EXPORTER_OTLP_HEADERS"` // TODO: needs json marshaler hook to mask tokens
+	Insecure       bool              `json:"insecure" env:"OTEL_EXPORTER_OTLP_INSECURE"`
+	Blocking       bool              `json:"otlp_blocking" env:"OTEL_EXPORTER_OTLP_BLOCKING"`
 
 	TlsCACert     string `json:"tls_ca_cert" env:"OTEL_EXPORTER_OTLP_CERTIFICATE,OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE"`
 	TlsClientKey  string `json:"tls_client_key" env:"OTEL_EXPORTER_OTLP_CLIENT_KEY,OTEL_EXPORTER_OTLP_TRACES_CLIENT_KEY"`
@@ -78,6 +81,8 @@ type Config struct {
 	Attributes        map[string]string `json:"span_attributes" env:"OTEL_CLI_ATTRIBUTES"`
 	StatusCode        string            `json:"span_status_code" env:"OTEL_CLI_STATUS_CODE"`
 	StatusDescription string            `json:"span_status_description" env:"OTEL_CLI_STATUS_DESCRIPTION"`
+	ForceSpanId       string            `json:"force_span_id" env:"OTEL_CLI_FORCE_SPAN_ID"`
+	ForceTraceId      string            `json:"force_trace_id" env:"OTEL_CLI_FORCE_TRACE_ID"`
 
 	TraceparentCarrierFile string `json:"traceparent_carrier_file" env:"OTEL_CLI_CARRIER_FILE"`
 	TraceparentIgnoreEnv   bool   `json:"traceparent_ignore_env" env:"OTEL_CLI_IGNORE_ENV"`
@@ -98,6 +103,9 @@ type Config struct {
 	CfgFile string `json:"config_file" env:"OTEL_CLI_CONFIG_FILE"`
 	Verbose bool   `json:"verbose" env:"OTEL_CLI_VERBOSE"`
 	Fail    bool   `json:"fail" env:"OTEL_CLI_FAIL"`
+
+	// private things for internals
+	envBackup []string // used to back up envvars for otel-cli exec
 }
 
 // LoadFile reads the file specified by -c/--config and overwrites the
@@ -219,7 +227,7 @@ func (c Config) ToStringMap() map[string]string {
 // IsRecording returns true if an endpoint is set and otel-cli expects to send real
 // spans. Returns false if unconfigured and going to run inert.
 func (c Config) IsRecording() bool {
-	if c.Endpoint == "" {
+	if c.Endpoint == "" && c.TracesEndpoint == "" {
 		diagnostics.IsRecording = false
 		return false
 	}
@@ -231,6 +239,12 @@ func (c Config) IsRecording() bool {
 // WithEndpoint returns the config with Endpoint set to the provided value.
 func (c Config) WithEndpoint(with string) Config {
 	c.Endpoint = with
+	return c
+}
+
+// WithTracesEndpoint returns the config with TracesEndpoint set to the provided value.
+func (c Config) WithTracesEndpoint(with string) Config {
+	c.TracesEndpoint = with
 	return c
 }
 

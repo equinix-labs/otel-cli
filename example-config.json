@@ -1,5 +1,6 @@
 {
    "endpoint" : "localhost:4317",
+   "traces_endpoint": "",
    "timeout" : "1s",
    "otlp_headers" : {
       "header1" : "header1-value"

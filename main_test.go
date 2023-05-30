@@ -147,7 +147,12 @@ func runFixture(t *testing.T, fixture Fixture, wait, done chan struct{}) {
 // checkAll gathers up all the check* funcs below into one function.
 func checkAll(t *testing.T, fixture Fixture, results Results) {
 	// check timeout and process status expectations
-	checkProcess(t, fixture, results)
+	success := checkProcess(t, fixture, results)
+	// when the process fails, no point in checking the rest, it's just noise
+	if !success {
+		t.Log("otel-cli process failed unexpectedly, will not test values from it")
+		return
+	}
 
 	// compare the number of recorded spans against expectations in the fixture
 	checkSpanCount(t, fixture, results)
@@ -179,13 +184,16 @@ func checkSpanCount(t *testing.T, fixture Fixture, results Results) {
 // checkProcess validates configured expectations about whether otel-cli failed
 // or the test timed out. These are mostly used for testing that otel-cli fails
 // in the way we want it to.
-func checkProcess(t *testing.T, fixture Fixture, results Results) {
+func checkProcess(t *testing.T, fixture Fixture, results Results) bool {
 	if results.TimedOut != fixture.Expect.TimedOut {
 		t.Errorf("[%s] test timeout status is %t but expected %t", fixture.Name, results.TimedOut, fixture.Expect.TimedOut)
+		return false
 	}
 	if results.CommandFailed != fixture.Expect.CommandFailed {
 		t.Errorf("[%s] command failed is %t but expected %t", fixture.Name, results.CommandFailed, fixture.Expect.CommandFailed)
+		return false
 	}
+	return true
 }
 
 // checkOutput looks that otel-cli output stored in the results and compares against
@@ -221,6 +229,11 @@ func checkStatusData(t *testing.T, fixture Fixture, results Results) {
 	// an empty string, just ignore that key
 	if wantDiag["cli_args"] == "" {
 		gotDiag["cli_args"] = ""
+	}
+	for k, v := range wantDiag {
+		if v == "*" {
+			wantDiag[k] = gotDiag[k]
+		}
 	}
 	if diff := cmp.Diff(wantDiag, gotDiag); diff != "" {
 		t.Errorf("[%s] diagnostic data did not match fixture (-want +got):\n%s", fixture.Name, diff)

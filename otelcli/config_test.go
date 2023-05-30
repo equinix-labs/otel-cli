@@ -42,6 +42,11 @@ func TestWithEndpoint(t *testing.T) {
 		t.Fail()
 	}
 }
+func TestWithTracesEndpoint(t *testing.T) {
+	if DefaultConfig().WithTracesEndpoint("foobar").TracesEndpoint != "foobar" {
+		t.Fail()
+	}
+}
 func TestWithTimeout(t *testing.T) {
 	if DefaultConfig().WithTimeout("foobar").Timeout != "foobar" {
 		t.Fail()

@@ -123,6 +123,8 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -148,6 +150,8 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -182,6 +186,8 @@ var suites = []FixtureSuite{
 					DetectedLocalhost:  true,
 					InsecureSkipVerify: true,
 					ParsedTimeoutMs:    1000,
+					Endpoint:           "*",
+					EndpointSource:     "*",
 				},
 				SpanCount: 1,
 			},
@@ -204,6 +210,8 @@ var suites = []FixtureSuite{
 					NumArgs:           4,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -239,6 +247,8 @@ var suites = []FixtureSuite{
 					DetectedLocalhost:  true,
 					InsecureSkipVerify: true,
 					ParsedTimeoutMs:    1000,
+					Endpoint:           "*",
+					EndpointSource:     "*",
 				},
 				SpanCount: 1,
 			},
@@ -271,6 +281,8 @@ var suites = []FixtureSuite{
 					NumArgs:           11,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -331,6 +343,8 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 					OtelError:         `Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
 				},
 				SpanCount: 0,
@@ -363,6 +377,75 @@ var suites = []FixtureSuite{
 				},
 			},
 		},
+		{
+			Name: "#181 OTEL_ envvars should persist through to otel-cli exec",
+			Config: FixtureConfig{
+				CliArgs: []string{"status"},
+				Env: map[string]string{
+					"OTEL_FAKE_VARIABLE":             "fake value",
+					"OTEL_EXPORTER_OTLP_ENDPOINT":    "{{endpoint}}",
+					"OTEL_EXPORTER_OTLP_CERTIFICATE": "{{tls_ca_cert}}",
+					"X_WHATEVER":                     "whatever",
+				},
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}").WithTlsCACert("{{tls_ca_cert}}"),
+				Env: map[string]string{
+					"OTEL_FAKE_VARIABLE":             "fake value",
+					"OTEL_EXPORTER_OTLP_ENDPOINT":    "{{endpoint}}",
+					"OTEL_EXPORTER_OTLP_CERTIFICATE": "{{tls_ca_cert}}",
+					"X_WHATEVER":                     "whatever",
+				},
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					NumArgs:           1,
+					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
+				},
+			},
+		},
+		{
+			Name: "#200 custom trace path in general endpoint gets signal path appended",
+			Config: FixtureConfig{
+				CliArgs:        []string{"status", "--endpoint", "http://{{endpoint}}/mycollector"},
+				ServerProtocol: httpProtocol,
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}/mycollector"),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					NumArgs:           3,
+					ParsedTimeoutMs:   1000,
+					// spec says /v1/traces should get appended to any general endpoint URL
+					Endpoint:       "http://{{endpoint}}/mycollector/v1/traces",
+					EndpointSource: "general",
+				},
+			},
+		},
+		{
+			Name: "#200 custom trace path on signal endpoint does not get modified",
+			Config: FixtureConfig{
+				CliArgs:        []string{"status", "--traces-endpoint", "http://{{endpoint}}/mycollector/x/1"},
+				ServerProtocol: httpProtocol,
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithTracesEndpoint("http://{{endpoint}}/mycollector/x/1"),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					NumArgs:           3,
+					ParsedTimeoutMs:   1000,
+					Endpoint:          "http://{{endpoint}}/mycollector/x/1",
+					EndpointSource:    "signal",
+				},
+			},
+		},
 	},
 	// otel-cli span with no OTLP config should do and print nothing
 	{
@@ -392,6 +475,11 @@ var suites = []FixtureSuite{
 					IsRecording:     true,
 					NumArgs:         3,
 					ParsedTimeoutMs: 1000,
+					Endpoint:        "*",
+					EndpointSource:  "*",
+				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
 				},
 				Config: otelcli.DefaultConfig().
 					WithEndpoint("{{endpoint}}"). // tells the test framework to ignore/overwrite
@@ -631,7 +719,8 @@ var suites = []FixtureSuite{
 		{
 			Name: "otel-cli span exec echo",
 			Config: FixtureConfig{
-				CliArgs: []string{"exec", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server", "echo hello world"},
+				// intentionally calling a command with no args bc it's a special case in exec.go
+				CliArgs: []string{"exec", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server", "echo"},
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
 					"TRACEPARENT":                 "00-edededededededededededededed9000-edededededededed-01",
@@ -643,7 +732,7 @@ var suites = []FixtureSuite{
 					"span_id":  "*",
 					"trace_id": "edededededededededededededed9000",
 				},
-				CliOutput: "hello world\n",
+				CliOutput: "\n",
 				SpanCount: 1,
 			},
 		},
@@ -655,7 +744,7 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{
 					"exec", "--name", "outer", "--endpoint", "{{endpoint}}", "--fail", "--verbose", "--",
-					"./otel-cli", "exec", "--name", "inner", "--endpoint", "{{endpoint}}", "--tp-required", "--fail", "--verbose", "echo hello world"},
+					"./otel-cli", "exec", "--name", "inner", "--endpoint", "{{endpoint}}", "--tp-required", "--fail", "--verbose", "echo", "hello world"},
 			},
 			Expect: Results{
 				Config: otelcli.DefaultConfig(),
@@ -688,6 +777,8 @@ var suites = []FixtureSuite{
 					NumArgs:           5,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -709,6 +800,8 @@ var suites = []FixtureSuite{
 					NumArgs:           5,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -729,6 +822,8 @@ var suites = []FixtureSuite{
 					NumArgs:           7,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 0,
 			},
@@ -750,11 +845,16 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"server_meta": "proto=grpc",
 				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -774,11 +874,16 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
 				},
+				Env: map[string]string{
+					"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 				},
 				SpanCount: 1,
 			},
@@ -802,9 +907,41 @@ var suites = []FixtureSuite{
 					NumArgs:           3,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
 					OtelError:         "invalid protocol setting \"roflcopter\"\n",
 				},
 				SpanCount: 0,
+			},
+		},
+	},
+	// --force-trace-id and --force-span-id allow setting/forcing custom trace & span ids
+	{
+		{
+			Name: "forced trace & span ids",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"status",
+					"--endpoint", "{{endpoint}}",
+					"--force-trace-id", "00112233445566778899aabbccddeeff",
+					"--force-span-id", "beefcafefacedead",
+				},
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				SpanData: map[string]string{
+					"trace_id": "00112233445566778899aabbccddeeff",
+					"span_id":  "beefcafefacedead",
+				},
+				SpanCount: 1,
+				Diagnostics: otelcli.Diagnostics{
+					NumArgs:           7,
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
+				},
 			},
 		},
 	},
