@@ -204,50 +204,6 @@ func tlsConfig(config Config) *tls.Config {
 	return tlsConfig
 }
 
-// httpOptions converts config to an otlphttp.Option list.
-func httpOptions(endpointURL *url.URL, config Config) []otlptracehttp.Option {
-	var endpointHostAndPort = endpointURL.Host
-	if endpointURL.Port() == "" {
-		if endpointURL.Scheme == "https" {
-			endpointHostAndPort += ":443"
-		} else {
-			endpointHostAndPort += ":80"
-		}
-	}
-
-	// otlptracehttp expects endpoint to be just a host:port pair
-	// it constructs a URL from endpoint, path, and scheme (via Insecure flag)
-	httpOpts := []otlptracehttp.Option{
-		otlptracehttp.WithEndpoint(endpointHostAndPort),
-		otlptracehttp.WithURLPath(endpointURL.Path),
-	}
-
-	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
-	if timeout := parseCliTimeout(config); timeout > 0 {
-		httpOpts = append(httpOpts, otlptracehttp.WithTimeout(timeout))
-	}
-
-	// otlptracehttp does the right thing and forces us to say WithInsecure to disable
-	// encryption, but I expect most users of this program to point at a localhost
-	// endpoint that might not have any encryption available, or setting it up
-	// raises the bar of entry too high.  The compromise is to automatically flip
-	// this flag to true when endpoint contains an an obvious "localhost",
-	// "127.0.0.x", or "::1" address.
-	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
-		httpOpts = append(httpOpts, otlptracehttp.WithInsecure())
-	} else if !isInsecureSchema(config.Endpoint) {
-		httpOpts = append(httpOpts, otlptracehttp.WithTLSClientConfig(tlsConfig(config)))
-	}
-
-	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(config.Headers) > 0 {
-		// fortunately WithHeaders can accept the string map as-is
-		httpOpts = append(httpOpts, otlptracehttp.WithHeaders(config.Headers))
-	}
-
-	return httpOpts
-}
-
 // deadlineCtx sets timeout on the context if the duration is non-zero.
 // Otherwise it returns the context as-is.
 func deadlineCtx(ctx context.Context, config Config, startupTime time.Time) (context.Context, context.CancelFunc) {
