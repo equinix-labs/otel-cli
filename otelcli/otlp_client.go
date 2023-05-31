@@ -14,7 +14,6 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -48,9 +47,8 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 		(strings.HasPrefix(config.Protocol, "http/") ||
 			endpointURL.Scheme == "http" ||
 			endpointURL.Scheme == "https") {
-		client = otlptracehttp.NewClient(httpOptions(endpointURL, config)...)
+		client = NewHttpClient()
 	} else {
-		//client = otlptracegrpc.NewClient(grpcOptions(endpointURL, config)...)
 		client = NewGrpcClient()
 	}
 
