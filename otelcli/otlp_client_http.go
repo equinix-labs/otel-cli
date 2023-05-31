@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -74,12 +75,19 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 
 	// TODO: look at the response
 	return retry(hc.timeout, func() (bool, error) {
-		_, err := hc.client.Do(req)
-		// e.g. http on https, un-retriable error, quit now
+		resp, err := hc.client.Do(req)
 		if uerr, ok := err.(*url.Error); ok {
+			// e.g. http on https, un-retriable error, quit now
 			return false, uerr
+		} else if err != nil {
+			// all other errors get retried
+			return true, err
+		} else {
+			// success!
+			io.ReadAll(resp.Body) // TODO, do something with body
+			resp.Body.Close()
+			return false, nil
 		}
-		return true, err
 	})
 }
 
