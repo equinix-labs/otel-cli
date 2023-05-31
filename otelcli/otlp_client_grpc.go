@@ -18,13 +18,7 @@ type GrpcClient struct {
 	config Config
 }
 
-// TODO: pass config into this, for now it's matching the OTel interface
-func NewGrpcClient() *GrpcClient {
-	// passes in the global, this will go away after lifting off the OTel backend
-	return RealNewGrpcClient(config)
-}
-
-func RealNewGrpcClient(config Config) *GrpcClient {
+func NewGrpcClient(config Config) *GrpcClient {
 	c := GrpcClient{config: config}
 	return &c
 }
@@ -38,7 +32,7 @@ func (gc *GrpcClient) Start(ctx context.Context) error {
 
 	grpcOpts := []grpc.DialOption{}
 
-	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
+	// Go's TLS does the right thing and forces us to say we want to disable encryption,
 	// but I expect most users of this program to point at a localhost endpoint that might not
 	// have any encryption available, or setting it up raises the bar of entry too high.
 	// The compromise is to automatically flip this flag to true when endpoint contains an
@@ -77,15 +71,12 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	req := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
 	ctx, cancel := deadlineCtx(ctx, gc.config, gc.config.startupTime)
 	defer cancel()
-	resp, err := gc.client.Export(ctx, &req, grpcOpts...)
-	if err != nil {
-		softFail("Export failed: %s", err)
-	}
 
-	// TODO: do something with this
-	resp.String()
-
-	return nil
+	timeout := parseCliTimeout(config)
+	return retry(timeout, func() (bool, error) {
+		_, err := gc.client.Export(ctx, &req, grpcOpts...)
+		return true, err
+	})
 }
 
 func (gc *GrpcClient) Stop(ctx context.Context) error {

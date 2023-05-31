@@ -6,6 +6,9 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -13,32 +16,32 @@ import (
 )
 
 type HttpClient struct {
-	client *http.Client
-	config Config
+	client  *http.Client
+	config  Config
+	timeout time.Duration
 }
 
-// TODO: pass config into this, for now it's matching the OTel interface
-func NewHttpClient() *HttpClient {
-	// passes in the global, this will go away after lifting off the OTel backend
-	return RealNewHttpClient(config)
-}
-
-func RealNewHttpClient(config Config) *HttpClient {
+func NewHttpClient(config Config) *HttpClient {
 	c := HttpClient{config: config}
 	return &c
 }
 
 func (hc *HttpClient) Start(ctx context.Context) error {
 	tlsConf := tlsConfig(hc.config)
-	timeout := parseCliTimeout(hc.config)
+	hc.timeout = parseCliTimeout(hc.config)
 
-	hc.client = &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				return tls.Dial(network, addr, tlsConf)
+	endpointURL, _ := parseEndpoint(config)
+	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
+		hc.client = &http.Client{Timeout: hc.timeout}
+	} else if !isInsecureSchema(config.Endpoint) {
+		hc.client = &http.Client{
+			Timeout: hc.timeout,
+			Transport: &http.Transport{
+				DialTLS: func(network, addr string) (net.Conn, error) {
+					return tls.Dial(network, addr, tlsConf)
+				},
 			},
-		},
+		}
 	}
 	return nil
 }
@@ -63,14 +66,14 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
-	resp, err := hc.client.Do(req)
-	if err != nil {
-		return err // TODO: beef up errors
-	}
-
-	softLog(resp.Status)
-
-	return nil
+	// TODO: look at the response
+	return retry(hc.timeout, func() (bool, error) {
+		_, err := hc.client.Do(req)
+		if uerr, ok := err.(*url.Error); ok {
+			return false, uerr
+		}
+		return true, err
+	})
 }
 
 func (hc *HttpClient) Stop(ctx context.Context) error {

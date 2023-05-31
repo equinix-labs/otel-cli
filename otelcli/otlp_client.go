@@ -47,9 +47,9 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 		(strings.HasPrefix(config.Protocol, "http/") ||
 			endpointURL.Scheme == "http" ||
 			endpointURL.Scheme == "https") {
-		client = NewHttpClient()
+		client = NewHttpClient(config)
 	} else {
-		client = NewGrpcClient()
+		client = NewGrpcClient(config)
 	}
 
 	err := client.Start(ctx)
@@ -296,4 +296,28 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 	}
 
 	return attrs
+}
+
+func retry(timeout time.Duration, fun func() (bool, error)) error {
+	deadline := config.startupTime.Add(timeout)
+	sleep := time.Duration(0)
+	for {
+		if keepGoing, err := fun(); err != nil {
+			softLog(err.Error())
+			if keepGoing {
+				sleep = sleep + time.Millisecond*10
+
+				time.Sleep(sleep)
+				if time.Now().After(deadline) {
+					diagnostics.OtelError = err.Error()
+					return err
+				}
+			} else {
+				diagnostics.OtelError = err.Error()
+				return err
+			}
+		} else {
+			return nil
+		}
+	}
 }
