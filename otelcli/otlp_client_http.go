@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 )
@@ -52,7 +52,7 @@ func (hc *HttpClient) Start(ctx context.Context) error {
 
 // UploadTraces sends the protobuf spans up to the HTTP server.
 func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) error {
-	msg := v1.ExportTraceServiceRequest{ResourceSpans: rsps}
+	msg := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
 	protoMsg, err := proto.Marshal(&msg)
 	if err != nil {
 		return err // TODO: beef up errors
