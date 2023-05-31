@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -42,7 +41,7 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 
 	endpointURL, _ := parseEndpoint(config)
 
-	var client otlptrace.Client // TODO: switch to OTLPClient
+	var client OTLPClient
 	if config.Protocol != "grpc" &&
 		(strings.HasPrefix(config.Protocol, "http/") ||
 			endpointURL.Scheme == "http" ||
