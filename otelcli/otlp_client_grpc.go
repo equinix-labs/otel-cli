@@ -12,17 +12,20 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// GrpcClient holds the state for gRPC connections.
 type GrpcClient struct {
 	conn   *grpc.ClientConn
 	client coltracepb.TraceServiceClient
 	config Config
 }
 
+// NewGrpcClient returns a fresh GrpcClient ready to Start.
 func NewGrpcClient(config Config) *GrpcClient {
 	c := GrpcClient{config: config}
 	return &c
 }
 
+// Start configures and starts the connection to the gRPC server in the background.
 func (gc *GrpcClient) Start(ctx context.Context) error {
 	endpointURL, _ := parseEndpoint(config)
 	host := endpointURL.Hostname()
@@ -63,6 +66,8 @@ func (gc *GrpcClient) Start(ctx context.Context) error {
 	return nil
 }
 
+// UploadTraces takes a list of protobuf spans and sends them out, doing retries
+// on some errors as needed.
 func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) error {
 	// add headers onto the request
 	md := metadata.New(config.Headers)
@@ -79,6 +84,7 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	})
 }
 
+// Stop closes the connection to the gRPC server.
 func (gc *GrpcClient) Stop(ctx context.Context) error {
 	return gc.conn.Close()
 }

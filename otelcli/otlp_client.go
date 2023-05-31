@@ -20,12 +20,17 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+// OTLPClient is an interface that allows for StartClient to return either a
+// gRPC or HTTP.
+// matches the OTel collector's similar interface
 type OTLPClient interface {
 	Start(context.Context) error
 	UploadTraces(context.Context, []*tracepb.ResourceSpans) error
 	Stop(context.Context) error
 }
 
+// StartClient uses the Config to setup and start either a gRPC or HTTP client,
+// and returns the OTLPClient interface to them.
 func StartClient(config Config) (context.Context, OTLPClient) {
 	ctx := context.Background()
 
@@ -297,6 +302,9 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 	return attrs
 }
 
+// retry is a simple retry mechanism that backs off linearly, 10ms at a time.
+// It calls the provided function and expects it to return true, err to keep
+// retrying, and false, err to stop retrying and return.
 func retry(timeout time.Duration, fun func() (bool, error)) error {
 	deadline := config.startupTime.Add(timeout)
 	sleep := time.Duration(0)
