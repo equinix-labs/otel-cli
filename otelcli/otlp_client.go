@@ -302,22 +302,37 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 	return attrs
 }
 
-// retry is a simple retry mechanism that backs off linearly, 10ms at a time.
-// It calls the provided function and expects it to return true, err to keep
-// retrying, and false, err to stop retrying and return.
-func retry(timeout time.Duration, fun func() (bool, error)) error {
+// retry calls the provided function and expects it to return (true, err) to
+// keep retrying, and (false, err) to stop retrying and return.
+//
+// This is a minimal retry mechanism that backs off linearly, 100ms at a time,
+// up to a maximum of 5 seconds.
+// While there are many robust implementations of retries out there, this one
+// is just ~20 LoC and seems to work fine for otel-cli's modest needs. It should
+// be rare for otel-cli to have a long timeout in the first place, and when it
+// does, maybe it's ok to wait a few seconds.
+// TODO: provide --otlp-retries (or something like that) option on CLI
+// TODO: --otlp-retry-sleep? --otlp-retry-timeout?
+// TODO: span events? hmm... feels weird to plumb spans this deep into the client
+// but it's probably fine?
+func retry(timeout time.Duration, fun retryFun) error {
 	deadline := config.startupTime.Add(timeout)
 	sleep := time.Duration(0)
 	for {
 		if keepGoing, err := fun(); err != nil {
-			softLog(err.Error())
-			if keepGoing {
-				sleep = sleep + time.Millisecond*10
+			softLog("error on retry %d: %s", diagnostics.Retries, err)
 
+			if keepGoing {
 				time.Sleep(sleep)
+
 				if time.Now().After(deadline) {
 					diagnostics.Error = err.Error()
 					return err
+				}
+
+				// linearly increase sleep time up to 5 seconds
+				if sleep < time.Second*5 {
+					sleep = sleep + time.Millisecond*100
 				}
 			} else {
 				diagnostics.Error = err.Error()
@@ -326,5 +341,15 @@ func retry(timeout time.Duration, fun func() (bool, error)) error {
 		} else {
 			return nil
 		}
+
+		// It's retries instead of "tries" because "tries" means other things
+		// too. Also, retries can default to 0 and it makes sense, saving
+		// copying in test data.
+		diagnostics.Retries++
 	}
 }
+
+// retryFun is the function signature for functions passed to retry().
+// Return (false, err) to stop retrying. Return (true,err) to continue
+// retrying until timeout.
+type retryFun func() (keepGoing bool, err error)

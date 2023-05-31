@@ -23,6 +23,7 @@ type Diagnostics struct {
 	EndpointSource     string   `json:"endpoint_source"`
 	Error              string   `json:"error"`
 	ExecExitCode       int      `json:"exec_exit_code"`
+	Retries            int      `json:"retries"`
 }
 
 // ToMap returns the Diagnostics struct as a string map for testing.

@@ -46,6 +46,8 @@ func (hc *HttpClient) Start(ctx context.Context) error {
 				},
 			},
 		}
+	} else {
+		softFail("BUG in otel-cli: an invalid configuration made it too far. Please report to https://github.com/equinix-labs/otel-cli/issues.")
 	}
 	return nil
 }
