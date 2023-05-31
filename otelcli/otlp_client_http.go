@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
@@ -15,7 +14,6 @@ import (
 
 type HttpClient struct {
 	client *http.Client
-	tsc    coltracepb.TraceServiceClient
 	config Config
 }
 
