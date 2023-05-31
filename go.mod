@@ -8,7 +8,6 @@ require (
 	github.com/pterm/pterm v0.12.61
 	github.com/spf13/cobra v1.7.0
 	go.opentelemetry.io/otel v1.16.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0
 	go.opentelemetry.io/otel/sdk v1.16.0
 	go.opentelemetry.io/proto/otlp v0.19.0
 	google.golang.org/grpc v1.55.0
