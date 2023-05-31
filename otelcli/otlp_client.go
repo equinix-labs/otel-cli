@@ -20,8 +20,8 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-// OTLPClient is an interface that allows for StartClient to return either a
-// gRPC or HTTP.
+// OTLPClient is an interface that allows for StartClient to return either
+// gRPC or HTTP clients.
 // matches the OTel collector's similar interface
 type OTLPClient interface {
 	Start(context.Context) error
@@ -40,7 +40,7 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
 		err := fmt.Errorf("invalid protocol setting %q", config.Protocol)
-		diagnostics.OtelError = err.Error()
+		diagnostics.Error = err.Error()
 		softFail(err.Error())
 	}
 
@@ -58,7 +58,7 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 
 	err := client.Start(ctx)
 	if err != nil {
-		diagnostics.OtelError = err.Error()
+		diagnostics.Error = err.Error()
 		softFail("Failed to start OTLP client: %s", err)
 	}
 
@@ -92,13 +92,13 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span tracep
 
 	err := client.UploadTraces(ctx, rsps)
 	if err != nil {
-		diagnostics.OtelError = err.Error()
+		diagnostics.Error = err.Error()
 		return err
 	}
 
 	err = client.Stop(ctx)
 	if err != nil {
-		diagnostics.OtelError = err.Error()
+		diagnostics.Error = err.Error()
 		return err
 	}
 
@@ -316,11 +316,11 @@ func retry(timeout time.Duration, fun func() (bool, error)) error {
 
 				time.Sleep(sleep)
 				if time.Now().After(deadline) {
-					diagnostics.OtelError = err.Error()
+					diagnostics.Error = err.Error()
 					return err
 				}
 			} else {
-				diagnostics.OtelError = err.Error()
+				diagnostics.Error = err.Error()
 				return err
 			}
 		} else {

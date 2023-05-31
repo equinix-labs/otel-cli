@@ -51,11 +51,6 @@ func ConfigPreRun(cmd *cobra.Command, args []string) {
 		// will need to specify --fail --verbose flags to see these errors
 		softFail("Error while loading environment variables: %s", err)
 	}
-
-	// plug a copy of the completed config into diagnostics
-	// so the otel error handler can check --fail/--verbose config
-	// this should go away after rewriting the otel exporter
-	diagnostics.config = config
 }
 
 // addCommonParams adds the --config and --endpoint params to the command.
