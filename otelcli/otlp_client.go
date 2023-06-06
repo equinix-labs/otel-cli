@@ -66,7 +66,7 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 }
 
 // SendSpan connects to the OTLP server, sends the span, and disconnects.
-func SendSpan(ctx context.Context, client OTLPClient, config Config, span tracepb.Span) error {
+func SendSpan(ctx context.Context, client OTLPClient, config Config, span *tracepb.Span) error {
 	if !config.IsRecording() {
 		return nil
 	}
@@ -83,7 +83,7 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span tracep
 					Attributes:             []*commonpb.KeyValue{},
 					DroppedAttributesCount: 0,
 				},
-				Spans:     []*tracepb.Span{&span},
+				Spans:     []*tracepb.Span{span},
 				SchemaUrl: semconv.SchemaURL,
 			}},
 			SchemaUrl: semconv.SchemaURL,
@@ -326,7 +326,9 @@ func retry(timeout time.Duration, fun retryFun) error {
 				time.Sleep(sleep)
 
 				if time.Now().After(deadline) {
-					diagnostics.Error = err.Error()
+					if err != nil {
+						diagnostics.Error = err.Error()
+					}
 					return err
 				}
 
@@ -335,7 +337,9 @@ func retry(timeout time.Duration, fun retryFun) error {
 					sleep = sleep + time.Millisecond*100
 				}
 			} else {
-				diagnostics.Error = err.Error()
+				if err != nil {
+					diagnostics.Error = err.Error()
+				}
 				return err
 			}
 		} else {

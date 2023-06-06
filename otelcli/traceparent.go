@@ -55,7 +55,7 @@ func (tp Traceparent) SpanIdString() string {
 }
 
 // traceparentFromSpan builds a Traceparent struct from the provided span.
-func traceparentFromSpan(span tracepb.Span) Traceparent {
+func traceparentFromSpan(span *tracepb.Span) Traceparent {
 	return Traceparent{
 		Version:     0,
 		TraceId:     span.TraceId,
@@ -155,7 +155,7 @@ func (tp Traceparent) saveToFile(filename string, span *tracepb.Span) {
 
 // propagateTraceparent saves the traceparent to file if necessary, then prints
 // span info to the console according to command-line args.
-func propagateTraceparent(span tracepb.Span, target io.Writer) {
+func propagateTraceparent(span *tracepb.Span, target io.Writer) {
 	var tp Traceparent
 	if config.IsRecording() {
 		tp = traceparentFromSpan(span)
@@ -163,10 +163,10 @@ func propagateTraceparent(span tracepb.Span, target io.Writer) {
 		// when in non-recording mode, and there is a TP available, propagate that
 		tp = loadTraceparent(config.TraceparentCarrierFile)
 	}
-	tp.saveToFile(config.TraceparentCarrierFile, &span)
+	tp.saveToFile(config.TraceparentCarrierFile, span)
 
 	if config.TraceparentPrint {
-		printSpanData(target, tp, &span)
+		printSpanData(target, tp, span)
 	}
 }
 

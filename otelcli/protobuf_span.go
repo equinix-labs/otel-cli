@@ -16,7 +16,7 @@ import (
 )
 
 // NewProtobufSpan returns an initialized OpenTelemetry protobuf Span.
-func NewProtobufSpan() tracepb.Span {
+func NewProtobufSpan() *tracepb.Span {
 	now := time.Now()
 	span := tracepb.Span{
 		TraceId:                emptyTraceId,
@@ -39,14 +39,14 @@ func NewProtobufSpan() tracepb.Span {
 		},
 	}
 
-	return span
+	return &span
 }
 
 // NewProtobufSpanEvent creates a new span event protobuf struct with reasonable
 // defaults and returns it.
-func NewProtobufSpanEvent() tracepb.Span_Event {
+func NewProtobufSpanEvent() *tracepb.Span_Event {
 	now := time.Now()
-	return tracepb.Span_Event{
+	return &tracepb.Span_Event{
 		TimeUnixNano: uint64(now.UnixNano()),
 		Attributes:   []*commonpb.KeyValue{},
 	}
@@ -54,7 +54,7 @@ func NewProtobufSpanEvent() tracepb.Span_Event {
 
 // NewProtobufSpanWithConfig creates a new span and populates it with information
 // from the provided config struct.
-func NewProtobufSpanWithConfig(c Config) tracepb.Span {
+func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	span := NewProtobufSpan()
 	span.TraceId = generateTraceId(c)
 	span.SpanId = generateSpanId(c)
@@ -97,7 +97,7 @@ func NewProtobufSpanWithConfig(c Config) tracepb.Span {
 		span.SpanId = parseHex(config.ForceSpanId, 8)
 	}
 
-	SetSpanStatus(&span, c)
+	SetSpanStatus(span, c)
 
 	return span
 }

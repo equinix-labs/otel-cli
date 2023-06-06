@@ -87,7 +87,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	// propagation before the server starts, instead of after
 	propagateTraceparent(span, os.Stdout)
 
-	bgs := createBgServer(spanBgSockfile(), &span)
+	bgs := createBgServer(spanBgSockfile(), span)
 
 	// set up signal handlers to cleanly exit on SIGINT/SIGTERM etc
 	signals := make(chan os.Signal)
@@ -111,7 +111,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 				cppid := os.Getppid()
 				if cppid != ppid {
 					rt := time.Since(started)
-					spanBgEndEvent(&span, "parent_exited", rt)
+					spanBgEndEvent(span, "parent_exited", rt)
 					bgs.Shutdown()
 				}
 			}
@@ -124,7 +124,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 		go func() {
 			time.Sleep(timeout)
 			rt := time.Since(started)
-			spanBgEndEvent(&span, "timeout", rt)
+			spanBgEndEvent(span, "timeout", rt)
 			bgs.Shutdown()
 		}()
 	}
@@ -149,5 +149,5 @@ func spanBgEndEvent(span *tracepb.Span, name string, elapsed time.Duration) {
 		"otel-cli.runtime_ms": strconv.FormatInt(elapsed.Milliseconds(), 10),
 	})
 
-	span.Events = append(span.Events, &event)
+	span.Events = append(span.Events, event)
 }

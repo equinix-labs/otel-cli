@@ -114,7 +114,7 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	config.TraceparentPrint = true
 	config.TraceparentPrintExport = true
 	buf = new(bytes.Buffer)
-	printSpanData(buf, parseTraceparent(tp), &span)
+	printSpanData(buf, parseTraceparent(tp), span)
 	if buf.Len() == 0 {
 		t.Error("expected more than zero bytes but got none")
 	}
