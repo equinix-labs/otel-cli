@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -58,14 +59,14 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	msg := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
 	protoMsg, err := proto.Marshal(&msg)
 	if err != nil {
-		return err // TODO: beef up errors
+		return fmt.Errorf("failed to marshal trace service request: %w", err)
 	}
 	body := bytes.NewBuffer(protoMsg)
 
 	endpointURL, _ := parseEndpoint(hc.config)
 	req, err := http.NewRequest("POST", endpointURL.String(), body)
 	if err != nil {
-		return err // TODO: beef up errors
+		return fmt.Errorf("failed to create HTTP POST request: %w", err)
 	}
 
 	for k, v := range config.Headers {
