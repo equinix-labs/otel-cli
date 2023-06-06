@@ -90,7 +90,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	bgs := createBgServer(spanBgSockfile(), span)
 
 	// set up signal handlers to cleanly exit on SIGINT/SIGTERM etc
-	signals := make(chan os.Signal)
+	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-signals
