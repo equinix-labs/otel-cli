@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// func processHTTPStatus(resp *http.Response, body []byte) (bool, error)
 func TestProcessHTTPStatus(t *testing.T) {
 
 	for _, tc := range []struct {

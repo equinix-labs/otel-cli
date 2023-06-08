@@ -79,12 +79,21 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 
 	timeout := parseCliTimeout(config)
 	return retry(timeout, func() (bool, error) {
-		_, err := gc.client.Export(ctx, &req, grpcOpts...)
-		return true, err
+		etsr, err := gc.client.Export(ctx, &req, grpcOpts...)
+		return processGrpcStatus(etsr, err)
 	})
 }
 
 // Stop closes the connection to the gRPC server.
 func (gc *GrpcClient) Stop(ctx context.Context) error {
 	return gc.conn.Close()
+}
+
+// func processHTTPStatus(resp *http.Response, body []byte) (bool, error)
+func processGrpcStatus(etsr *coltracepb.ExportTraceServiceResponse, err error) (bool, error) {
+	if err != nil {
+		return true, err
+	} else {
+		return false, nil
+	}
 }
