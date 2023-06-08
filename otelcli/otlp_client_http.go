@@ -75,7 +75,6 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
-	// TODO: look at the response
 	return retry(hc.timeout, func() (bool, error) {
 		var body []byte
 		resp, err := hc.client.Do(req)
@@ -92,40 +91,50 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 			}
 			resp.Body.Close()
 
-			if resp.StatusCode == 200 {
-				// success & partial success
-				etsr := coltracepb.ExportTraceServiceResponse{}
-				err = proto.Unmarshal(body, &etsr)
-				if err != nil {
-					// if the server's sending garbage, no point in retrying
-					return false, fmt.Errorf("unmarshal of server response failed: %w", err)
-				}
-
-				if partial := etsr.GetPartialSuccess(); partial != nil {
-					// spec says to stop retrying and drop rejected spans
-					return false, fmt.Errorf("partial success. %d spans were rejected", partial.GetRejectedSpans())
-
-				} else {
-					// full success!
-					return false, nil
-				}
-			} else if resp.StatusCode == 429 || resp.StatusCode == 502 || resp.StatusCode == 503 || resp.StatusCode == 504 {
-				// 429, 502, 503, and 504 must be retried according to spec
-				return false, fmt.Errorf("server responded with unretriable code %d", resp.StatusCode)
-			} else if resp.StatusCode <= 400 {
-				// https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/specification.md#failures-1
-				st := status.Status{}
-				err = proto.Unmarshal(body, &st)
-				if err != nil {
-					return false, fmt.Errorf("unmarshal of server status failed: %w", err)
-				} else {
-					return false, fmt.Errorf("server returned unretriable code %d with status: %s", resp.StatusCode, st.GetMessage())
-				}
-			}
-
-			return false, nil
+			return processHTTPStatus(resp, body)
 		}
 	})
+}
+
+// processHTTPStatus takes the http.Response and body, returning the same bool, error
+// as retryFunc. Mostly it's broken out so it can be unit tested.
+func processHTTPStatus(resp *http.Response, body []byte) (bool, error) {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		// success & partial success
+		// spec says server MUST send 200 OK, we'll be generous and accept any 200
+		etsr := coltracepb.ExportTraceServiceResponse{}
+		err := proto.Unmarshal(body, &etsr)
+		if err != nil {
+			// if the server's sending garbage, no point in retrying
+			return false, fmt.Errorf("unmarshal of server response failed: %w", err)
+		}
+
+		if partial := etsr.GetPartialSuccess(); partial != nil {
+			// spec says to stop retrying and drop rejected spans
+			return false, fmt.Errorf("partial success. %d spans were rejected", partial.GetRejectedSpans())
+
+		} else {
+			// full success!
+			return false, nil
+		}
+	} else if resp.StatusCode == 429 || resp.StatusCode == 502 || resp.StatusCode == 503 || resp.StatusCode == 504 {
+		// 429, 502, 503, and 504 must be retried according to spec
+		return false, fmt.Errorf("server responded with unretriable code %d", resp.StatusCode)
+	} else if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		// spec doesn't say anything 300's, ignore body and assume they're errors and unretriable
+		return false, fmt.Errorf("server returned unsupported code %d", resp.StatusCode)
+	} else if resp.StatusCode >= 400 {
+		// https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/specification.md#failures-1
+		st := status.Status{}
+		err := proto.Unmarshal(body, &st)
+		if err != nil {
+			return false, fmt.Errorf("unmarshal of server status failed: %w", err)
+		} else {
+			return false, fmt.Errorf("server returned unretriable code %d with status: %s", resp.StatusCode, st.GetMessage())
+		}
+	}
+
+	return false, nil
 }
 
 // Stop does nothing for HTTP, for now. It exists to fulfill the interface.
