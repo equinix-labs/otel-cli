@@ -41,6 +41,15 @@ func (d *Diagnostics) ToStringMap() map[string]string {
 	}
 }
 
+// SetError sets the diagnostics Error to the error's string if it's
+// not nil and returns the same error so it can be inlined in return.
+func (d *Diagnostics) SetError(err error) error {
+	if err != nil {
+		diagnostics.Error = err.Error()
+	}
+	return err
+}
+
 // GetExitCode() is a helper for Cobra to retrieve the exit code, mainly
 // used by exec to make otel-cli return the child program's exit code.
 func GetExitCode() int {
