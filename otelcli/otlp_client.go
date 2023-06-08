@@ -302,8 +302,10 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 	return attrs
 }
 
-// retry calls the provided function and expects it to return (true, err) to
-// keep retrying, and (false, err) to stop retrying and return.
+// retry calls the provided function and expects it to return (true, wait, err)
+// to keep retrying, and (false, wait, err) to stop retrying and return.
+// The wait value is a time.Duration so the server can recommend a backoff
+// and it will be followed.
 //
 // This is a minimal retry mechanism that backs off linearly, 100ms at a time,
 // up to a maximum of 5 seconds.
