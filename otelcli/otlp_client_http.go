@@ -14,6 +14,7 @@ import (
 
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -76,6 +77,7 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 
 	// TODO: look at the response
 	return retry(hc.timeout, func() (bool, error) {
+		var body []byte
 		resp, err := hc.client.Do(req)
 		if uerr, ok := err.(*url.Error); ok {
 			// e.g. http on https, un-retriable error, quit now
@@ -84,9 +86,43 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 			// all other errors get retried
 			return true, err
 		} else {
-			// success!
-			io.ReadAll(resp.Body) // TODO, do something with body
+			body, err = io.ReadAll(resp.Body)
+			if err != nil {
+				return true, fmt.Errorf("io.Readall of response body failed: %w", err)
+			}
 			resp.Body.Close()
+
+			if resp.StatusCode == 200 {
+				// success & partial success
+				etsr := coltracepb.ExportTraceServiceResponse{}
+				err = proto.Unmarshal(body, &etsr)
+				if err != nil {
+					// if the server's sending garbage, no point in retrying
+					return false, fmt.Errorf("unmarshal of server response failed: %w", err)
+				}
+
+				if partial := etsr.GetPartialSuccess(); partial != nil {
+					// spec says to stop retrying and drop rejected spans
+					return false, fmt.Errorf("partial success. %d spans were rejected", partial.GetRejectedSpans())
+
+				} else {
+					// full success!
+					return false, nil
+				}
+			} else if resp.StatusCode == 429 || resp.StatusCode == 502 || resp.StatusCode == 503 || resp.StatusCode == 504 {
+				// 429, 502, 503, and 504 must be retried according to spec
+				return false, fmt.Errorf("server responded with unretriable code %d", resp.StatusCode)
+			} else if resp.StatusCode <= 400 {
+				// https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/specification.md#failures-1
+				st := status.Status{}
+				err = proto.Unmarshal(body, &st)
+				if err != nil {
+					return false, fmt.Errorf("unmarshal of server status failed: %w", err)
+				} else {
+					return false, fmt.Errorf("server returned unretriable code %d with status: %s", resp.StatusCode, st.GetMessage())
+				}
+			}
+
 			return false, nil
 		}
 	})
