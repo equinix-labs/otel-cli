@@ -97,7 +97,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 			err:       fmt.Errorf("BUG: fell through error checking with status code 0"),
 		},
 	} {
-		kg, err := processHTTPStatus(tc.resp, tc.body)
+		kg, _, err := processHTTPStatus(tc.resp, tc.body)
 
 		if kg != tc.keepgoing {
 			t.Errorf("keepgoing value returned %t but expected %t", kg, tc.keepgoing)

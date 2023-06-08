@@ -3,13 +3,17 @@ package otelcli
 import (
 	"context"
 	"strings"
+	"time"
 
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // GrpcClient holds the state for gRPC connections.
@@ -78,7 +82,7 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	defer cancel()
 
 	timeout := parseCliTimeout(config)
-	return retry(timeout, func() (bool, error) {
+	return retry(timeout, func() (bool, time.Duration, error) {
 		etsr, err := gc.client.Export(ctx, &req, grpcOpts...)
 		return processGrpcStatus(etsr, err)
 	})
@@ -89,11 +93,47 @@ func (gc *GrpcClient) Stop(ctx context.Context) error {
 	return gc.conn.Close()
 }
 
-// func processHTTPStatus(resp *http.Response, body []byte) (bool, error)
-func processGrpcStatus(etsr *coltracepb.ExportTraceServiceResponse, err error) (bool, error) {
-	if err != nil {
-		return true, err
-	} else {
-		return false, nil
+func processGrpcStatus(etsr *coltracepb.ExportTraceServiceResponse, err error) (bool, time.Duration, error) {
+	if err == nil {
+		// success!
+		return false, 0, nil
 	}
+
+	st := status.Convert(err)
+	if st.Code() == codes.OK {
+		// apparently this can happen and is a success
+		return false, 0, nil
+	}
+
+	var ri *errdetails.RetryInfo
+	for _, d := range st.Details() {
+		if t, ok := d.(*errdetails.RetryInfo); ok {
+			ri = t
+		}
+	}
+
+	// handle retriable codes, somewhat lifted from otel collector
+	switch st.Code() {
+	case codes.Aborted,
+		codes.Canceled,
+		codes.DataLoss,
+		codes.DeadlineExceeded,
+		codes.OutOfRange,
+		codes.Unavailable:
+		return true, 0, err
+	case codes.ResourceExhausted:
+		// only retry this one if RetryInfo was set
+		if ri != nil && ri.RetryDelay != nil {
+			// when RetryDelay is available, pass it back to the retry loop
+			// so it can sleep that duration
+			wait := time.Duration(ri.RetryDelay.Seconds)*time.Second + time.Duration(ri.RetryDelay.Nanos)*time.Nanosecond
+			return true, wait, err
+		} else {
+			return false, 0, err
+		}
+	default:
+		// don't retry anything else
+		return false, 0, err
+	}
+
 }

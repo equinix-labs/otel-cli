@@ -319,17 +319,22 @@ func retry(timeout time.Duration, fun retryFun) error {
 	deadline := config.startupTime.Add(timeout)
 	sleep := time.Duration(0)
 	for {
-		if keepGoing, err := fun(); err != nil {
+		if keepGoing, wait, err := fun(); err != nil {
 			softLog("error on retry %d: %s", diagnostics.Retries, err)
 
 			if keepGoing {
-				time.Sleep(sleep)
+				if wait > 0 {
+					if time.Now().Add(wait).After(deadline) {
+						// wait will be after deadline, give up now
+						return diagnostics.SetError(err)
+					}
+					time.Sleep(wait)
+				} else {
+					time.Sleep(sleep)
+				}
 
 				if time.Now().After(deadline) {
-					if err != nil {
-						diagnostics.Error = err.Error()
-					}
-					return err
+					return diagnostics.SetError(err)
 				}
 
 				// linearly increase sleep time up to 5 seconds
@@ -337,10 +342,7 @@ func retry(timeout time.Duration, fun retryFun) error {
 					sleep = sleep + time.Millisecond*100
 				}
 			} else {
-				if err != nil {
-					diagnostics.Error = err.Error()
-				}
-				return err
+				return diagnostics.SetError(err)
 			}
 		} else {
 			return nil
@@ -354,6 +356,7 @@ func retry(timeout time.Duration, fun retryFun) error {
 }
 
 // retryFun is the function signature for functions passed to retry().
-// Return (false, err) to stop retrying. Return (true,err) to continue
-// retrying until timeout.
-type retryFun func() (keepGoing bool, err error)
+// Return (false, 0, err) to stop retrying. Return (true, 0, err) to continue
+// retrying until timeout. Set the middle wait arg to a time.Duration to
+// sleep a requested amount of time before next try
+type retryFun func() (keepGoing bool, wait time.Duration, err error)
