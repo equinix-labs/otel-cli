@@ -119,7 +119,7 @@ func processHTTPStatus(resp *http.Response, body []byte) (bool, error) {
 		}
 	} else if resp.StatusCode == 429 || resp.StatusCode == 502 || resp.StatusCode == 503 || resp.StatusCode == 504 {
 		// 429, 502, 503, and 504 must be retried according to spec
-		return false, fmt.Errorf("server responded with unretriable code %d", resp.StatusCode)
+		return true, fmt.Errorf("server responded with retriable code %d", resp.StatusCode)
 	} else if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		// spec doesn't say anything 300's, ignore body and assume they're errors and unretriable
 		return false, fmt.Errorf("server returned unsupported code %d", resp.StatusCode)
@@ -134,7 +134,8 @@ func processHTTPStatus(resp *http.Response, body []byte) (bool, error) {
 		}
 	}
 
-	return false, nil
+	// should never happen
+	return false, fmt.Errorf("BUG: fell through error checking with status code %d", resp.StatusCode)
 }
 
 // Stop does nothing for HTTP, for now. It exists to fulfill the interface.
