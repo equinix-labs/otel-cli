@@ -81,9 +81,6 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 		if uerr, ok := err.(*url.Error); ok {
 			// e.g. http on https, un-retriable error, quit now
 			return false, 0, uerr
-		} else if err != nil {
-			// all other errors get retried
-			return true, 0, err
 		} else {
 			body, err = io.ReadAll(resp.Body)
 			if err != nil {
