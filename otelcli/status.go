@@ -1,7 +1,6 @@
 package otelcli
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -41,6 +40,7 @@ func init() {
 
 func doStatus(cmd *cobra.Command, args []string) {
 	exitCode := 0
+	ctx, client := StartClient(config)
 
 	// TODO: this always canaries as it is, gotta find the right flags
 	// to try to stall sending at the end so as much as possible of the otel
@@ -67,7 +67,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	}
 
 	// send the span out before printing anything
-	err := SendSpan(context.Background(), config, span)
+	err := SendSpan(ctx, client, config, span)
 	if err != nil {
 		if config.Fail {
 			log.Fatalf("%s", err)

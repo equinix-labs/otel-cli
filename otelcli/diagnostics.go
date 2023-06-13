@@ -21,23 +21,9 @@ type Diagnostics struct {
 	ParsedTimeoutMs    int64    `json:"parsed_timeout_ms"`
 	Endpoint           string   `json:"endpoint"` // the computed endpoint, not the raw config val
 	EndpointSource     string   `json:"endpoint_source"`
-	OtelError          string   `json:"otel_error"`
+	Error              string   `json:"error"`
 	ExecExitCode       int      `json:"exec_exit_code"`
-	config             Config
-}
-
-// Handle complies with the otel error handler interface to capture errors
-// both for diagnostics and to make sure the error output goes through softLog
-// so it doesn't pollute output of caller scripts.
-// hack: ignores the Diagnostics assigned to it and writes to the global
-func (Diagnostics) Handle(err error) {
-	diagnostics.OtelError = err.Error() // write to the global
-
-	if diagnostics.config.Fail {
-		softFail("OpenTelemetry error: %s", err)
-	} else {
-		softLog("OpenTelemetry error: %s", err)
-	}
+	Retries            int      `json:"retries"`
 }
 
 // ToMap returns the Diagnostics struct as a string map for testing.
@@ -51,8 +37,17 @@ func (d *Diagnostics) ToStringMap() map[string]string {
 		"parsed_timeout_ms":  strconv.FormatInt(d.ParsedTimeoutMs, 10),
 		"endpoint":           d.Endpoint,
 		"endpoint_source":    d.EndpointSource,
-		"otel_error":         d.OtelError,
+		"error":              d.Error,
 	}
+}
+
+// SetError sets the diagnostics Error to the error's string if it's
+// not nil and returns the same error so it can be inlined in return.
+func (d *Diagnostics) SetError(err error) error {
+	if err != nil {
+		diagnostics.Error = err.Error()
+	}
+	return err
 }
 
 // GetExitCode() is a helper for Cobra to retrieve the exit code, mainly

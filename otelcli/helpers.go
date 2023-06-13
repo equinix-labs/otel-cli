@@ -131,6 +131,8 @@ func parseCliTimeout(config Config) time.Duration {
 }
 
 // softLog only calls through to log if otel-cli was run with the --verbose flag.
+// TODO: does it make any sense to support %w? probably yes, can clean up some
+// diagnostics.Error touch points.
 func softLog(format string, a ...interface{}) {
 	if !config.Verbose {
 		return

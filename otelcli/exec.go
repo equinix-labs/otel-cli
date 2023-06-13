@@ -2,7 +2,6 @@ package otelcli
 
 import (
 	"bytes"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // execCmd represents the span command
@@ -43,6 +41,8 @@ func init() {
 }
 
 func doExec(cmd *cobra.Command, args []string) {
+	ctx, client := StartClient(config)
+
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
 	config.Attributes["arguments"] = ""
@@ -92,12 +92,11 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 
 	if err := child.Run(); err != nil {
-		span.Status.Code = tracepb.Status_STATUS_CODE_ERROR
-		span.Status.Message = fmt.Sprintf("command failed: %s", err)
+		softFail("command failed: %s", err)
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
-	err := SendSpan(context.Background(), config, span)
+	err := SendSpan(ctx, client, config, span)
 	if err != nil {
 		softFail("unable to send span: %s", err)
 	}

@@ -1,7 +1,6 @@
 package otelcli
 
 import (
-	"context"
 	"os"
 	"regexp"
 
@@ -51,7 +50,8 @@ func init() {
 }
 
 func doSpan(cmd *cobra.Command, args []string) {
+	ctx, client := StartClient(config)
 	span := NewProtobufSpanWithConfig(config)
-	SendSpan(context.Background(), config, span)
+	SendSpan(ctx, client, config, span)
 	propagateTraceparent(span, os.Stdout)
 }

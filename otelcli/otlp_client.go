@@ -10,48 +10,65 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
-// SendSpan connects to the OTLP server, sends the span, and disconnects.
-func SendSpan(ctx context.Context, config Config, span tracepb.Span) error {
+// OTLPClient is an interface that allows for StartClient to return either
+// gRPC or HTTP clients.
+// matches the OTel collector's similar interface
+type OTLPClient interface {
+	Start(context.Context) error
+	UploadTraces(context.Context, []*tracepb.ResourceSpans) error
+	Stop(context.Context) error
+}
+
+// StartClient uses the Config to setup and start either a gRPC or HTTP client,
+// and returns the OTLPClient interface to them.
+func StartClient(config Config) (context.Context, OTLPClient) {
+	ctx := context.Background()
+
 	if !config.IsRecording() {
-		return nil
+		return ctx, nil
 	}
 
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
 		err := fmt.Errorf("invalid protocol setting %q", config.Protocol)
-		diagnostics.OtelError = err.Error()
-		return err
+		diagnostics.Error = err.Error()
+		softFail(err.Error())
 	}
 
 	endpointURL, _ := parseEndpoint(config)
 
-	var client otlptrace.Client
+	var client OTLPClient
 	if config.Protocol != "grpc" &&
 		(strings.HasPrefix(config.Protocol, "http/") ||
 			endpointURL.Scheme == "http" ||
 			endpointURL.Scheme == "https") {
-		client = otlptracehttp.NewClient(httpOptions(endpointURL, config)...)
+		client = NewHttpClient(config)
 	} else {
-		client = otlptracegrpc.NewClient(grpcOptions(endpointURL, config)...)
+		client = NewGrpcClient(config)
 	}
 
 	err := client.Start(ctx)
 	if err != nil {
-		diagnostics.OtelError = err.Error()
-		return err
+		diagnostics.Error = err.Error()
+		softFail("Failed to start OTLP client: %s", err)
+	}
+
+	return ctx, client
+}
+
+// SendSpan connects to the OTLP server, sends the span, and disconnects.
+func SendSpan(ctx context.Context, client OTLPClient, config Config, span *tracepb.Span) error {
+	if !config.IsRecording() {
+		return nil
 	}
 
 	rsps := []*tracepb.ResourceSpans{
@@ -66,22 +83,22 @@ func SendSpan(ctx context.Context, config Config, span tracepb.Span) error {
 					Attributes:             []*commonpb.KeyValue{},
 					DroppedAttributesCount: 0,
 				},
-				Spans:     []*tracepb.Span{&span},
+				Spans:     []*tracepb.Span{span},
 				SchemaUrl: semconv.SchemaURL,
 			}},
 			SchemaUrl: semconv.SchemaURL,
 		},
 	}
 
-	err = client.UploadTraces(ctx, rsps)
+	err := client.UploadTraces(ctx, rsps)
 	if err != nil {
-		diagnostics.OtelError = err.Error()
+		diagnostics.Error = err.Error()
 		return err
 	}
 
 	err = client.Stop(ctx)
 	if err != nil {
-		diagnostics.OtelError = err.Error()
+		diagnostics.Error = err.Error()
 		return err
 	}
 
@@ -189,89 +206,15 @@ func tlsConfig(config Config) *tls.Config {
 	return tlsConfig
 }
 
-// grpcOptions convets config settings to an otlpgrpc.Option list.
-func grpcOptions(endpointURL *url.URL, config Config) []otlptracegrpc.Option {
-	host := endpointURL.Hostname()
-	if endpointURL.Port() != "" {
-		host = host + ":" + endpointURL.Port()
-	}
-	grpcOpts := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(host)}
-
-	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
+// deadlineCtx sets timeout on the context if the duration is non-zero.
+// Otherwise it returns the context as-is.
+func deadlineCtx(ctx context.Context, config Config, startupTime time.Time) (context.Context, context.CancelFunc) {
 	if timeout := parseCliTimeout(config); timeout > 0 {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithTimeout(timeout))
+		deadline := startupTime.Add(timeout)
+		return context.WithDeadline(ctx, deadline)
 	}
 
-	// gRPC does the right thing and forces us to say WithInsecure to disable encryption,
-	// but I expect most users of this program to point at a localhost endpoint that might not
-	// have any encryption available, or setting it up raises the bar of entry too high.
-	// The compromise is to automatically flip this flag to true when endpoint contains an
-	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithInsecure())
-	} else if !isInsecureSchema(config.Endpoint) {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(tlsConfig(config))))
-	}
-
-	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(config.Headers) > 0 {
-		// fortunately WithHeaders can accept the string map as-is
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithHeaders(config.Headers))
-	}
-
-	// OTLP examples usually show this with the grpc.WithBlock() dial option to
-	// make the connection synchronous, but it's not the right default for cli
-	// instead, rely on the shutdown methods to make sure everything is flushed
-	// by the time the program exits.
-	if config.Blocking {
-		grpcOpts = append(grpcOpts, otlptracegrpc.WithDialOption(grpc.WithBlock()))
-	}
-
-	return grpcOpts
-}
-
-// httpOptions converts config to an otlphttp.Option list.
-func httpOptions(endpointURL *url.URL, config Config) []otlptracehttp.Option {
-	var endpointHostAndPort = endpointURL.Host
-	if endpointURL.Port() == "" {
-		if endpointURL.Scheme == "https" {
-			endpointHostAndPort += ":443"
-		} else {
-			endpointHostAndPort += ":80"
-		}
-	}
-
-	// otlptracehttp expects endpoint to be just a host:port pair
-	// it constructs a URL from endpoint, path, and scheme (via Insecure flag)
-	httpOpts := []otlptracehttp.Option{
-		otlptracehttp.WithEndpoint(endpointHostAndPort),
-		otlptracehttp.WithURLPath(endpointURL.Path),
-	}
-
-	// set timeout if the duration is non-zero, otherwise just leave things to the defaults
-	if timeout := parseCliTimeout(config); timeout > 0 {
-		httpOpts = append(httpOpts, otlptracehttp.WithTimeout(timeout))
-	}
-
-	// otlptracehttp does the right thing and forces us to say WithInsecure to disable
-	// encryption, but I expect most users of this program to point at a localhost
-	// endpoint that might not have any encryption available, or setting it up
-	// raises the bar of entry too high.  The compromise is to automatically flip
-	// this flag to true when endpoint contains an an obvious "localhost",
-	// "127.0.0.x", or "::1" address.
-	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
-		httpOpts = append(httpOpts, otlptracehttp.WithInsecure())
-	} else if !isInsecureSchema(config.Endpoint) {
-		httpOpts = append(httpOpts, otlptracehttp.WithTLSClientConfig(tlsConfig(config)))
-	}
-
-	// support for OTLP headers, e.g. for authenticating to SaaS OTLP endpoints
-	if len(config.Headers) > 0 {
-		// fortunately WithHeaders can accept the string map as-is
-		httpOpts = append(httpOpts, otlptracehttp.WithHeaders(config.Headers))
-	}
-
-	return httpOpts
+	return ctx, func() {}
 }
 
 // isLoopbackAddr takes a url.URL, looks up the address, then returns true
@@ -358,3 +301,64 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 
 	return attrs
 }
+
+// retry calls the provided function and expects it to return (true, wait, err)
+// to keep retrying, and (false, wait, err) to stop retrying and return.
+// The wait value is a time.Duration so the server can recommend a backoff
+// and it will be followed.
+//
+// This is a minimal retry mechanism that backs off linearly, 100ms at a time,
+// up to a maximum of 5 seconds.
+// While there are many robust implementations of retries out there, this one
+// is just ~20 LoC and seems to work fine for otel-cli's modest needs. It should
+// be rare for otel-cli to have a long timeout in the first place, and when it
+// does, maybe it's ok to wait a few seconds.
+// TODO: provide --otlp-retries (or something like that) option on CLI
+// TODO: --otlp-retry-sleep? --otlp-retry-timeout?
+// TODO: span events? hmm... feels weird to plumb spans this deep into the client
+// but it's probably fine?
+func retry(timeout time.Duration, fun retryFun) error {
+	deadline := config.startupTime.Add(timeout)
+	sleep := time.Duration(0)
+	for {
+		if keepGoing, wait, err := fun(); err != nil {
+			softLog("error on retry %d: %s", diagnostics.Retries, err)
+
+			if keepGoing {
+				if wait > 0 {
+					if time.Now().Add(wait).After(deadline) {
+						// wait will be after deadline, give up now
+						return diagnostics.SetError(err)
+					}
+					time.Sleep(wait)
+				} else {
+					time.Sleep(sleep)
+				}
+
+				if time.Now().After(deadline) {
+					return diagnostics.SetError(err)
+				}
+
+				// linearly increase sleep time up to 5 seconds
+				if sleep < time.Second*5 {
+					sleep = sleep + time.Millisecond*100
+				}
+			} else {
+				return diagnostics.SetError(err)
+			}
+		} else {
+			return nil
+		}
+
+		// It's retries instead of "tries" because "tries" means other things
+		// too. Also, retries can default to 0 and it makes sense, saving
+		// copying in test data.
+		diagnostics.Retries++
+	}
+}
+
+// retryFun is the function signature for functions passed to retry().
+// Return (false, 0, err) to stop retrying. Return (true, 0, err) to continue
+// retrying until timeout. Set the middle wait arg to a time.Duration to
+// sleep a requested amount of time before next try
+type retryFun func() (keepGoing bool, wait time.Duration, err error)

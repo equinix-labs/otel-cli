@@ -40,7 +40,7 @@ type BgEnd struct {
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	reply.TraceID = hex.EncodeToString(bs.span.TraceId)
 	reply.SpanID = hex.EncodeToString(bs.span.SpanId)
-	reply.Traceparent = traceparentFromSpan(*bs.span).Encode()
+	reply.Traceparent = traceparentFromSpan(bs.span).Encode()
 
 	ts, err := time.Parse(time.RFC3339Nano, bse.Timestamp)
 	if err != nil {
@@ -53,7 +53,7 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	event.TimeUnixNano = uint64(ts.UnixNano())
 	event.Attributes = cliAttrsToOtelPb(bse.Attributes)
 
-	bs.span.Events = append(bs.span.Events, &event)
+	bs.span.Events = append(bs.span.Events, event)
 
 	return nil
 }
