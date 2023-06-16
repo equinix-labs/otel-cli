@@ -29,9 +29,10 @@ func runServer(config Config, cb otlpserver.Callback, stop otlpserver.Stopper) {
 	var cs otlpserver.OtlpServer
 	if config.Protocol != "grpc" &&
 		(strings.HasPrefix(config.Protocol, "http/") ||
-			endpointURL.Scheme == "http" ||
-			endpointURL.Scheme == "https") {
+			endpointURL.Scheme == "http") {
 		cs = otlpserver.NewServer("http", cb, stop)
+	} else if config.Protocol == "https" || endpointURL.Scheme == "https" {
+		softFail("https server is not supported yet, please raise an issue")
 	} else {
 		cs = otlpserver.NewServer("grpc", cb, stop)
 	}
