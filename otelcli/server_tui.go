@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/pterm/pterm"
@@ -49,21 +50,25 @@ func doServerTui(cmd *cobra.Command, args []string) {
 		tuiServer.area.Stop()
 	}
 
-	var cs otlpserver.OtlpServer
-	switch config.Protocol {
-	case "", "grpc":
-		cs = otlpserver.NewServer("grpc", renderTui, stop)
-	case "http", "http/protobuf":
-		cs = otlpserver.NewServer("http", renderTui, stop)
-	}
-	defer cs.Stop()
-
 	// unlike the rest of otel-cli, server should default to localhost:4317
 	if config.Endpoint == "" {
 		config.Endpoint = defaultOtlpEndpoint
 	}
-	epUrl, _ := parseEndpoint(config)
-	cs.ListenAndServe(epUrl.Host)
+	endpointURL, _ := parseEndpoint(config)
+
+	var cs otlpserver.OtlpServer
+	if config.Protocol != "grpc" &&
+		(strings.HasPrefix(config.Protocol, "http/") ||
+			endpointURL.Scheme == "http" ||
+			endpointURL.Scheme == "https") {
+		cs = otlpserver.NewServer("http", renderTui, stop)
+	} else {
+		cs = otlpserver.NewServer("grpc", renderTui, stop)
+	}
+
+	defer cs.Stop()
+
+	cs.ListenAndServe(endpointURL.Host)
 }
 
 // renderTui takes the given span and events, appends them to the in-memory
