@@ -176,9 +176,6 @@ type SpanEventUnion struct {
 	Event *tracepb.Span_Event
 }
 
-// func (seu *SpanEventUnion) TraceId() []byte       { return seu.Span.TraceId }
-// func (seu *SpanEventUnion) SpanId() []byte        { return seu.Span.SpanId }
-
 func (seu *SpanEventUnion) TraceIdString() string { return hex.EncodeToString(seu.Span.TraceId) }
 func (seu *SpanEventUnion) SpanIdString() string  { return hex.EncodeToString(seu.Span.SpanId) }
 
