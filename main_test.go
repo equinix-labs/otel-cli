@@ -171,6 +171,10 @@ func checkAll(t *testing.T, fixture Fixture, results Results) {
 		checkOutput(t, fixture, results)
 	}
 
+	if len(fixture.Expect.ServerMeta) > 0 {
+		checkServerMeta(t, fixture, results)
+	}
+
 	checkFuncs(t, fixture, results)
 }
 
@@ -315,6 +319,16 @@ func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 	injectMapVars(fixture.Endpoint, wantSpan, fixture.TlsData)
 	if diff := cmp.Diff(wantSpan, gotSpan); diff != "" {
 		t.Errorf("[%s] otel span info did not match fixture (-want +got):\n%s", fixture.Name, diff)
+	}
+}
+
+// checkServerMeta compares the expected and received server metadata.
+func checkServerMeta(t *testing.T, fixture Fixture, results Results) {
+	injectMapVars(fixture.Endpoint, fixture.Expect.ServerMeta, fixture.TlsData)
+	injectMapVars(fixture.Endpoint, results.ServerMeta, fixture.TlsData)
+
+	if diff := cmp.Diff(fixture.Expect.ServerMeta, results.ServerMeta); diff != "" {
+		t.Errorf("[%s] server metadata did not match expected (-want +got):\n%s", fixture.Name, diff)
 	}
 }
 
