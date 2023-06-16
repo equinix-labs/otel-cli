@@ -41,9 +41,8 @@ func NewServer(protocol string, cb Callback, stop Stopper) OtlpServer {
 	return nil
 }
 
-// otelToCliEvent takes an otel trace request data structure and converts
-// it to CliEvents, calling the provided callback for each span in the
-// request.
+// doCallback unwraps the OTLP service request and calls the callback
+// for each span in the request.
 func doCallback(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta map[string]string) bool {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
