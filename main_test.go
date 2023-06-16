@@ -18,8 +18,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/otelcli"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/google/go-cmp/cmp"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // otel-cli will fail with "getent not found" if PATH is empty
@@ -260,11 +262,9 @@ func checkStatusData(t *testing.T, fixture Fixture, results Results) {
 // fixture data.
 func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 	// check the expected span data against what was received by the OTLP server
-	gotSpan := results.Span.ToStringMap()
+	gotSpan := otelcli.SpanToStringMap(results.Span, results.ResourceSpans, results.ServerMeta)
+	//racepb.ScopeSpans, serverMeta map[string]string)
 	injectMapVars(fixture.Endpoint, gotSpan, fixture.TlsData)
-	// remove keys that aren't supported for comparison (for now)
-	delete(gotSpan, "is_populated")
-	delete(gotSpan, "library")
 	wantSpan := map[string]string{} // to be passed to cmp.Diff
 
 	// verify all fields that were expected were present in output span
@@ -335,18 +335,20 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 	results := Results{
 		SpanData:   map[string]string{},
 		Env:        map[string]string{},
-		SpanEvents: otlpserver.CliEventList{},
+		SpanEvents: []*tracepb.Span_Event{},
 	}
 
 	// these channels need to be buffered or the callback will hang trying to send
-	rcvSpan := make(chan otlpserver.CliEvent, 100) // 100 spans is enough for anybody
-	rcvEvents := make(chan otlpserver.CliEventList, 100)
+	rcvSpan := make(chan *tracepb.Span, 100) // 100 spans is enough for anybody
+	rcvEvents := make(chan []*tracepb.Span_Event, 100)
 
 	// otlpserver calls this function for each span received
-	cb := func(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
+	cb := func(span *tracepb.Span, events []*tracepb.Span_Event, rss *tracepb.ResourceSpans, meta map[string]string) bool {
 		rcvSpan <- span
 		rcvEvents <- events
 
+		results.ServerMeta = meta
+		results.ResourceSpans = rss
 		results.SpanCount++
 		results.EventCount += len(events)
 

@@ -1,6 +1,7 @@
 package otelcli
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // jsonSvr holds the command-line configured settings for otel-cli server json
@@ -57,18 +59,18 @@ func doServerJson(cmd *cobra.Command, args []string) {
 
 // writeFile takes the spans and events and writes them out to json files in the
 // tid/sid/span.json and tid/sid/events.json files.
-func renderJson(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
+func renderJson(span *tracepb.Span, events []*tracepb.Span_Event, ss *tracepb.ResourceSpans, meta map[string]string) bool {
 	jsonSvr.spansSeen++ // count spans for exiting on --max-spans
 
 	// TODO: check for existence of outdir and error when it doesn't exist
 	var outpath string
 	if jsonSvr.outDir != "" {
 		// create trace directory
-		outpath = filepath.Join(jsonSvr.outDir, span.TraceID)
+		outpath = filepath.Join(jsonSvr.outDir, hex.EncodeToString(span.TraceId))
 		os.Mkdir(outpath, 0755) // ignore errors for now
 
 		// create span directory
-		outpath = filepath.Join(outpath, span.SpanID)
+		outpath = filepath.Join(outpath, hex.EncodeToString(span.SpanId))
 		os.Mkdir(outpath, 0755) // ignore errors for now
 	}
 

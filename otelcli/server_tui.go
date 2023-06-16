@@ -1,17 +1,21 @@
 package otelcli
 
 import (
+	"encoding/hex"
 	"log"
+	"math"
 	"sort"
 	"strconv"
 
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var tuiServer struct {
-	events otlpserver.CliEventList
+	lines  SpanEventUnionList
+	traces map[string]*tracepb.Span // for looking up top span of trace by trace id
 	area   *pterm.AreaPrinter
 }
 
@@ -38,7 +42,8 @@ func doServerTui(cmd *cobra.Command, args []string) {
 	}
 	tuiServer.area = area
 
-	tuiServer.events = []otlpserver.CliEvent{}
+	tuiServer.lines = []SpanEventUnion{}
+	tuiServer.traces = make(map[string]*tracepb.Span)
 
 	stop := func(otlpserver.OtlpServer) {
 		tuiServer.area.Stop()
@@ -55,60 +60,82 @@ func doServerTui(cmd *cobra.Command, args []string) {
 
 // renderTui takes the given span and events, appends them to the in-memory
 // event list, sorts that, then prints it as a pterm table.
-func renderTui(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
-	tuiServer.events = append(tuiServer.events, span)
-	tuiServer.events = append(tuiServer.events, events...)
-	sort.Sort(tuiServer.events)
+func renderTui(span *tracepb.Span, events []*tracepb.Span_Event, rss *tracepb.ResourceSpans, meta map[string]string) bool {
+	spanTraceId := hex.EncodeToString(span.TraceId)
+	if _, ok := tuiServer.traces[spanTraceId]; !ok {
+		tuiServer.traces[spanTraceId] = span
+	}
+
+	tuiServer.lines = append(tuiServer.lines, SpanEventUnion{Span: span})
+	for _, e := range events {
+		tuiServer.lines = append(tuiServer.lines, SpanEventUnion{Span: span, Event: e})
+	}
+	sort.Sort(tuiServer.lines)
 	trimTuiEvents()
 
 	td := pterm.TableData{
 		{"Trace ID", "Span ID", "Parent", "Name", "Kind", "Start", "End", "Elapsed"},
 	}
 
-	top := tuiServer.events[0] // for calculating time offsets
-	for _, e := range tuiServer.events {
-		// if the trace id changes, reset the top event used to calculate offsets
-		if e.TraceID != top.TraceID {
-			// make sure we have the youngest possible (expensive but whatever)
-			// TODO: figure out how events are even getting inserted before a span
-			top = e
-			for _, te := range tuiServer.events {
-				if te.TraceID == top.TraceID && te.Nanos < top.Nanos {
-					top = te
-					break
-				}
-			}
-		}
+	for _, line := range tuiServer.lines {
+		var traceId, spanId, parent, name, kind string
+		var startOffset, endOffset, elapsed int64
+		if line.IsSpan() {
+			name = line.Span.Name
+			kind = SpanKindIntToString(line.Span.GetKind())
+			traceId = line.TraceIdString()
+			spanId = line.SpanIdString()
 
-		var startOffset, endOffset string
-		if e.Kind == "event" {
-			e.TraceID = "" // hide ids on events to make screen less busy
-			e.SpanID = ""
-			startOffset = strconv.FormatInt(e.Start.Sub(top.Start).Milliseconds(), 10)
-		} else {
-			if e.TraceID == top.TraceID && e.SpanID != top.SpanID {
-				e.TraceID = "" // hide it after printing the first trace id
+			if tspan, ok := tuiServer.traces[traceId]; ok {
+				startOffset = roundedDelta(line.Span.StartTimeUnixNano, tspan.StartTimeUnixNano)
+				endOffset = roundedDelta(line.Span.EndTimeUnixNano, tspan.StartTimeUnixNano)
+			} else {
+				endOffset = roundedDelta(line.Span.EndTimeUnixNano, line.Span.StartTimeUnixNano)
 			}
-			so := e.Start.Sub(top.Start).Milliseconds()
-			startOffset = strconv.FormatInt(so, 10)
-			eo := e.End.Sub(top.Start).Milliseconds()
-			endOffset = strconv.FormatInt(eo, 10)
+
+			if len(line.Span.ParentSpanId) > 0 {
+				traceId = "" // hide it after printing the first trace id
+				parent = hex.EncodeToString(line.Span.ParentSpanId)
+			}
+
+			elapsed = endOffset - startOffset
+		} else { // span events
+			name = line.Event.Name
+			kind = "event"
+			traceId = "" // hide ids on events to make screen less busy
+			parent = line.SpanIdString()
+			if tspan, ok := tuiServer.traces[traceId]; ok {
+				startOffset = roundedDelta(line.Event.TimeUnixNano, tspan.StartTimeUnixNano)
+			} else {
+				startOffset = roundedDelta(line.Event.TimeUnixNano, line.Span.StartTimeUnixNano)
+			}
+			endOffset = startOffset
+			elapsed = 0
 		}
 
 		td = append(td, []string{
-			e.TraceID,
-			e.SpanID,
-			e.Parent,
-			e.Name,
-			e.Kind,
-			startOffset,
-			endOffset,
-			strconv.FormatInt(e.ElapsedMs, 10),
+			traceId,
+			spanId,
+			parent,
+			name,
+			kind,
+			strconv.FormatInt(startOffset, 10),
+			strconv.FormatInt(endOffset, 10),
+			strconv.FormatInt(elapsed, 10),
 		})
 	}
 
 	tuiServer.area.Update(pterm.DefaultTable.WithHasHeader().WithData(td).Srender())
 	return false // keep running until user hits ctrl-c
+}
+
+// roundedDelta takes to uint64 nanos values, cuts them down to milliseconds,
+// takes the delta (absolute value, so any order is fine), and returns an int64
+// of ms between the values.
+func roundedDelta(ts1, ts2 uint64) int64 {
+	deltaMs := math.Abs(float64(ts1/1000000) - float64(ts2/1000000))
+	rounded := math.Round(deltaMs)
+	return int64(rounded)
 }
 
 // trimEvents looks to see if there's room on the screen for the number of incoming
@@ -117,20 +144,20 @@ func renderTui(span otlpserver.CliEvent, events otlpserver.CliEventList) bool {
 func trimTuiEvents() {
 	maxRows := pterm.GetTerminalHeight() // TODO: allow override of this?
 
-	if len(tuiServer.events) == 0 || len(tuiServer.events) < maxRows {
+	if len(tuiServer.lines) == 0 || len(tuiServer.lines) < maxRows {
 		return // plenty of room, nothing to do
 	}
 
-	end := len(tuiServer.events) - 1              // should never happen but default to all
-	need := (len(tuiServer.events) - maxRows) + 2 // trim at least this many
-	tid := tuiServer.events[0].TraceID            // we always remove the whole trace
-	for i, v := range tuiServer.events {
-		if v.TraceID == tid {
+	end := len(tuiServer.lines) - 1              // should never happen but default to all
+	need := (len(tuiServer.lines) - maxRows) + 2 // trim at least this many
+	tid := tuiServer.lines[0].TraceIdString()    // we always remove the whole trace
+	for i, v := range tuiServer.lines {
+		if v.TraceIdString() == tid {
 			end = i
 		} else {
 			if end+1 < need {
 				// trace id changed, advance the trim point, and change trace ids
-				tid = v.TraceID
+				tid = v.TraceIdString()
 				end = i
 			} else {
 				break // made enough room, we can quit early
@@ -139,5 +166,37 @@ func trimTuiEvents() {
 	}
 
 	// might need to realloc to not leak memory here?
-	tuiServer.events = tuiServer.events[end:]
+	tuiServer.lines = tuiServer.lines[end:]
 }
+
+// SpanEventUnion is for server_tui so it can sort spans and events together
+// by timestamp.
+type SpanEventUnion struct {
+	Span  *tracepb.Span
+	Event *tracepb.Span_Event
+}
+
+// func (seu *SpanEventUnion) TraceId() []byte       { return seu.Span.TraceId }
+// func (seu *SpanEventUnion) SpanId() []byte        { return seu.Span.SpanId }
+
+func (seu *SpanEventUnion) TraceIdString() string { return hex.EncodeToString(seu.Span.TraceId) }
+func (seu *SpanEventUnion) SpanIdString() string  { return hex.EncodeToString(seu.Span.SpanId) }
+
+func (seu *SpanEventUnion) UnixNanos() uint64 {
+	if seu.IsSpan() {
+		return seu.Span.StartTimeUnixNano
+	} else {
+		return seu.Event.TimeUnixNano
+	}
+}
+
+// IsSpan returns true if this union is for an event. Span is always populated
+// but Event is only populated for events.
+func (seu *SpanEventUnion) IsSpan() bool { return seu.Event == nil }
+
+// SpanEventUnionList is a sortable list of SpanEventUnion, sorted on timestamp.
+type SpanEventUnionList []SpanEventUnion
+
+func (sl SpanEventUnionList) Len() int           { return len(sl) }
+func (sl SpanEventUnionList) Swap(i, j int)      { sl[i], sl[j] = sl[j], sl[i] }
+func (sl SpanEventUnionList) Less(i, j int) bool { return sl[i].UnixNanos() < sl[j].UnixNanos() }
