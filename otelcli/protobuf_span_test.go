@@ -217,7 +217,7 @@ func TestCliAttrsToOtel(t *testing.T) {
 		"test 7 - bool, False": "False",
 	}
 
-	otelAttrs := cliAttrsToOtelPb(testAttrs)
+	otelAttrs := StringMapAttrsToProtobuf(testAttrs)
 
 	// can't count on any ordering from map -> array
 	for _, attr := range otelAttrs {

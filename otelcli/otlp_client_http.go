@@ -35,9 +35,9 @@ func NewHttpClient(config Config) *HttpClient {
 // TODO: see if there's a way to background start http2 connections?
 func (hc *HttpClient) Start(ctx context.Context) error {
 	tlsConf := tlsConfig(hc.config)
-	hc.timeout = hc.config.parseCliTimeout()
+	hc.timeout = hc.config.ParseCliTimeout()
 
-	endpointURL, _ := parseEndpoint(hc.config)
+	endpointURL, _ := ParseEndpoint(hc.config)
 	isLoopback, err := isLoopbackAddr(endpointURL)
 	hc.config.SoftFailIfErr(err)
 	if hc.config.Insecure || (isLoopback && !strings.HasPrefix(hc.config.Endpoint, "https")) {
@@ -66,7 +66,7 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	}
 	body := bytes.NewBuffer(protoMsg)
 
-	endpointURL, _ := parseEndpoint(hc.config)
+	endpointURL, _ := ParseEndpoint(hc.config)
 	req, err := http.NewRequest("POST", endpointURL.String(), body)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP POST request: %w", err)

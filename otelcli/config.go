@@ -19,9 +19,6 @@ import (
 var detectBrokenRFC3339PrefixRe *regexp.Regexp
 var epochNanoTimeRE *regexp.Regexp
 
-const defaultOtlpEndpoint = "grpc://localhost:4317"
-const spanBgSockfilename = "otel-cli-background.sock"
-
 func init() {
 	detectBrokenRFC3339PrefixRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} `)
 	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
@@ -114,9 +111,9 @@ type Config struct {
 	Verbose bool   `json:"verbose" env:"OTEL_CLI_VERBOSE"`
 	Fail    bool   `json:"fail" env:"OTEL_CLI_FAIL"`
 
-	// private things for internals
-	startupTime time.Time // used to compute deadlines for timeouts
-	envBackup   []string  // used to back up envvars for otel-cli exec
+	// not exported, used to get data from cobra to otelcli internals
+	StartupTime time.Time `json:"-"`
+	Version     string    `json:"-"`
 }
 
 // LoadFile reads the file specified by -c/--config and overwrites the
@@ -158,9 +155,6 @@ func (c *Config) LoadEnv(getenv func(string) string) error {
 			// call the provided func(string)string provided to get the
 			// envvar, usually os.Getenv but can be a fake for testing
 			envVal := getenv(envVar)
-
-			// prevent OTel SDK and child processes from reading config envvars
-			os.Unsetenv(envVar)
 
 			if envVal == "" {
 				continue
@@ -239,18 +233,18 @@ func (c Config) ToStringMap() map[string]string {
 // spans. Returns false if unconfigured and going to run inert.
 func (c Config) IsRecording() bool {
 	if c.Endpoint == "" && c.TracesEndpoint == "" {
-		diagnostics.IsRecording = false
+		Diag.IsRecording = false
 		return false
 	}
 
-	diagnostics.IsRecording = true
+	Diag.IsRecording = true
 	return true
 }
 
-// parseCliTimeout parses the cliTimeout global string value to a time.Duration.
+// ParseCliTimeout parses the cliTimeout global string value to a time.Duration.
 // When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
 // It logs an error and returns time.Duration(0) if the string is empty or unparseable.
-func (c Config) parseCliTimeout() time.Duration {
+func (c Config) ParseCliTimeout() time.Duration {
 	var out time.Duration
 	if c.Timeout == "" {
 		out = time.Duration(0)
@@ -263,7 +257,7 @@ func (c Config) parseCliTimeout() time.Duration {
 		out = time.Duration(0)
 	}
 
-	diagnostics.ParsedTimeoutMs = out.Milliseconds()
+	Diag.ParsedTimeoutMs = out.Milliseconds()
 	return out
 }
 
@@ -292,8 +286,8 @@ func (c Config) SoftLogIfErr(err error) {
 func (c Config) SoftFail(format string, a ...interface{}) {
 	c.SoftLog(format, a...)
 
-	if !c.Fail {
-		os.Exit(-1)
+	if c.Fail {
+		os.Exit(1)
 	} else {
 		os.Exit(0)
 	}
@@ -358,14 +352,23 @@ func parseCkvStringMap(in string) (map[string]string, error) {
 	return out, nil
 }
 
+// ParsedSpanStartTime returns config.SpanStartTime as time.Time.
 func (c Config) ParsedSpanStartTime() time.Time {
 	t, err := c.parseTime(c.SpanStartTime, "start")
 	c.SoftFailIfErr(err)
 	return t
 }
 
+// ParsedSpanEndTime returns config.SpanEndTime as time.Time.
 func (c Config) ParsedSpanEndTime() time.Time {
 	t, err := c.parseTime(c.SpanEndTime, "end")
+	c.SoftFailIfErr(err)
+	return t
+}
+
+// ParsedEventTime returns config.EventTime as time.Time.
+func (c Config) ParsedEventTime() time.Time {
+	t, err := c.parseTime(c.EventTime, "event")
 	c.SoftFailIfErr(err)
 	return t
 }
@@ -414,19 +417,19 @@ func (c Config) parseTime(ts, which string) (time.Time, error) {
 
 	// none of the formats worked, print whatever errors are remaining
 	if uterr != nil {
-		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
+		return time.Time{}, fmt.Errorf("could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
 	}
 	if utnerr != nil || utnnerr != nil {
-		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
+		return time.Time{}, fmt.Errorf("could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
 	}
 	if rerr != nil {
-		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
+		return time.Time{}, fmt.Errorf("could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
 	}
 	if rnerr != nil {
-		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
+		return time.Time{}, fmt.Errorf("could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
 	}
 
-	return time.Time{}, fmt.Errorf("Could not parse span %s time %q as any supported format", which, ts)
+	return time.Time{}, fmt.Errorf("could not parse span %s time %q as any supported format", which, ts)
 }
 
 // WithEndpoint returns the config with Endpoint set to the provided value.

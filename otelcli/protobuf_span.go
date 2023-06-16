@@ -62,7 +62,7 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	span.SpanId = generateSpanId(c)
 	span.Name = c.SpanName
 	span.Kind = SpanKindStringToInt(c.Kind)
-	span.Attributes = cliAttrsToOtelPb(c.Attributes)
+	span.Attributes = StringMapAttrsToProtobuf(c.Attributes)
 
 	now := time.Now()
 	if c.SpanStartTime != "" {
@@ -80,7 +80,7 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	}
 
 	if c.IsRecording() {
-		if tp := loadTraceparent(c); tp.initialized {
+		if tp := LoadTraceparent(c); tp.Initialized {
 			span.TraceId = tp.TraceId
 			span.ParentSpanId = tp.SpanId
 		}
@@ -213,9 +213,9 @@ func SpanStatusStringToInt(status string) tracepb.Status_StatusCode {
 	}
 }
 
-// cliAttrsToOtelPb takes a map of string:string, such as that from --attrs
+// StringMapAttrsToProtobuf takes a map of string:string, such as that from --attrs
 // and returns them in an []*commonpb.KeyValue
-func cliAttrsToOtelPb(attributes map[string]string) []*commonpb.KeyValue {
+func StringMapAttrsToProtobuf(attributes map[string]string) []*commonpb.KeyValue {
 	out := []*commonpb.KeyValue{}
 
 	for k, v := range attributes {

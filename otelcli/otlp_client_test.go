@@ -61,7 +61,7 @@ func TestParseEndpoint(t *testing.T) {
 			wantSource:   "signal",
 		},
 	} {
-		u, src := parseEndpoint(tc.config)
+		u, src := ParseEndpoint(tc.config)
 
 		if u.String() != tc.wantEndpoint {
 			t.Errorf("Expected endpoint %q but got %q", tc.wantEndpoint, u.String())

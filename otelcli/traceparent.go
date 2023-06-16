@@ -30,7 +30,7 @@ type Traceparent struct {
 	TraceId     []byte
 	SpanId      []byte
 	Sampling    bool
-	initialized bool
+	Initialized bool
 }
 
 // Encode returns the traceparent as a W3C formatted string.
@@ -54,32 +54,32 @@ func (tp Traceparent) SpanIdString() string {
 	return hex.EncodeToString(tp.SpanId)
 }
 
-// traceparentFromSpan builds a Traceparent struct from the provided span.
-func traceparentFromSpan(span *tracepb.Span) Traceparent {
+// TraceparentFromSpan builds a Traceparent struct from the provided span.
+func TraceparentFromSpan(span *tracepb.Span) Traceparent {
 	return Traceparent{
 		Version:     0,
 		TraceId:     span.TraceId,
 		SpanId:      span.SpanId,
 		Sampling:    true, // TODO: fix this: hax
-		initialized: true,
+		Initialized: true,
 	}
 }
 
-// loadTraceparent checks the environment first for TRACEPARENT then if filename
+// LoadTraceparent checks the environment first for TRACEPARENT then if filename
 // isn't empty, it will read that file and look for a bare traceparent in that
 // file.
-func loadTraceparent(config Config) Traceparent {
+func LoadTraceparent(config Config) Traceparent {
 	tp := loadTraceparentFromEnv(config)
 	if config.TraceparentCarrierFile != "" {
 		fileTp, err := loadTraceparentFromFile(config.TraceparentCarrierFile, config.TraceparentRequired)
 		config.SoftFailIfErr(err)
-		if fileTp.initialized {
+		if fileTp.Initialized {
 			tp = fileTp
 		}
 	}
 
 	if config.TraceparentRequired {
-		if tp.initialized {
+		if tp.Initialized {
 			// return from here if everything looks ok, otherwise fall through to the log.Fatal
 			if !bytes.Equal(tp.TraceId, emptyTraceId) && !bytes.Equal(tp.SpanId, emptySpanId) {
 				return tp
@@ -97,14 +97,14 @@ func loadTraceparent(config Config) Traceparent {
 func loadTraceparentFromFile(filename string, tpRequired bool) (Traceparent, error) {
 	file, err := os.Open(filename)
 	if err != nil {
+		errOut := fmt.Errorf("could not open file '%s' for read: %s", filename, err)
+		Diag.SetError(errOut)
 		// only fatal when the tp carrier file is required explicitly, otherwise
 		// just silently return the unmodified context
 		if tpRequired {
-			return Traceparent{}, fmt.Errorf("could not open file '%s' for read: %s", filename, err)
+			return Traceparent{}, errOut
 		} else {
-			// mask the error but save it in diagnostics
-			diagnostics.SetError(err)
-			return Traceparent{}, nil
+			return Traceparent{}, nil // mask the error
 		}
 	}
 	defer file.Close()
@@ -136,7 +136,7 @@ func loadTraceparentFromFile(filename string, tpRequired bool) (Traceparent, err
 		return Traceparent{}, fmt.Errorf("file '%s' was read but does not contain a valid traceparent", filename)
 	}
 
-	return parseTraceparent(tp)
+	return ParseTraceparent(tp)
 }
 
 // saveToFile takes a context and filename and writes the tp from
@@ -152,29 +152,29 @@ func (tp Traceparent) saveToFile(config Config, span *tracepb.Span) {
 	}
 	defer file.Close()
 
-	printSpanData(file, tp, span, config.TraceparentPrintExport)
+	PrintSpanData(file, tp, span, config.TraceparentPrintExport)
 }
 
-// propagateTraceparent saves the traceparent to file if necessary, then prints
+// PropagateTraceparent saves the traceparent to file if necessary, then prints
 // span info to the console according to command-line args.
-func propagateTraceparent(config Config, span *tracepb.Span, target io.Writer) {
+func PropagateTraceparent(config Config, span *tracepb.Span, target io.Writer) {
 	var tp Traceparent
 	if config.IsRecording() {
-		tp = traceparentFromSpan(span)
+		tp = TraceparentFromSpan(span)
 	} else {
 		// when in non-recording mode, and there is a TP available, propagate that
-		tp = loadTraceparent(config)
+		tp = LoadTraceparent(config)
 	}
 	tp.saveToFile(config, span)
 
 	if config.TraceparentPrint {
-		printSpanData(target, tp, span, config.TraceparentPrintExport)
+		PrintSpanData(target, tp, span, config.TraceparentPrintExport)
 	}
 }
 
-// printSpanData takes the provided strings and prints them in a consitent format,
+// PrintSpanData takes the provided strings and prints them in a consitent format,
 // depending on which command line arguments were set.
-func printSpanData(target io.Writer, tp Traceparent, span *tracepb.Span, export bool) {
+func PrintSpanData(target io.Writer, tp Traceparent, span *tracepb.Span, export bool) {
 	// --tp-export will print "export TRACEPARENT" so it's
 	// one less step to print to a file & source, or eval
 	var exported string
@@ -211,13 +211,13 @@ func loadTraceparentFromEnv(config Config) Traceparent {
 		return Traceparent{}
 	}
 
-	tps, err := parseTraceparent(tp)
+	tps, err := ParseTraceparent(tp)
 	config.SoftFailIfErr(err)
 	return tps
 }
 
-// parseTraceparent parses a string traceparent and returns the struct.
-func parseTraceparent(tp string) (Traceparent, error) {
+// ParseTraceparent parses a string traceparent and returns the struct.
+func ParseTraceparent(tp string) (Traceparent, error) {
 	var err error
 	out := Traceparent{}
 
@@ -248,7 +248,7 @@ func parseTraceparent(tp string) (Traceparent, error) {
 	out.Sampling = (sampleFlag == 1)
 
 	// mark that this is a successfully parsed struct
-	out.initialized = true
+	out.Initialized = true
 
 	return out, nil
 }

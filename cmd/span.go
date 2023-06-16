@@ -1,17 +1,25 @@
-package otelcli
+package otelcmd
 
 import (
 	"os"
 	"regexp"
 
+	"github.com/equinix-labs/otel-cli/otelcli"
 	"github.com/spf13/cobra"
 )
 
+var epochNanoTimeRE *regexp.Regexp
+
+func init() {
+	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
+}
+
 // spanCmd represents the span command
-var spanCmd = &cobra.Command{
-	Use:   "span",
-	Short: "create an OpenTelemetry span and send it",
-	Long: `Create an OpenTelemetry span as specified and send it along. The
+func spanCmd(config *otelcli.Config) *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "span",
+		Short: "create an OpenTelemetry span and send it",
+		Long: `Create an OpenTelemetry span as specified and send it along. The
 span can be customized with a start/end time via RFC3339 or Unix epoch format,
 with support for nanoseconds on both.
 
@@ -24,34 +32,30 @@ Example:
 		--attrs "os.kernel=$(uname -r)" \
 		--tp-print
 `,
-	Run: doSpan,
-}
+		Run: doSpan,
+	}
 
-var epochNanoTimeRE *regexp.Regexp
+	cmd.Flags().SortFlags = false
 
-func init() {
-	defaults := DefaultConfig()
+	addCommonParams(&cmd, config)
+	addSpanParams(&cmd, config)
+	addSpanStartEndParams(&cmd, config)
+	addAttrParams(&cmd, config)
+	addClientParams(&cmd, config)
 
-	rootCmd.AddCommand(spanCmd)
-	spanCmd.Flags().SortFlags = false
+	// subcommands
+	cmd.AddCommand(spanBgCmd(config))
+	cmd.AddCommand(spanEventCmd(config))
+	cmd.AddCommand(spanEndCmd(config))
 
-	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
-	spanCmd.Flags().StringVar(&config.SpanStartTime, "start", defaults.SpanStartTime, "a Unix epoch or RFC3339 timestamp for the start of the span")
-
-	// --end $timestamp
-	spanCmd.Flags().StringVar(&config.SpanEndTime, "end", defaults.SpanEndTime, "an Unix epoch or RFC3339 timestamp for the end of the span")
-
-	addCommonParams(spanCmd)
-	addSpanParams(spanCmd)
-	addAttrParams(spanCmd)
-	addClientParams(spanCmd)
-
-	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
+	return &cmd
 }
 
 func doSpan(cmd *cobra.Command, args []string) {
-	ctx, client := StartClient(config)
-	span := NewProtobufSpanWithConfig(config)
-	SendSpan(ctx, client, config, span)
-	propagateTraceparent(span, os.Stdout)
+	ctx := cmd.Context()
+	config := getConfig(ctx)
+	ctx, client := otelcli.StartClient(ctx, config)
+	span := otelcli.NewProtobufSpanWithConfig(config)
+	otelcli.SendSpan(ctx, client, config, span)
+	otelcli.PropagateTraceparent(config, span, os.Stdout)
 }

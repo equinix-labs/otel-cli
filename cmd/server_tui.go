@@ -1,4 +1,4 @@
-package otelcli
+package otelcmd
 
 import (
 	"encoding/hex"
@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/equinix-labs/otel-cli/otelcli"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
@@ -19,23 +20,24 @@ var tuiServer struct {
 	area   *pterm.AreaPrinter
 }
 
-var serverTuiCmd = &cobra.Command{
-	Use:   "tui",
-	Short: "display spans in a terminal UI",
-	Long: `Run otel-cli as an OTLP server with a terminal UI that displays traces.
+func serverTuiCmd(config *otelcli.Config) *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "tui",
+		Short: "display spans in a terminal UI",
+		Long: `Run otel-cli as an OTLP server with a terminal UI that displays traces.
 	
 	# run otel-cli as a local server and print spans to the console as a table
 	otel-cli server tui`,
-	Run: doServerTui,
-}
+		Run: doServerTui,
+	}
 
-func init() {
-	serverCmd.AddCommand(serverTuiCmd)
-	addCommonParams(serverTuiCmd)
+	addCommonParams(&cmd, config)
+	return &cmd
 }
 
 // doServerTui implements the 'otel-cli server tui' subcommand.
 func doServerTui(cmd *cobra.Command, args []string) {
+	config := getConfig(cmd.Context())
 	area, err := pterm.DefaultArea.Start()
 	if err != nil {
 		log.Fatalf("failed to set up terminal for rendering: %s", err)
@@ -76,7 +78,7 @@ func renderTui(span *tracepb.Span, events []*tracepb.Span_Event, rss *tracepb.Re
 		var startOffset, endOffset, elapsed int64
 		if line.IsSpan() {
 			name = line.Span.Name
-			kind = SpanKindIntToString(line.Span.GetKind())
+			kind = otelcli.SpanKindIntToString(line.Span.GetKind())
 			traceId = line.TraceIdString()
 			spanId = line.SpanIdString()
 

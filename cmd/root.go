@@ -1,61 +1,97 @@
-package otelcli
+package otelcmd
 
 import (
+	"context"
 	"os"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/otelcli"
 	"github.com/spf13/cobra"
 )
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:              "otel-cli",
-	Short:            "CLI for creating and sending OpenTelemetry spans and events.",
-	Long:             `A command-line interface for generating OpenTelemetry data on the command line.`,
-	PersistentPreRun: ConfigPreRun,
+// cliContextKey is a type for storing otelcli.Config in context.
+type cliContextKey string
+
+// configContextKey returns the typed key for storing/retrieving config in context.
+func configContextKey() cliContextKey {
+	return cliContextKey("config")
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute(version string) {
-	rootCmd.Version = version
-	cobra.CheckErr(rootCmd.Execute())
+// getConfigRef retrieves the otelcli.Config from the context and returns a
+// pointer to it.
+func getConfigRef(ctx context.Context) *otelcli.Config {
+	if cv := ctx.Value(configContextKey()); cv != nil {
+		if c, ok := cv.(*otelcli.Config); ok {
+			return c
+		} else {
+			panic("BUG: failed to unwrap config that was in context, please report an issue")
+		}
+	} else {
+		panic("BUG: failed to retrieve config from context, please report an issue")
+	}
 }
 
-func init() {
+// getConfig retrieves the otelcli.Config from context and returns a copy.
+func getConfig(ctx context.Context) otelcli.Config {
+	config := getConfigRef(ctx)
+	return *config
+}
+
+func createRootCmd(config *otelcli.Config) *cobra.Command {
+	// rootCmd represents the base command when called without any subcommands
+	var rootCmd = &cobra.Command{
+		Use:   "otel-cli",
+		Short: "CLI for creating and sending OpenTelemetry spans and events.",
+		Long:  `A command-line interface for generating OpenTelemetry data on the command line.`,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			config := getConfigRef(cmd.Context())
+			if err := config.LoadFile(); err != nil {
+				config.SoftFail("Error while loading configuration file %s: %s", config.CfgFile, err)
+			}
+			if err := config.LoadEnv(os.Getenv); err != nil {
+				// will need to specify --fail --verbose flags to see these errors
+				config.SoftFail("Error while loading environment variables: %s", err)
+			}
+		},
+	}
+
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
 
-	diagnostics.NumArgs = len(os.Args) - 1
-	diagnostics.CliArgs = []string{}
+	otelcli.Diag.NumArgs = len(os.Args) - 1
+	otelcli.Diag.CliArgs = []string{}
 	if len(os.Args) > 1 {
-		diagnostics.CliArgs = os.Args[1:]
+		otelcli.Diag.CliArgs = os.Args[1:]
 	}
+
+	// add all the subcommands to rootCmd
+	rootCmd.AddCommand(spanCmd(config))
+	rootCmd.AddCommand(execCmd(config))
+	rootCmd.AddCommand(statusCmd(config))
+	rootCmd.AddCommand(serverCmd(config))
+	rootCmd.AddCommand(completionCmd(config))
+
+	return rootCmd
 }
 
-// ConfigPreRun is called by Cobra right after reading CLI args, and will load
-// the config file, then environment.
-func ConfigPreRun(cmd *cobra.Command, args []string) {
-	// record startup time as early as possible for doing timeouts
-	config.startupTime = time.Now()
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once.
+func Execute(version string) {
+	config := otelcli.DefaultConfig()
+	config.StartupTime = time.Now() // record startup time as early as possible timeouts
+	config.Version = version
 
-	// because the OTel collector client code directly reads envvars, the OTEL_
-	// variables are deleted during config.LoadEnv(). This breaks expectations
-	// for otel-cli exec users, so we save a copy to pass to exec
-	config.envBackup = os.Environ()
+	// Cobra can tunnel config through context, so set that up now
+	configKey := cliContextKey("config")
+	ctx := context.WithValue(context.Background(), configKey, &config)
 
-	if err := config.LoadFile(); err != nil {
-		softFail("Error while loading configuration file %s: %s", config.CfgFile, err)
-	}
-	if err := config.LoadEnv(os.Getenv); err != nil {
-		// will need to specify --fail --verbose flags to see these errors
-		softFail("Error while loading environment variables: %s", err)
-	}
+	rootCmd := createRootCmd(&config)
+	cobra.CheckErr(rootCmd.ExecuteContext(ctx))
 }
 
 // addCommonParams adds the --config and --endpoint params to the command.
-func addCommonParams(cmd *cobra.Command) {
-	defaults := DefaultConfig()
+func addCommonParams(cmd *cobra.Command, config *otelcli.Config) {
+	defaults := otelcli.DefaultConfig()
 
 	// --config / -c a JSON configuration file
 	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "JSON configuration file")
@@ -77,8 +113,8 @@ func addCommonParams(cmd *cobra.Command) {
 // envvars are named according to the otel specs, others use the OTEL_CLI prefix
 // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/sdk-environment-variables.md
 // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md
-func addClientParams(cmd *cobra.Command) {
-	defaults := DefaultConfig()
+func addClientParams(cmd *cobra.Command, config *otelcli.Config) {
+	defaults := otelcli.DefaultConfig()
 	config.Headers = make(map[string]string)
 
 	// OTEL_EXPORTER standard env and variable params
@@ -101,8 +137,9 @@ func addClientParams(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&config.TraceparentPrintExport, "tp-export", "p", defaults.TraceparentPrintExport, "same as --tp-print but it puts an 'export ' in front so it's more convinenient to source in scripts")
 }
 
-func addSpanParams(cmd *cobra.Command) {
-	defaults := DefaultConfig()
+func addSpanParams(cmd *cobra.Command, config *otelcli.Config) {
+	defaults := otelcli.DefaultConfig()
+
 	// --name / -s
 	cmd.Flags().StringVarP(&config.SpanName, "name", "n", defaults.SpanName, "set the name of the span")
 	// --service / -n
@@ -114,11 +151,21 @@ func addSpanParams(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&config.ForceTraceId, "force-trace-id", defaults.ForceTraceId, "expert: force the trace id to be the one provided in hex")
 	cmd.Flags().StringVar(&config.ForceSpanId, "force-span-id", defaults.ForceSpanId, "expert: force the span id to be the one provided in hex")
 
-	addSpanStatusParams(cmd)
+	addSpanStatusParams(cmd, config)
 }
 
-func addSpanStatusParams(cmd *cobra.Command) {
-	defaults := DefaultConfig()
+func addSpanStartEndParams(cmd *cobra.Command, config *otelcli.Config) {
+	defaults := otelcli.DefaultConfig()
+
+	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
+	cmd.Flags().StringVar(&config.SpanStartTime, "start", defaults.SpanStartTime, "a Unix epoch or RFC3339 timestamp for the start of the span")
+
+	// --end $timestamp
+	cmd.Flags().StringVar(&config.SpanEndTime, "end", defaults.SpanEndTime, "an Unix epoch or RFC3339 timestamp for the end of the span")
+}
+
+func addSpanStatusParams(cmd *cobra.Command, config *otelcli.Config) {
+	defaults := otelcli.DefaultConfig()
 
 	// --status-code / -sc
 	cmd.Flags().StringVar(&config.StatusCode, "status-code", defaults.StatusCode, "set the span status code, e.g. unset|ok|error")
@@ -126,8 +173,8 @@ func addSpanStatusParams(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&config.StatusDescription, "status-description", defaults.StatusDescription, "set the span status description when a span status code of error is set, e.g. 'cancelled'")
 }
 
-func addAttrParams(cmd *cobra.Command) {
-	defaults := DefaultConfig()
+func addAttrParams(cmd *cobra.Command, config *otelcli.Config) {
+	defaults := otelcli.DefaultConfig()
 	// --attrs key=value,foo=bar
 	config.Attributes = make(map[string]string)
 	cmd.Flags().StringToStringVarP(&config.Attributes, "attrs", "a", defaults.Attributes, "a comma-separated list of key=value attributes")

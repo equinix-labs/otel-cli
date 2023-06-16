@@ -1,16 +1,18 @@
-package otelcli
+package otelcmd
 
 import (
 	"log"
 	"os"
 
+	"github.com/equinix-labs/otel-cli/otelcli"
 	"github.com/spf13/cobra"
 )
 
-var completionCmd = &cobra.Command{
-	Use:   "completion [bash|zsh|fish|powershell]",
-	Short: "Generate completion script",
-	Long: `To load completions:
+func completionCmd(config *otelcli.Config) *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "completion [bash|zsh|fish|powershell]",
+		Short: "Generate completion script",
+		Long: `To load completions:
 
 Bash:
 
@@ -49,35 +51,34 @@ PowerShell:
   PS> otel-cli completion powershell > otel-cli.ps1
   # and source this file from your PowerShell profile.
 `,
-	DisableFlagsInUseLine: true,
-	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
-	Args:                  cobra.MatchAll(cobra.ExactArgs(1)),
-	Run: func(cmd *cobra.Command, args []string) {
-		switch args[0] {
-		case "bash":
-			err := cmd.Root().GenBashCompletion(os.Stdout)
-			if err != nil {
-				log.Fatalf("failed to write completion to stdout")
+		DisableFlagsInUseLine: true,
+		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+		Args:                  cobra.MatchAll(cobra.ExactArgs(1)),
+		Run: func(cmd *cobra.Command, args []string) {
+			switch args[0] {
+			case "bash":
+				err := cmd.Root().GenBashCompletion(os.Stdout)
+				if err != nil {
+					log.Fatalf("failed to write completion to stdout")
+				}
+			case "zsh":
+				err := cmd.Root().GenZshCompletion(os.Stdout)
+				if err != nil {
+					log.Fatalf("failed to write completion to stdout")
+				}
+			case "fish":
+				err := cmd.Root().GenFishCompletion(os.Stdout, true)
+				if err != nil {
+					log.Fatalf("failed to write completion to stdout")
+				}
+			case "powershell":
+				err := cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
+				if err != nil {
+					log.Fatalf("failed to write completion to stdout")
+				}
 			}
-		case "zsh":
-			err := cmd.Root().GenZshCompletion(os.Stdout)
-			if err != nil {
-				log.Fatalf("failed to write completion to stdout")
-			}
-		case "fish":
-			err := cmd.Root().GenFishCompletion(os.Stdout, true)
-			if err != nil {
-				log.Fatalf("failed to write completion to stdout")
-			}
-		case "powershell":
-			err := cmd.Root().GenPowerShellCompletionWithDesc(os.Stdout)
-			if err != nil {
-				log.Fatalf("failed to write completion to stdout")
-			}
-		}
-	},
-}
+		},
+	}
 
-func init() {
-	rootCmd.AddCommand(completionCmd)
+	return &cmd
 }

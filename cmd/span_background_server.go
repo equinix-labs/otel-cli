@@ -1,15 +1,18 @@
-package otelcli
+package otelcmd
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"net"
 	"net/rpc"
 	"net/rpc/jsonrpc"
 	"os"
+	"path"
 	"sync"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/otelcli"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -19,6 +22,7 @@ type BgSpan struct {
 	SpanID      string `json:"span_id"`
 	Traceparent string `json:"traceparent"`
 	Error       string `json:"error"`
+	config      otelcli.Config
 	span        *tracepb.Span
 	shutdown    func()
 }
@@ -40,7 +44,7 @@ type BgEnd struct {
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	reply.TraceID = hex.EncodeToString(bs.span.TraceId)
 	reply.SpanID = hex.EncodeToString(bs.span.SpanId)
-	reply.Traceparent = traceparentFromSpan(bs.span).Encode()
+	reply.Traceparent = otelcli.TraceparentFromSpan(bs.span).Encode()
 
 	ts, err := time.Parse(time.RFC3339Nano, bse.Timestamp)
 	if err != nil {
@@ -48,10 +52,10 @@ func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 		return err
 	}
 
-	event := NewProtobufSpanEvent()
+	event := otelcli.NewProtobufSpanEvent()
 	event.Name = bse.Name
 	event.TimeUnixNano = uint64(ts.UnixNano())
-	event.Attributes = cliAttrsToOtelPb(bse.Attributes)
+	event.Attributes = otelcli.StringMapAttrsToProtobuf(bse.Attributes)
 
 	bs.span.Events = append(bs.span.Events, event)
 
@@ -67,8 +71,8 @@ func (bs BgSpan) Wait(in, reply *struct{}) error {
 // ends the span end exits the background process.
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
 	// handle --status-code and --status-description args to span end
-	c := config.WithStatusCode(in.StatusCode).WithStatusDescription(in.StatusDesc)
-	SetSpanStatus(bs.span, c)
+	c := bs.config.WithStatusCode(in.StatusCode).WithStatusDescription(in.StatusDesc)
+	otelcli.SetSpanStatus(bs.span, c)
 
 	// running the shutdown as a goroutine prevents the client from getting an
 	// error here when the server gets closed. defer didn't do the trick.
@@ -82,26 +86,30 @@ type bgServer struct {
 	listener net.Listener
 	quit     chan struct{}
 	wg       sync.WaitGroup
+	config   otelcli.Config
 }
 
 // createBgServer opens a new span background server on a unix socket and
 // returns with the server ready to go. Not expected to block.
-func createBgServer(sockfile string, span *tracepb.Span) *bgServer {
+func createBgServer(ctx context.Context, sockfile string, span *tracepb.Span) *bgServer {
 	var err error
+	config := getConfig(ctx)
 
 	bgs := bgServer{
 		sockfile: sockfile,
 		quit:     make(chan struct{}),
+		config:   config,
 	}
 
 	// TODO: be safer?
 	if err = os.RemoveAll(sockfile); err != nil {
-		softFail("failed while cleaning up for socket file '%s': %s", sockfile, err)
+		config.SoftFail("failed while cleaning up for socket file '%s': %s", sockfile, err)
 	}
 
 	bgspan := BgSpan{
 		TraceID:  hex.EncodeToString(span.TraceId),
 		SpanID:   hex.EncodeToString(span.SpanId),
+		config:   config,
 		span:     span,
 		shutdown: func() { bgs.Shutdown() },
 	}
@@ -110,7 +118,7 @@ func createBgServer(sockfile string, span *tracepb.Span) *bgServer {
 
 	bgs.listener, err = net.Listen("unix", sockfile)
 	if err != nil {
-		softFail("unable to listen on unix socket '%s': %s", sockfile, err)
+		config.SoftFail("unable to listen on unix socket '%s': %s", sockfile, err)
 	}
 
 	bgs.wg.Add(1) // cleanup will block until this is done
@@ -128,7 +136,7 @@ func (bgs *bgServer) Run() {
 			case <-bgs.quit: // quitting gracefully
 				return
 			default:
-				softFail("error while accepting connection: %s", err)
+				bgs.config.SoftFail("error while accepting connection: %s", err)
 			}
 		}
 
@@ -152,10 +160,10 @@ func (bgs *bgServer) Shutdown() {
 // createBgClient sets up a client connection to the unix socket jsonrpc server
 // and returns the rpc client handle and a shutdown function that should be
 // deferred.
-func createBgClient() (*rpc.Client, func()) {
-	sockfile := spanBgSockfile()
+func createBgClient(config otelcli.Config) (*rpc.Client, func()) {
+	sockfile := path.Join(config.BackgroundSockdir, spanBgSockfilename)
 	started := time.Now()
-	timeout := parseCliTimeout(config)
+	timeout := config.ParseCliTimeout()
 
 	// wait for the socket file to show up, polling every 25ms until it does or timeout
 	for {
@@ -163,20 +171,20 @@ func createBgClient() (*rpc.Client, func()) {
 		if os.IsNotExist(err) {
 			time.Sleep(time.Millisecond * 25) // sleep 25ms between checks
 		} else if err != nil {
-			softFail("failed to stat file '%s': %s", sockfile, err)
+			config.SoftFail("failed to stat file '%s': %s", sockfile, err)
 		} else {
 			break
 		}
 
 		if timeout > 0 && time.Since(started) > timeout {
-			softFail("timeout after %s while waiting for span background socket '%s' to appear", config.Timeout, sockfile)
+			config.SoftFail("timeout after %s while waiting for span background socket '%s' to appear", config.Timeout, sockfile)
 		}
 	}
 
 	sock := net.UnixAddr{Name: sockfile, Net: "unix"}
 	conn, err := net.DialUnix(sock.Net, nil, &sock)
 	if err != nil {
-		softFail("unable to connect to span background server at '%s': %s", config.BackgroundSockdir, err)
+		config.SoftFail("unable to connect to span background server at '%s': %s", config.BackgroundSockdir, err)
 	}
 
 	return jsonrpc.NewClient(conn), func() { conn.Close() }

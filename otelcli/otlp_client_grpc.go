@@ -32,7 +32,7 @@ func NewGrpcClient(config Config) *GrpcClient {
 // Start configures and starts the connection to the gRPC server in the background.
 func (gc *GrpcClient) Start(ctx context.Context) error {
 	var err error
-	endpointURL, _ := parseEndpoint(gc.config)
+	endpointURL, _ := ParseEndpoint(gc.config)
 	host := endpointURL.Hostname()
 	if endpointURL.Port() != "" {
 		host = host + ":" + endpointURL.Port()
@@ -61,7 +61,7 @@ func (gc *GrpcClient) Start(ctx context.Context) error {
 		grpcOpts = append(grpcOpts, grpc.WithBlock())
 	}
 
-	ctx, _ = deadlineCtx(ctx, gc.config, gc.config.startupTime)
+	ctx, _ = deadlineCtx(ctx, gc.config, gc.config.StartupTime)
 	gc.conn, err = grpc.DialContext(ctx, host, grpcOpts...)
 	if err != nil {
 		gc.config.SoftFail("could not connect to gRPC/OTLP: %s", err)
@@ -80,10 +80,10 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	grpcOpts := []grpc.CallOption{grpc.HeaderCallOption{HeaderAddr: &md}}
 
 	req := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
-	ctx, cancel := deadlineCtx(ctx, gc.config, gc.config.startupTime)
+	ctx, cancel := deadlineCtx(ctx, gc.config, gc.config.StartupTime)
 	defer cancel()
 
-	timeout := gc.config.parseCliTimeout()
+	timeout := gc.config.ParseCliTimeout()
 	return retry(gc.config, timeout, func() (bool, time.Duration, error) {
 		etsr, err := gc.client.Export(ctx, &req, grpcOpts...)
 		return processGrpcStatus(etsr, err)

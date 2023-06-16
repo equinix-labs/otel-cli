@@ -1,4 +1,4 @@
-package otelcli
+package otelcmd
 
 import (
 	"encoding/hex"
@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/otelcli"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -22,27 +23,29 @@ var jsonSvr struct {
 	spansSeen int
 }
 
-var serverJsonCmd = &cobra.Command{
-	Use:   "json",
-	Short: "write spans to json or stdout",
-	Long:  "",
-	Run:   doServerJson,
-}
+func serverJsonCmd(config *otelcli.Config) *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "json",
+		Short: "write spans to json or stdout",
+		Long:  "",
+		Run:   doServerJson,
+	}
 
-func init() {
-	serverCmd.AddCommand(serverJsonCmd)
-	addCommonParams(serverJsonCmd)
-	serverJsonCmd.Flags().StringVar(&jsonSvr.outDir, "dir", "", "write spans to json in the specified directory")
-	serverJsonCmd.Flags().BoolVar(&jsonSvr.stdout, "stdout", false, "write span jsons to stdout")
-	serverJsonCmd.Flags().IntVar(&jsonSvr.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
+	addCommonParams(&cmd, config)
+	cmd.Flags().StringVar(&jsonSvr.outDir, "dir", "", "write spans to json in the specified directory")
+	cmd.Flags().BoolVar(&jsonSvr.stdout, "stdout", false, "write span jsons to stdout")
+	cmd.Flags().IntVar(&jsonSvr.maxSpans, "max-spans", 0, "exit the server after this many spans come in")
+
+	return &cmd
 }
 
 func doServerJson(cmd *cobra.Command, args []string) {
+	config := getConfig(cmd.Context())
 	stop := func(otlpserver.OtlpServer) {}
 	cs := otlpserver.NewGrpcServer(renderJson, stop)
 
 	// stops the grpc server after timeout
-	timeout := parseCliTimeout(config)
+	timeout := config.ParseCliTimeout()
 	if timeout > 0 {
 		go func() {
 			time.Sleep(timeout)
