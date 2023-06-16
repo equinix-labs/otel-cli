@@ -484,11 +484,13 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				SpanCount: 1,
 				Diagnostics: otelcli.Diagnostics{
-					IsRecording:     true,
-					NumArgs:         3,
-					ParsedTimeoutMs: 1000,
-					Endpoint:        "*",
-					EndpointSource:  "*",
+					IsRecording:       true,
+					NumArgs:           3,
+					ParsedTimeoutMs:   1000,
+					Endpoint:          "*",
+					EndpointSource:    "*",
+					DetectedLocalhost: true,
+					Error:             "could not open file '/tmp/traceparent.txt' for read: open /tmp/traceparent.txt: no such file or directory",
 				},
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
