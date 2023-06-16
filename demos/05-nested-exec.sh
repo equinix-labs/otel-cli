@@ -15,6 +15,9 @@ carrier=$(mktemp)
 	--name       "hammer the server for sweet sweet data" \
 	--kind       "client" \
 	--tp-carrier $carrier \
-	"../otel-cli exec -n fake-server -s 'put up with the clients nonsense' -k server echo 500 NOPE"
+	--verbose \
+     	--fail \
+	-- \
+	../otel-cli exec -n fake-server -s 'put up with the clients nonsense' -k server /bin/echo 500 NOPE
 	# ^ child span, the responding "server" that just echos NOPE
 
