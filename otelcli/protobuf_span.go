@@ -9,6 +9,7 @@ package otelcli
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -65,21 +66,21 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 
 	now := time.Now()
 	if c.SpanStartTime != "" {
-		st := parseTime(c.SpanStartTime, "start")
+		st := c.ParsedSpanStartTime()
 		span.StartTimeUnixNano = uint64(st.UnixNano())
 	} else {
 		span.StartTimeUnixNano = uint64(now.UnixNano())
 	}
 
 	if c.SpanEndTime != "" {
-		et := parseTime(c.SpanEndTime, "end")
+		et := c.ParsedSpanEndTime()
 		span.EndTimeUnixNano = uint64(et.UnixNano())
 	} else {
 		span.EndTimeUnixNano = uint64(now.UnixNano())
 	}
 
-	if config.IsRecording() {
-		if tp := loadTraceparent(c.TraceparentCarrierFile); tp.initialized {
+	if c.IsRecording() {
+		if tp := loadTraceparent(c); tp.initialized {
 			span.TraceId = tp.TraceId
 			span.ParentSpanId = tp.SpanId
 		}
@@ -91,11 +92,14 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 
 	// --force-trace-id and --force-span-id let the user set their own trace & span ids
 	// these work in non-recording mode and will stomp trace id from the traceparent
-	if config.ForceTraceId != "" {
-		span.TraceId = parseHex(config.ForceTraceId, 16)
+	var err error
+	if c.ForceTraceId != "" {
+		span.TraceId, err = parseHex(c.ForceTraceId, 16)
+		c.SoftFailIfErr(err)
 	}
-	if config.ForceSpanId != "" {
-		span.SpanId = parseHex(config.ForceSpanId, 8)
+	if c.ForceSpanId != "" {
+		span.SpanId, err = parseHex(c.ForceSpanId, 8)
+		c.SoftFailIfErr(err)
 	}
 
 	SetSpanStatus(span, c)
@@ -121,7 +125,7 @@ func generateTraceId(c Config) []byte {
 		buf := make([]byte, 16)
 		_, err := rand.Read(buf)
 		if err != nil {
-			softFail("Failed to generate random data for trace id: %s", err)
+			c.SoftFail("Failed to generate random data for trace id: %s", err)
 		}
 		return buf
 	} else {
@@ -135,7 +139,7 @@ func generateSpanId(c Config) []byte {
 		buf := make([]byte, 8)
 		_, err := rand.Read(buf)
 		if err != nil {
-			softFail("Failed to generate random data for span id: %s", err)
+			c.SoftFail("Failed to generate random data for span id: %s", err)
 		}
 		return buf
 	} else {
@@ -145,15 +149,15 @@ func generateSpanId(c Config) []byte {
 
 // parseHex parses hex into a []byte of length provided. Errors if the input is
 // not valid hex or the converted hex is not the right number of bytes.
-func parseHex(in string, expectedLen int) []byte {
+func parseHex(in string, expectedLen int) ([]byte, error) {
 	out, err := hex.DecodeString(in)
 	if err != nil {
-		softFail("error parsing hex string %q: %s", in, err)
+		return nil, fmt.Errorf("error parsing hex string %q: %w", in, err)
 	}
 	if len(out) != expectedLen {
-		softFail("hex string %q is the wrong length, expected %d bytes but got %d", in, expectedLen, len(out))
+		return nil, fmt.Errorf("hex string %q is the wrong length, expected %d bytes but got %d", in, expectedLen, len(out))
 	}
-	return out
+	return out, nil
 }
 
 // SpanKindIntToString takes an integer/constant protobuf span kind value
@@ -207,6 +211,36 @@ func SpanStatusStringToInt(status string) tracepb.Status_StatusCode {
 	default:
 		return tracepb.Status_STATUS_CODE_UNSET
 	}
+}
+
+// cliAttrsToOtelPb takes a map of string:string, such as that from --attrs
+// and returns them in an []*commonpb.KeyValue
+func cliAttrsToOtelPb(attributes map[string]string) []*commonpb.KeyValue {
+	out := []*commonpb.KeyValue{}
+
+	for k, v := range attributes {
+		av := new(commonpb.AnyValue)
+
+		// try to parse as numbers, and fall through to string
+		if i, err := strconv.ParseInt(v, 0, 64); err == nil {
+			av.Value = &commonpb.AnyValue_IntValue{IntValue: i}
+		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
+			av.Value = &commonpb.AnyValue_DoubleValue{DoubleValue: f}
+		} else if b, err := strconv.ParseBool(v); err == nil {
+			av.Value = &commonpb.AnyValue_BoolValue{BoolValue: b}
+		} else {
+			av.Value = &commonpb.AnyValue_StringValue{StringValue: v}
+		}
+
+		akv := commonpb.KeyValue{
+			Key:   k,
+			Value: av,
+		}
+
+		out = append(out, &akv)
+	}
+
+	return out
 }
 
 // SpanAttributesToStringMap converts the span's attributes to a string map.

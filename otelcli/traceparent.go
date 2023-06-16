@@ -60,7 +60,7 @@ func traceparentFromSpan(span *tracepb.Span) Traceparent {
 		Version:     0,
 		TraceId:     span.TraceId,
 		SpanId:      span.SpanId,
-		Sampling:    config.IsRecording(), // TODO: is this the right thing?
+		Sampling:    true, // TODO: fix this: hax
 		initialized: true,
 	}
 }
@@ -68,10 +68,11 @@ func traceparentFromSpan(span *tracepb.Span) Traceparent {
 // loadTraceparent checks the environment first for TRACEPARENT then if filename
 // isn't empty, it will read that file and look for a bare traceparent in that
 // file.
-func loadTraceparent(filename string) Traceparent {
-	tp := loadTraceparentFromEnv()
-	if filename != "" {
-		fileTp := loadTraceparentFromFile(filename)
+func loadTraceparent(config Config) Traceparent {
+	tp := loadTraceparentFromEnv(config)
+	if config.TraceparentCarrierFile != "" {
+		fileTp, err := loadTraceparentFromFile(config.TraceparentCarrierFile, config.TraceparentRequired)
+		config.SoftFailIfErr(err)
 		if fileTp.initialized {
 			tp = fileTp
 		}
@@ -84,7 +85,7 @@ func loadTraceparent(filename string) Traceparent {
 				return tp
 			}
 		}
-		softFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", filename)
+		config.SoftFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", config.TraceparentCarrierFile)
 	}
 	return tp
 }
@@ -93,15 +94,17 @@ func loadTraceparent(filename string) Traceparent {
 // context with the traceparent set. The format for the file as written is
 // just a bare traceparent string. Whitespace, "export " and "TRACEPARENT=" are
 // stripped automatically so the file can also be a valid shell snippet.
-func loadTraceparentFromFile(filename string) Traceparent {
+func loadTraceparentFromFile(filename string, tpRequired bool) (Traceparent, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		// only fatal when the tp carrier file is required explicitly, otherwise
 		// just silently return the unmodified context
-		if config.TraceparentRequired {
-			softFail("could not open file '%s' for read: %s", filename, err)
+		if tpRequired {
+			return Traceparent{}, fmt.Errorf("could not open file '%s' for read: %s", filename, err)
 		} else {
-			return Traceparent{}
+			// mask the error but save it in diagnostics
+			diagnostics.SetError(err)
+			return Traceparent{}, nil
 		}
 	}
 	defer file.Close()
@@ -122,7 +125,7 @@ func loadTraceparentFromFile(filename string) Traceparent {
 
 	// silently fail if no traceparent was found
 	if tp == "" {
-		return Traceparent{}
+		return Traceparent{}, nil
 	}
 
 	// clean 'export TRACEPARENT=' and 'TRACEPARENT=' off the output
@@ -130,8 +133,7 @@ func loadTraceparentFromFile(filename string) Traceparent {
 	tp = strings.TrimPrefix(tp, "TRACEPARENT=")
 
 	if !traceparentRe.MatchString(tp) {
-		softLog("file '%s' was read but does not contain a valid traceparent", filename)
-		return Traceparent{}
+		return Traceparent{}, fmt.Errorf("file '%s' was read but does not contain a valid traceparent", filename)
 	}
 
 	return parseTraceparent(tp)
@@ -139,44 +141,44 @@ func loadTraceparentFromFile(filename string) Traceparent {
 
 // saveToFile takes a context and filename and writes the tp from
 // that context into the specified file.
-func (tp Traceparent) saveToFile(filename string, span *tracepb.Span) {
-	if filename == "" {
+func (tp Traceparent) saveToFile(config Config, span *tracepb.Span) {
+	if config.TraceparentCarrierFile == "" {
 		return
 	}
 
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+	file, err := os.OpenFile(config.TraceparentCarrierFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
-		softFail("failure opening file '%s' for write: %s", filename, err)
+		config.SoftFail("failure opening file '%s' for write: %s", config.TraceparentCarrierFile, err)
 	}
 	defer file.Close()
 
-	printSpanData(file, tp, span)
+	printSpanData(file, tp, span, config.TraceparentPrintExport)
 }
 
 // propagateTraceparent saves the traceparent to file if necessary, then prints
 // span info to the console according to command-line args.
-func propagateTraceparent(span *tracepb.Span, target io.Writer) {
+func propagateTraceparent(config Config, span *tracepb.Span, target io.Writer) {
 	var tp Traceparent
 	if config.IsRecording() {
 		tp = traceparentFromSpan(span)
 	} else {
 		// when in non-recording mode, and there is a TP available, propagate that
-		tp = loadTraceparent(config.TraceparentCarrierFile)
+		tp = loadTraceparent(config)
 	}
-	tp.saveToFile(config.TraceparentCarrierFile, span)
+	tp.saveToFile(config, span)
 
 	if config.TraceparentPrint {
-		printSpanData(target, tp, span)
+		printSpanData(target, tp, span, config.TraceparentPrintExport)
 	}
 }
 
 // printSpanData takes the provided strings and prints them in a consitent format,
 // depending on which command line arguments were set.
-func printSpanData(target io.Writer, tp Traceparent, span *tracepb.Span) {
+func printSpanData(target io.Writer, tp Traceparent, span *tracepb.Span, export bool) {
 	// --tp-export will print "export TRACEPARENT" so it's
 	// one less step to print to a file & source, or eval
 	var exported string
-	if config.TraceparentPrintExport {
+	if export {
 		exported = "export "
 	}
 
@@ -198,7 +200,7 @@ func printSpanData(target io.Writer, tp Traceparent, span *tracepb.Span) {
 
 // loadTraceparentFromEnv loads the traceparent from the environment variable
 // TRACEPARENT and sets it in the returned Go context.
-func loadTraceparentFromEnv() Traceparent {
+func loadTraceparentFromEnv(config Config) Traceparent {
 	// don't load the envvar when --tp-ignore-env is set
 	if config.TraceparentIgnoreEnv {
 		return Traceparent{}
@@ -209,42 +211,44 @@ func loadTraceparentFromEnv() Traceparent {
 		return Traceparent{}
 	}
 
-	return parseTraceparent(tp)
+	tps, err := parseTraceparent(tp)
+	config.SoftFailIfErr(err)
+	return tps
 }
 
 // parseTraceparent parses a string traceparent and returns the struct.
-func parseTraceparent(tp string) Traceparent {
+func parseTraceparent(tp string) (Traceparent, error) {
 	var err error
 	out := Traceparent{}
 
 	parts := traceparentRe.FindStringSubmatch(tp)
 	if len(parts) != 5 {
-		softFail("could not parse invalid traceparent %q", tp)
+		return out, fmt.Errorf("could not parse invalid traceparent %q", tp)
 	}
 
 	out.Version, err = strconv.Atoi(parts[1])
 	if err != nil {
-		softFail("could not parse traceparent version component in %q", tp)
+		return out, fmt.Errorf("could not parse traceparent version component in %q", tp)
 	}
 
 	out.TraceId, err = hex.DecodeString(parts[2])
 	if err != nil {
-		softFail("could not parse traceparent trace id component in %q", tp)
+		return out, fmt.Errorf("could not parse traceparent trace id component in %q", tp)
 	}
 
 	out.SpanId, err = hex.DecodeString(parts[3])
 	if err != nil {
-		softFail("could not parse traceparent span id component in %q", tp)
+		return out, fmt.Errorf("could not parse traceparent span id component in %q", tp)
 	}
 
 	sampleFlag, err := strconv.ParseInt(parts[4], 10, 64)
 	if err != nil {
-		softFail("could not parse traceparent sampling bits component in %q", tp)
+		return out, fmt.Errorf("could not parse traceparent sampling bits component in %q", tp)
 	}
 	out.Sampling = (sampleFlag == 1)
 
 	// mark that this is a successfully parsed struct
 	out.initialized = true
 
-	return out
+	return out, nil
 }

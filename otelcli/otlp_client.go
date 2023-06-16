@@ -41,7 +41,7 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
 		err := fmt.Errorf("invalid protocol setting %q", config.Protocol)
 		diagnostics.Error = err.Error()
-		softFail(err.Error())
+		config.SoftFail(err.Error())
 	}
 
 	endpointURL, _ := parseEndpoint(config)
@@ -59,7 +59,7 @@ func StartClient(config Config) (context.Context, OTLPClient) {
 	err := client.Start(ctx)
 	if err != nil {
 		diagnostics.Error = err.Error()
-		softFail("Failed to start OTLP client: %s", err)
+		config.SoftFail("Failed to start OTLP client: %s", err)
 	}
 
 	return ctx, client
@@ -71,15 +71,18 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 		return nil
 	}
 
+	resourceAttrs, err := resourceAttributes(ctx, config.ServiceName)
+	config.SoftFailIfErr(err)
+
 	rsps := []*tracepb.ResourceSpans{
 		{
 			Resource: &resourcepb.Resource{
-				Attributes: resourceAttributes(ctx),
+				Attributes: resourceAttrs,
 			},
 			ScopeSpans: []*tracepb.ScopeSpans{{
 				Scope: &commonpb.InstrumentationScope{
 					Name:                   "github.com/equinix-labs/otel-cli",
-					Version:                rootCmd.Version, // TODO: plumb this through config
+					Version:                "0.4.0", // rootCmd.Version, // TODO: plumb this through config
 					Attributes:             []*commonpb.KeyValue{},
 					DroppedAttributesCount: 0,
 				},
@@ -90,7 +93,7 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 		},
 	}
 
-	err := client.UploadTraces(ctx, rsps)
+	err = client.UploadTraces(ctx, rsps)
 	if err != nil {
 		diagnostics.Error = err.Error()
 		return err
@@ -121,7 +124,7 @@ func parseEndpoint(config Config) (*url.URL, string) {
 		endpoint = config.Endpoint
 		source = "general"
 	} else {
-		softFail("no endpoint configuration available")
+		config.SoftFail("no endpoint configuration available")
 	}
 
 	parts := strings.Split(endpoint, ":")
@@ -129,7 +132,7 @@ func parseEndpoint(config Config) (*url.URL, string) {
 	if len(parts) == 1 {
 		epUrl, err = url.Parse("grpc://" + endpoint + ":4317")
 		if err != nil {
-			softFail("error parsing (assumed) gRPC bare host address '%s': %s", endpoint, err)
+			config.SoftFail("error parsing (assumed) gRPC bare host address '%s': %s", endpoint, err)
 		}
 	} else if len(parts) > 1 { // could be URI or host:port
 		// actual URIs
@@ -137,13 +140,13 @@ func parseEndpoint(config Config) (*url.URL, string) {
 		if parts[0] == "grpc" || parts[0] == "http" || parts[0] == "https" {
 			epUrl, err = url.Parse(endpoint)
 			if err != nil {
-				softFail("error parsing provided %s URI '%s': %s", source, endpoint, err)
+				config.SoftFail("error parsing provided %s URI '%s': %s", source, endpoint, err)
 			}
 		} else {
 			// gRPC host:port
 			epUrl, err = url.Parse("grpc://" + endpoint)
 			if err != nil {
-				softFail("error parsing (assumed) gRPC host:port address '%s': %s", endpoint, err)
+				config.SoftFail("error parsing (assumed) gRPC host:port address '%s': %s", endpoint, err)
 			}
 		}
 	}
@@ -174,7 +177,7 @@ func tlsConfig(config Config) *tls.Config {
 	if config.TlsCACert != "" {
 		data, err := os.ReadFile(config.TlsCACert)
 		if err != nil {
-			softFail("failed to load CA certificate: %s", err)
+			config.SoftFail("failed to load CA certificate: %s", err)
 		}
 
 		certpool := x509.NewCertPool()
@@ -186,21 +189,21 @@ func tlsConfig(config Config) *tls.Config {
 	if config.TlsClientCert != "" && config.TlsClientKey != "" {
 		clientPEM, err := os.ReadFile(config.TlsClientCert)
 		if err != nil {
-			softFail("failed to read client certificate file %s: %s", config.TlsClientCert, err)
+			config.SoftFail("failed to read client certificate file %s: %s", config.TlsClientCert, err)
 		}
 		clientKeyPEM, err := os.ReadFile(config.TlsClientKey)
 		if err != nil {
-			softFail("failed to read client key file %s: %s", config.TlsClientKey, err)
+			config.SoftFail("failed to read client key file %s: %s", config.TlsClientKey, err)
 		}
 		certPair, err := tls.X509KeyPair(clientPEM, clientKeyPEM)
 		if err != nil {
-			softFail("failed to parse client cert pair: %s", err)
+			config.SoftFail("failed to parse client cert pair: %s", err)
 		}
 		tlsConfig.Certificates = []tls.Certificate{certPair}
 	} else if config.TlsClientCert != "" {
-		softFail("client cert and key must be specified together")
+		config.SoftFail("client cert and key must be specified together")
 	} else if config.TlsClientKey != "" {
-		softFail("client cert and key must be specified together")
+		config.SoftFail("client cert and key must be specified together")
 	}
 
 	return tlsConfig
@@ -209,7 +212,7 @@ func tlsConfig(config Config) *tls.Config {
 // deadlineCtx sets timeout on the context if the duration is non-zero.
 // Otherwise it returns the context as-is.
 func deadlineCtx(ctx context.Context, config Config, startupTime time.Time) (context.Context, context.CancelFunc) {
-	if timeout := parseCliTimeout(config); timeout > 0 {
+	if timeout := config.parseCliTimeout(); timeout > 0 {
 		deadline := startupTime.Add(timeout)
 		return context.WithDeadline(ctx, deadline)
 	}
@@ -222,17 +225,17 @@ func deadlineCtx(ctx context.Context, config Config, startupTime time.Time) (con
 // As I understood the OTLP spec, only host:port or an HTTP URL are acceptable.
 // This function is _not_ meant to validate the endpoint, that will happen when
 // otel-go attempts to connect to the endpoint.
-func isLoopbackAddr(u *url.URL) bool {
+func isLoopbackAddr(u *url.URL) (bool, error) {
 	hostname := u.Hostname()
 
 	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
 		diagnostics.DetectedLocalhost = true
-		return true
+		return true, nil
 	}
 
 	ips, err := net.LookupIP(hostname)
 	if err != nil {
-		softFail("unable to look up hostname '%s': %s", hostname, err)
+		return false, fmt.Errorf("unable to look up hostname '%s': %s", hostname, err)
 	}
 
 	// all ips returned must be loopback to return true
@@ -245,7 +248,7 @@ func isLoopbackAddr(u *url.URL) bool {
 	}
 
 	diagnostics.DetectedLocalhost = allAreLoopback
-	return allAreLoopback
+	return allAreLoopback, nil
 }
 
 // isInsecureSchema returns true if the provided endpoint is an unencrypted HTTP URL or unix socket
@@ -256,10 +259,10 @@ func isInsecureSchema(endpoint string) bool {
 
 // resourceAttributes calls the OTel SDK to get automatic resource attrs and
 // returns them converted to []*commonpb.KeyValue for use with protobuf.
-func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
+func resourceAttributes(ctx context.Context, serviceName string) ([]*commonpb.KeyValue, error) {
 	// set the service name that will show up in tracing UIs
 	resOpts := []resource.Option{
-		resource.WithAttributes(semconv.ServiceNameKey.String(config.ServiceName)),
+		resource.WithAttributes(semconv.ServiceNameKey.String(serviceName)),
 		resource.WithFromEnv(), // maybe switch to manually loading this envvar?
 		// TODO: make these autodetectors configurable
 		//resource.WithHost(),
@@ -270,7 +273,7 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 
 	res, err := resource.New(ctx, resOpts...)
 	if err != nil {
-		softFail("failed to create OpenTelemetry service name resource: %s", err)
+		return nil, fmt.Errorf("failed to create OpenTelemetry service name resource: %s", err)
 	}
 
 	attrs := []*commonpb.KeyValue{}
@@ -289,7 +292,7 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 		case attribute.STRING:
 			av.Value = &commonpb.AnyValue_StringValue{StringValue: attr.Value.AsString()}
 		default:
-			softFail("BUG: unable to convert resource attribute, please file an issue")
+			return nil, fmt.Errorf("BUG: unable to convert resource attribute, please file an issue")
 		}
 
 		ckv := commonpb.KeyValue{
@@ -299,7 +302,7 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 		attrs = append(attrs, &ckv)
 	}
 
-	return attrs
+	return attrs, nil
 }
 
 // retry calls the provided function and expects it to return (true, wait, err)
@@ -317,12 +320,12 @@ func resourceAttributes(ctx context.Context) []*commonpb.KeyValue {
 // TODO: --otlp-retry-sleep? --otlp-retry-timeout?
 // TODO: span events? hmm... feels weird to plumb spans this deep into the client
 // but it's probably fine?
-func retry(timeout time.Duration, fun retryFun) error {
+func retry(config Config, timeout time.Duration, fun retryFun) error {
 	deadline := config.startupTime.Add(timeout)
 	sleep := time.Duration(0)
 	for {
 		if keepGoing, wait, err := fun(); err != nil {
-			softLog("error on retry %d: %s", diagnostics.Retries, err)
+			config.SoftLog("error on retry %d: %s", diagnostics.Retries, err)
 
 			if keepGoing {
 				if wait > 0 {

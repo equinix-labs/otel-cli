@@ -31,7 +31,8 @@ func NewGrpcClient(config Config) *GrpcClient {
 
 // Start configures and starts the connection to the gRPC server in the background.
 func (gc *GrpcClient) Start(ctx context.Context) error {
-	endpointURL, _ := parseEndpoint(config)
+	var err error
+	endpointURL, _ := parseEndpoint(gc.config)
 	host := endpointURL.Hostname()
 	if endpointURL.Port() != "" {
 		host = host + ":" + endpointURL.Port()
@@ -44,25 +45,26 @@ func (gc *GrpcClient) Start(ctx context.Context) error {
 	// have any encryption available, or setting it up raises the bar of entry too high.
 	// The compromise is to automatically flip this flag to true when endpoint contains an
 	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
+	isLoopback, err := isLoopbackAddr(endpointURL)
+	gc.config.SoftFailIfErr(err)
+	if gc.config.Insecure || (isLoopback && !strings.HasPrefix(gc.config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else if !isInsecureSchema(config.Endpoint) {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig(config))))
+	} else if !isInsecureSchema(gc.config.Endpoint) {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig(gc.config))))
 	}
 
 	// OTLP examples usually show this with the grpc.WithBlock() dial option to
 	// make the connection synchronous, but it's not the right default for cli
 	// instead, rely on the shutdown methods to make sure everything is flushed
 	// by the time the program exits.
-	if config.Blocking {
+	if gc.config.Blocking {
 		grpcOpts = append(grpcOpts, grpc.WithBlock())
 	}
 
-	var err error
 	ctx, _ = deadlineCtx(ctx, gc.config, gc.config.startupTime)
 	gc.conn, err = grpc.DialContext(ctx, host, grpcOpts...)
 	if err != nil {
-		softFail("could not connect to gRPC/OTLP: %s", err)
+		gc.config.SoftFail("could not connect to gRPC/OTLP: %s", err)
 	}
 
 	gc.client = coltracepb.NewTraceServiceClient(gc.conn)
@@ -74,15 +76,15 @@ func (gc *GrpcClient) Start(ctx context.Context) error {
 // on some errors as needed.
 func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) error {
 	// add headers onto the request
-	md := metadata.New(config.Headers)
+	md := metadata.New(gc.config.Headers)
 	grpcOpts := []grpc.CallOption{grpc.HeaderCallOption{HeaderAddr: &md}}
 
 	req := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
 	ctx, cancel := deadlineCtx(ctx, gc.config, gc.config.startupTime)
 	defer cancel()
 
-	timeout := parseCliTimeout(config)
-	return retry(timeout, func() (bool, time.Duration, error) {
+	timeout := gc.config.parseCliTimeout()
+	return retry(gc.config, timeout, func() (bool, time.Duration, error) {
 		etsr, err := gc.client.Export(ctx, &req, grpcOpts...)
 		return processGrpcStatus(etsr, err)
 	})

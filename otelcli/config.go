@@ -1,9 +1,14 @@
 package otelcli
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
+	"log"
 	"os"
 	"reflect"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -11,12 +16,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-// config is the global configuraiton used by all of otel-cli.
-// global so that Cobra can access it
-var config Config
+var detectBrokenRFC3339PrefixRe *regexp.Regexp
+var epochNanoTimeRE *regexp.Regexp
 
 const defaultOtlpEndpoint = "grpc://localhost:4317"
 const spanBgSockfilename = "otel-cli-background.sock"
+
+func init() {
+	detectBrokenRFC3339PrefixRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} `)
+	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
+}
 
 // DefaultConfig returns a Config with all defaults set.
 func DefaultConfig() Config {
@@ -236,6 +245,188 @@ func (c Config) IsRecording() bool {
 
 	diagnostics.IsRecording = true
 	return true
+}
+
+// parseCliTimeout parses the cliTimeout global string value to a time.Duration.
+// When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
+// It logs an error and returns time.Duration(0) if the string is empty or unparseable.
+func (c Config) parseCliTimeout() time.Duration {
+	var out time.Duration
+	if c.Timeout == "" {
+		out = time.Duration(0)
+	} else if d, err := time.ParseDuration(c.Timeout); err == nil {
+		out = d
+	} else if secs, serr := strconv.ParseInt(c.Timeout, 10, 0); serr == nil {
+		out = time.Second * time.Duration(secs)
+	} else {
+		c.SoftLog("unable to parse --timeout %q: %s", c.Timeout, err)
+		out = time.Duration(0)
+	}
+
+	diagnostics.ParsedTimeoutMs = out.Milliseconds()
+	return out
+}
+
+// SoftLog only calls through to log if otel-cli was run with the --verbose flag.
+// TODO: does it make any sense to support %w? probably yes, can clean up some
+// diagnostics.Error touch points.
+func (c Config) SoftLog(format string, a ...interface{}) {
+	if !c.Verbose {
+		return
+	}
+	log.Printf(format, a...)
+}
+
+// SoftLogIfErr calls SoftLog only if err != nil.
+// Written as an interim step to pushing errors up the stack instead of calling
+// SoftLog/SoftFail directly in methods that don't need a config handle.
+func (c Config) SoftLogIfErr(err error) {
+	if err != nil {
+		c.SoftLog(err.Error())
+	}
+}
+
+// SoftFail calls through to softLog (which logs only if otel-cli was run with the --verbose
+// flag), then immediately exits - with status -1 by default, or 1 if --fail was
+// set (a la `curl --fail`)
+func (c Config) SoftFail(format string, a ...interface{}) {
+	c.SoftLog(format, a...)
+
+	if !c.Fail {
+		os.Exit(-1)
+	} else {
+		os.Exit(0)
+	}
+}
+
+// SoftFailIfErr calls SoftFail only if err != nil.
+// Written as an interim step to pushing errors up the stack instead of calling
+// SoftLog/SoftFail directly in methods that don't need a config handle.
+func (c Config) SoftFailIfErr(err error) {
+	if err != nil {
+		c.SoftFail(err.Error())
+	}
+}
+
+// flattenStringMap takes a string map and returns it flattened into a string with
+// keys sorted lexically so it should be mostly consistent enough for comparisons
+// and printing. Output is k=v,k=v style like attributes input.
+func flattenStringMap(mp map[string]string, emptyValue string) string {
+	if len(mp) == 0 {
+		return emptyValue
+	}
+
+	var out string
+	keys := make([]string, len(mp)) // for sorting
+	var i int
+	for k := range mp {
+		keys[i] = k
+		i++
+	}
+	sort.Strings(keys)
+
+	for i, k := range keys {
+		out = out + k + "=" + mp[k]
+		if i == len(keys)-1 {
+			break
+		}
+		out = out + ","
+	}
+
+	return out
+}
+
+// parseCkvStringMap parses key=value,foo=bar formatted strings as a line of CSV
+// and returns it as a string map.
+func parseCkvStringMap(in string) (map[string]string, error) {
+	r := csv.NewReader(strings.NewReader(in))
+	pairs, err := r.Read()
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	out := make(map[string]string)
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, "=", 2)
+		if parts[0] != "" && parts[1] != "" {
+			out[parts[0]] = parts[1]
+		} else {
+			return map[string]string{}, fmt.Errorf("kv pair %s must be in key=value format", pair)
+		}
+	}
+
+	return out, nil
+}
+
+func (c Config) ParsedSpanStartTime() time.Time {
+	t, err := c.parseTime(c.SpanStartTime, "start")
+	c.SoftFailIfErr(err)
+	return t
+}
+
+func (c Config) ParsedSpanEndTime() time.Time {
+	t, err := c.parseTime(c.SpanEndTime, "end")
+	c.SoftFailIfErr(err)
+	return t
+}
+
+// parseTime tries to parse Unix epoch, then RFC3339, both with/without nanoseconds
+func (c Config) parseTime(ts, which string) (time.Time, error) {
+	var uterr, utnerr, utnnerr, rerr, rnerr error
+
+	if ts == "now" {
+		return time.Now(), nil
+	}
+
+	// Unix epoch time
+	if i, uterr := strconv.ParseInt(ts, 10, 64); uterr == nil {
+		return time.Unix(i, 0), nil
+	}
+
+	// date --rfc-3339 returns an invalid format for Go because it has a
+	// space instead of 'T' between date and time
+	if detectBrokenRFC3339PrefixRe.MatchString(ts) {
+		ts = strings.Replace(ts, " ", "T", 1)
+	}
+
+	// Unix epoch time with nanoseconds
+	if epochNanoTimeRE.MatchString(ts) {
+		parts := strings.Split(ts, ".")
+		if len(parts) == 2 {
+			secs, utnerr := strconv.ParseInt(parts[0], 10, 64)
+			nsecs, utnnerr := strconv.ParseInt(parts[1], 10, 64)
+			if utnerr == nil && utnnerr == nil && secs > 0 {
+				return time.Unix(secs, nsecs), nil
+			}
+		}
+	}
+
+	// try RFC3339 then again with nanos
+	t, rerr := time.Parse(time.RFC3339, ts)
+	if rerr != nil {
+		t, rnerr := time.Parse(time.RFC3339Nano, ts)
+		if rnerr == nil {
+			return t, nil
+		}
+	} else {
+		return t, nil
+	}
+
+	// none of the formats worked, print whatever errors are remaining
+	if uterr != nil {
+		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
+	}
+	if utnerr != nil || utnnerr != nil {
+		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
+	}
+	if rerr != nil {
+		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
+	}
+	if rnerr != nil {
+		return time.Time{}, fmt.Errorf("Could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
+	}
+
+	return time.Time{}, fmt.Errorf("Could not parse span %s time %q as any supported format", which, ts)
 }
 
 // WithEndpoint returns the config with Endpoint set to the provided value.
