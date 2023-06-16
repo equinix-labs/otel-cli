@@ -56,7 +56,7 @@ func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		"uri":          req.RequestURI,
 	}
 
-	done := otelToCliEvent(hs.callback, &msg, meta)
+	done := doCallback(hs.callback, &msg, meta)
 	if done {
 		go hs.StopWait()
 	}

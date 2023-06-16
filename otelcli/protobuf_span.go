@@ -9,6 +9,7 @@ package otelcli
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"strconv"
 	"time"
 
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -205,5 +206,62 @@ func SpanStatusStringToInt(status string) tracepb.Status_StatusCode {
 		return tracepb.Status_STATUS_CODE_ERROR
 	default:
 		return tracepb.Status_STATUS_CODE_UNSET
+	}
+}
+
+// SpanAttributesToStringMap converts the span's attributes to a string map.
+// Only used by tests for now.
+func SpanAttributesToStringMap(span *tracepb.Span) map[string]string {
+	out := make(map[string]string)
+	for _, attr := range span.Attributes {
+		out[attr.Key] = AttrValueToString(attr)
+	}
+	return out
+}
+
+// ResourceAttributesToStringMap converts the ResourceSpan's resource attributes to a string map.
+// Only used by tests for now.
+func ResourceAttributesToStringMap(rss *tracepb.ResourceSpans) map[string]string {
+	out := make(map[string]string)
+	for _, attr := range rss.Resource.Attributes {
+		out[attr.Key] = AttrValueToString(attr)
+	}
+	return out
+}
+
+// AttrValueToString coverts a commonpb.KeyValue attribute to a string.
+// Only used by tests for now.
+func AttrValueToString(attr *commonpb.KeyValue) string {
+	v := attr.GetValue()
+	v.GetIntValue()
+	if _, ok := v.Value.(*commonpb.AnyValue_StringValue); ok {
+		return v.GetStringValue()
+	} else if _, ok := v.Value.(*commonpb.AnyValue_IntValue); ok {
+		return strconv.FormatInt(v.GetIntValue(), 10)
+	} else if _, ok := v.Value.(*commonpb.AnyValue_DoubleValue); ok {
+		return strconv.FormatFloat(v.GetDoubleValue(), byte('f'), -1, 64)
+	}
+
+	return ""
+}
+
+// SpanToStringMap converts a span with some extra data into a stringmap.
+// Only used by tests for now.
+func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]string {
+	if span == nil {
+		return map[string]string{}
+	}
+	return map[string]string{
+		"trace_id":           hex.EncodeToString(span.GetTraceId()),
+		"span_id":            hex.EncodeToString(span.GetSpanId()),
+		"parent":             hex.EncodeToString(span.GetParentSpanId()),
+		"name":               span.Name,
+		"kind":               SpanKindIntToString(span.GetKind()),
+		"start":              strconv.FormatUint(span.StartTimeUnixNano, 10),
+		"end":                strconv.FormatUint(span.EndTimeUnixNano, 10),
+		"attributes":         flattenStringMap(SpanAttributesToStringMap(span), "{}"),
+		"service_attributes": flattenStringMap(ResourceAttributesToStringMap(rss), "{}"),
+		"status_code":        strconv.FormatInt(int64(span.Status.GetCode()), 10),
+		"status_description": span.Status.GetMessage(),
 	}
 }

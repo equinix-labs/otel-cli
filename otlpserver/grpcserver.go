@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net"
-	"strings"
 	"sync"
 
 	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -56,7 +55,6 @@ func (gs *GrpcServer) Serve(listener net.Listener) error {
 // ListenAndServeGRPC starts a TCP listener then starts the GRPC server using
 // ServeGRPC for you.
 func (gs *GrpcServer) ListenAndServe(otlpEndpoint string) {
-	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "grpc://")
 	listener, err := net.Listen("tcp", otlpEndpoint)
 	if err != nil {
 		log.Fatalf("failed to listen on OTLP endpoint %q: %s", otlpEndpoint, err)
@@ -84,7 +82,7 @@ func (gs *GrpcServer) StopWait() {
 
 // Export implements the gRPC server interface for exporting messages.
 func (gs *GrpcServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
-	done := otelToCliEvent(gs.callback, req, map[string]string{"proto": "grpc"})
+	done := doCallback(gs.callback, req, map[string]string{"proto": "grpc"})
 	if done {
 		go gs.StopWait()
 	}

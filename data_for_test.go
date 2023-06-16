@@ -10,9 +10,10 @@ package main_test
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/equinix-labs/otel-cli/otelcli"
-	"github.com/equinix-labs/otel-cli/otlpserver"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 type serverProtocol int
@@ -59,14 +60,16 @@ type Results struct {
 	Env         map[string]string   `json:"env"`
 	Diagnostics otelcli.Diagnostics `json:"diagnostics"`
 	// these are specific to tests...
+	ServerMeta    map[string]string
+	ResourceSpans *tracepb.ResourceSpans
 	CliOutput     string         // merged stdout and stderr
 	CliOutputRe   *regexp.Regexp // regular expression to clean the output before comparison
 	SpanCount     int            // number of spans received
 	EventCount    int            // number of events received
 	TimedOut      bool           // true when test timed out
 	CommandFailed bool           // otel-cli failed / was killed
-	Span          otlpserver.CliEvent
-	SpanEvents    otlpserver.CliEventList
+	Span          *tracepb.Span
+	SpanEvents    []*tracepb.Span_Event
 }
 
 // Fixture represents a test fixture for otel-cli.
@@ -114,9 +117,11 @@ var suites = []FixtureSuite{
 					WithEndpoint("{{endpoint}}").
 					WithInsecure(false),
 				SpanData: map[string]string{
-					"span_id":     "*",
-					"trace_id":    "*",
-					"server_meta": "proto=grpc",
+					"span_id":  "*",
+					"trace_id": "*",
+				},
+				ServerMeta: map[string]string{
+					"proto": "grpc",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
@@ -141,9 +146,15 @@ var suites = []FixtureSuite{
 					WithEndpoint("http://{{endpoint}}").
 					WithInsecure(false),
 				SpanData: map[string]string{
-					"span_id":     "*",
-					"trace_id":    "*",
-					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
+					"span_id":  "*",
+					"trace_id": "*",
+				},
+				ServerMeta: map[string]string{
+					"content-type": "application/x-protobuf",
+					"host":         "{{endpoint}}",
+					"method":       "POST",
+					"proto":        "HTTP/1.1",
+					"uri":          "/v1/traces",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
@@ -370,7 +381,8 @@ var suites = []FixtureSuite{
 			},
 			CheckFuncs: []CheckFunc{
 				func(t *testing.T, f Fixture, r Results) {
-					elapsed := r.Span.End.Sub(r.Span.Start)
+					//elapsed := r.Span.End.Sub(r.Span.Start)
+					elapsed := time.Duration((r.Span.EndTimeUnixNano - r.Span.StartTimeUnixNano) * uint64(time.Nanosecond))
 					if elapsed.Milliseconds() < 10 {
 						t.Errorf("elapsed test time not long enough. Expected 10ms, got %d ms", elapsed.Milliseconds())
 					}
@@ -677,11 +689,11 @@ var suites = []FixtureSuite{
 			// this validates options sent to otel-cli span end
 			CheckFuncs: []CheckFunc{
 				func(t *testing.T, f Fixture, r Results) {
-					if r.Span.StatusCode != 2 {
-						t.Errorf("expected 2 for span status code, but got %d", r.Span.StatusCode)
+					if r.Span.Status.GetCode() != 2 {
+						t.Errorf("expected 2 for span status code, but got %d", r.Span.Status.GetCode())
 					}
-					if r.Span.StatusDescription != "I can't do that Dave." {
-						t.Errorf("got wrong string for status description: %q", r.Span.StatusDescription)
+					if r.Span.Status.GetMessage() != "I can't do that Dave." {
+						t.Errorf("got wrong string for status description: %q", r.Span.Status.GetMessage())
 					}
 				},
 			},
@@ -769,8 +781,8 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				Config: otelcli.DefaultConfig().WithEndpoint("{{endpoint}}").WithProtocol("grpc"),
-				SpanData: map[string]string{
-					"server_meta": "proto=grpc",
+				ServerMeta: map[string]string{
+					"proto": "grpc",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
@@ -792,8 +804,12 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
-				SpanData: map[string]string{
-					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
+				ServerMeta: map[string]string{
+					"content-type": "application/x-protobuf",
+					"host":         "{{endpoint}}",
+					"method":       "POST",
+					"proto":        "HTTP/1.1",
+					"uri":          "/v1/traces",
 				},
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
@@ -842,8 +858,8 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("grpc"),
-				SpanData: map[string]string{
-					"server_meta": "proto=grpc",
+				ServerMeta: map[string]string{
+					"proto": "grpc",
 				},
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
@@ -871,8 +887,12 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
-				SpanData: map[string]string{
-					"server_meta": "content-type=application/x-protobuf,host={{endpoint}},method=POST,proto=HTTP/1.1,uri=/v1/traces",
+				ServerMeta: map[string]string{
+					"content-type": "application/x-protobuf",
+					"host":         "{{endpoint}}",
+					"method":       "POST",
+					"proto":        "HTTP/1.1",
+					"uri":          "/v1/traces",
 				},
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
