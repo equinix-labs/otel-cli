@@ -247,7 +247,7 @@ func AttrValueToString(attr *commonpb.KeyValue) string {
 
 // SpanToStringMap converts a span with some extra data into a stringmap.
 // Only used by tests for now.
-func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans, serverMeta map[string]string) map[string]string {
+func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]string {
 	if span == nil {
 		return map[string]string{}
 	}
@@ -263,7 +263,5 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans, serverMeta 
 		"service_attributes": flattenStringMap(ResourceAttributesToStringMap(rss), "{}"),
 		"status_code":        strconv.FormatInt(int64(span.Status.GetCode()), 10),
 		"status_description": span.Status.GetMessage(),
-		// is populated, removed
-		"server_meta": flattenStringMap(serverMeta, "{}"),
 	}
 }

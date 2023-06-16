@@ -262,8 +262,7 @@ func checkStatusData(t *testing.T, fixture Fixture, results Results) {
 // fixture data.
 func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 	// check the expected span data against what was received by the OTLP server
-	gotSpan := otelcli.SpanToStringMap(results.Span, results.ResourceSpans, results.ServerMeta)
-	//racepb.ScopeSpans, serverMeta map[string]string)
+	gotSpan := otelcli.SpanToStringMap(results.Span, results.ResourceSpans)
 	injectMapVars(fixture.Endpoint, gotSpan, fixture.TlsData)
 	wantSpan := map[string]string{} // to be passed to cmp.Diff
 

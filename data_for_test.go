@@ -152,7 +152,7 @@ var suites = []FixtureSuite{
 				ServerMeta: map[string]string{
 					"content-type": "application/x-protobuf",
 					"host":         "{{endpoint}}",
-					"method":       "POST",
+					"method":       "POxST",
 					"proto":        "HTTP/1.1",
 					"uri":          "/v1/traces",
 				},
