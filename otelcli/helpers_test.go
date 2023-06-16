@@ -3,8 +3,6 @@ package otelcli
 import (
 	"testing"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestCliAttrsToOtel(t *testing.T) {
@@ -107,7 +105,7 @@ func TestParseTime(t *testing.T) {
 		// @tobert: gonna leave that for functional tests for now
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
-			out := parseTime(testcase.input, "test")
+			out, _ := parseTime(testcase.input, "test")
 			if !out.Equal(testcase.want) {
 				t.Errorf("got wrong time from parseTime: %s", out.Format(time.RFC3339Nano))
 			}
@@ -146,46 +144,12 @@ func TestParseCliTime(t *testing.T) {
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
 			config := DefaultConfig().WithTimeout(testcase.input)
-			got := parseCliTimeout(config)
+			got := config.parseCliTimeout()
 			if got != testcase.expected {
 				ed := testcase.expected.String()
 				gd := got.String()
 				t.Errorf("duration string %q was expected to return %s but returned %s", config.Timeout, ed, gd)
 			}
 		})
-	}
-}
-
-func TestFlattenStringMap(t *testing.T) {
-	in := map[string]string{
-		"sample1": "value1",
-		"more":    "stuff",
-		"getting": "bored",
-		"okay":    "that's enough",
-	}
-
-	out := flattenStringMap(in, "{}")
-
-	if out != "getting=bored,more=stuff,okay=that's enough,sample1=value1" {
-		t.Fail()
-	}
-}
-
-func TestParseCkvStringMap(t *testing.T) {
-	expect := map[string]string{
-		"sample1": "value1",
-		"more":    "stuff",
-		"getting": "bored",
-		"okay":    "that's enough",
-		"1":       "324",
-	}
-
-	got, err := parseCkvStringMap("1=324,getting=bored,more=stuff,okay=that's enough,sample1=value1")
-	if err != nil {
-		t.Errorf("error on valid input: %s", err)
-	}
-
-	if diff := cmp.Diff(expect, got); diff != "" {
-		t.Errorf("maps didn't match (-want +got):\n%s", diff)
 	}
 }
