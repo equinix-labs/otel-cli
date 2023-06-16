@@ -386,11 +386,11 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 	var listener net.Listener
 	var err error
 	if fixture.Config.ServerTLSEnabled {
-		tlsConf := *fixture.TlsData.serverTLSConf
+		tlsConf := fixture.TlsData.serverTLSConf.Clone()
 		if fixture.Config.ServerTLSAuthEnabled {
 			tlsConf.ClientAuth = tls.RequireAndVerifyClientCert
 		}
-		listener, err = tls.Listen("tcp", "localhost:0", &tlsConf)
+		listener, err = tls.Listen("tcp", "localhost:0", tlsConf)
 	} else {
 		listener, err = net.Listen("tcp", "localhost:0")
 	}
