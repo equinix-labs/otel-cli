@@ -14,8 +14,6 @@ var (
 	date    = ""
 )
 
-var ExitCode int
-
 func main() {
 	otelcli.Execute(otelcli.FormatVersion(version, commit, date))
 	os.Exit(otlpclient.GetExitCode())
