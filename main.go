@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	otelcmd "github.com/equinix-labs/otel-cli/otelcli"
+	"github.com/equinix-labs/otel-cli/otelcli"
 	"github.com/equinix-labs/otel-cli/otlpclient"
 )
 
@@ -17,6 +17,6 @@ var (
 var ExitCode int
 
 func main() {
-	otelcmd.Execute(otelcmd.FormatVersion(version, commit, date))
+	otelcli.Execute(otelcli.FormatVersion(version, commit, date))
 	os.Exit(otlpclient.GetExitCode())
 }
