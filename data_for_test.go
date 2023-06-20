@@ -116,10 +116,6 @@ var suites = []FixtureSuite{
 				Config: otlpclient.DefaultConfig().
 					WithEndpoint("{{endpoint}}").
 					WithInsecure(false),
-				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
-				},
 				ServerMeta: map[string]string{
 					"proto": "grpc",
 				},
@@ -145,10 +141,6 @@ var suites = []FixtureSuite{
 				Config: otlpclient.DefaultConfig().
 					WithEndpoint("http://{{endpoint}}").
 					WithInsecure(false),
-				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
-				},
 				ServerMeta: map[string]string{
 					"content-type": "application/x-protobuf",
 					"host":         "{{endpoint}}",
@@ -540,11 +532,7 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
-				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
-				},
+				Config:    otlpclient.DefaultConfig(),
 				SpanCount: 1,
 			},
 		},
@@ -760,11 +748,7 @@ var suites = []FixtureSuite{
 					"./otel-cli", "exec", "--name", "inner", "--endpoint", "{{endpoint}}", "--tp-required", "--fail", "--verbose", "echo", "hello world"},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
-				SpanData: map[string]string{
-					"span_id":  "*",
-					"trace_id": "*",
-				},
+				Config:    otlpclient.DefaultConfig(),
 				CliOutput: "hello world\n",
 				SpanCount: 2,
 			},
