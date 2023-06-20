@@ -3,28 +3,35 @@ package otelcli
 import (
 	"strings"
 
+	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
 )
 
-var serverCmd = &cobra.Command{
-	Use:   "server",
-	Short: "run an embedded OTLP server",
-	Long:  "Run otel-cli as an OTLP server. See subcommands.",
-}
+const defaultOtlpEndpoint = "grpc://localhost:4317"
+const spanBgSockfilename = "otel-cli-background.sock"
 
-func init() {
-	rootCmd.AddCommand(serverCmd)
+func serverCmd(config *otlpclient.Config) *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "server",
+		Short: "run an embedded OTLP server",
+		Long:  "Run otel-cli as an OTLP server. See subcommands.",
+	}
+
+	cmd.AddCommand(serverJsonCmd(config))
+	cmd.AddCommand(serverTuiCmd(config))
+
+	return &cmd
 }
 
 // runServer runs the server on either grpc or http and blocks until the server
 // stops or is killed.
-func runServer(config Config, cb otlpserver.Callback, stop otlpserver.Stopper) {
+func runServer(config otlpclient.Config, cb otlpserver.Callback, stop otlpserver.Stopper) {
 	// unlike the rest of otel-cli, server should default to localhost:4317
 	if config.Endpoint == "" {
 		config.Endpoint = defaultOtlpEndpoint
 	}
-	endpointURL, _ := parseEndpoint(config)
+	endpointURL, _ := otlpclient.ParseEndpoint(config)
 
 	var cs otlpserver.OtlpServer
 	if config.Protocol != "grpc" &&
@@ -32,7 +39,7 @@ func runServer(config Config, cb otlpserver.Callback, stop otlpserver.Stopper) {
 			endpointURL.Scheme == "http") {
 		cs = otlpserver.NewServer("http", cb, stop)
 	} else if config.Protocol == "https" || endpointURL.Scheme == "https" {
-		softFail("https server is not supported yet, please raise an issue")
+		config.SoftFail("https server is not supported yet, please raise an issue")
 	} else {
 		cs = otlpserver.NewServer("grpc", cb, stop)
 	}

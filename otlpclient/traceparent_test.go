@@ -1,4 +1,4 @@
-package otelcli
+package otlpclient
 
 import (
 	"bytes"
@@ -10,12 +10,13 @@ import (
 )
 
 func TestLoadTraceparent(t *testing.T) {
+	config := DefaultConfig()
 	// make sure the environment variable isn't polluting test state
 	os.Unsetenv("TRACEPARENT")
 
 	// trace id should not change, because there's no envvar and no file
-	tp := loadTraceparent(os.DevNull)
-	if tp.initialized {
+	tp := LoadTraceparent(config.WithTraceparentCarrierFile(os.DevNull))
+	if tp.Initialized {
 		t.Error("traceparent detected where there should be none")
 	}
 
@@ -32,7 +33,7 @@ func TestLoadTraceparent(t *testing.T) {
 	file.Close()
 
 	// actually do the test...
-	tp = loadTraceparent(file.Name())
+	tp = LoadTraceparent(config.WithTraceparentCarrierFile(file.Name()))
 	if tp.Encode() != testFileTp {
 		t.Errorf("loadTraceparent with file failed, expected '%s', got '%s'", testFileTp, tp.Encode())
 	}
@@ -40,22 +41,23 @@ func TestLoadTraceparent(t *testing.T) {
 	// load from environment only
 	testEnvTp := "00-b122b620341449410b9cd900c96d459d-aa21cda35388b694-01"
 	os.Setenv("TRACEPARENT", testEnvTp)
-	tp = loadTraceparent(os.DevNull)
+	tp = LoadTraceparent(config.WithTraceparentCarrierFile(os.DevNull))
 	if tp.Encode() != testEnvTp {
 		t.Errorf("loadTraceparent with envvar failed, expected '%s', got '%s'", testEnvTp, tp.Encode())
 	}
 
 	// now try with both file and envvar set by the previous tests
 	// the file is expected to win
-	tp = loadTraceparent(file.Name())
+	tp = LoadTraceparent(config.WithTraceparentCarrierFile(file.Name()))
 	if tp.Encode() != testFileTp {
 		t.Errorf("loadTraceparent with file and envvar set to different values failed, expected '%s', got '%s'", testFileTp, tp.Encode())
 	}
 }
 
 func TestWriteTraceparentToFile(t *testing.T) {
+	config := DefaultConfig()
 	testTp := "00-ce1c6ae29edafc52eb6dd223da7d20b4-1c617f036253531c-01"
-	tp := parseTraceparent(testTp)
+	tp, _ := ParseTraceparent(testTp)
 
 	// create a tempfile for messing with
 	file, err := os.CreateTemp(t.TempDir(), "go-test-otel-cli")
@@ -65,7 +67,7 @@ func TestWriteTraceparentToFile(t *testing.T) {
 	file.Close()
 	defer os.Remove(file.Name()) // not strictly necessary
 
-	tp.saveToFile(file.Name(), nil)
+	tp.saveToFile(config.WithTraceparentCarrierFile(file.Name()), nil)
 
 	// read the data back, it should just be the traceparent string
 	data, err := os.ReadFile(file.Name())
@@ -86,12 +88,10 @@ func TestWriteTraceparentToFile(t *testing.T) {
 func TestPropagateOtelCliSpan(t *testing.T) {
 	// TODO: should this noop the tracing backend?
 
-	// set package globals to a known state
-	config = Config{
-		TraceparentCarrierFile: "",
-		TraceparentPrint:       false,
-		TraceparentPrintExport: false,
-	}
+	config := DefaultConfig().
+		WithTraceparentCarrierFile("").
+		WithTraceparentPrint(false).
+		WithTraceparentPrintExport(false)
 
 	tp := "00-3433d5ae39bdfee397f44be5146867b3-8a5518f1e5c54d0a-01"
 	tid := "3433d5ae39bdfee397f44be5146867b3"
@@ -106,7 +106,7 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	buf := new(bytes.Buffer)
 	// mostly smoke testing this, will validate printSpanData output
 	// TODO: maybe validate the file write works, but that's tested elsewhere...
-	propagateTraceparent(span, buf)
+	PropagateTraceparent(config, span, buf)
 	if buf.Len() != 0 {
 		t.Errorf("nothing was supposed to be written but %d bytes were", buf.Len())
 	}
@@ -114,7 +114,8 @@ func TestPropagateOtelCliSpan(t *testing.T) {
 	config.TraceparentPrint = true
 	config.TraceparentPrintExport = true
 	buf = new(bytes.Buffer)
-	printSpanData(buf, parseTraceparent(tp), span)
+	ptp, _ := ParseTraceparent(tp)
+	PrintSpanData(buf, ptp, span, config.TraceparentPrintExport)
 	if buf.Len() == 0 {
 		t.Error("expected more than zero bytes but got none")
 	}

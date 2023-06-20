@@ -1,12 +1,13 @@
-package otelcli
+package otlpclient
 
 import (
 	"strconv"
 	"strings"
 )
 
-// global diagnostics handle, written to from all over otel-cli
-var diagnostics Diagnostics
+// package global Diagnostics handle, written to from all over otel-cli
+// and used in e.g. otel-cli status to show internal state
+var Diag Diagnostics
 
 // Diagnostics is a place to put things that are useful for testing and
 // diagnosing issues with otel-cli. The only user-facing feature that should be
@@ -26,7 +27,7 @@ type Diagnostics struct {
 	Retries            int      `json:"retries"`
 }
 
-// ToMap returns the Diagnostics struct as a string map for testing.
+// ToMap returns the Diag struct as a string map for testing.
 func (d *Diagnostics) ToStringMap() map[string]string {
 	return map[string]string{
 		"cli_args":           strings.Join(d.CliArgs, " "),
@@ -45,7 +46,7 @@ func (d *Diagnostics) ToStringMap() map[string]string {
 // not nil and returns the same error so it can be inlined in return.
 func (d *Diagnostics) SetError(err error) error {
 	if err != nil {
-		diagnostics.Error = err.Error()
+		Diag.Error = err.Error()
 	}
 	return err
 }
@@ -53,5 +54,5 @@ func (d *Diagnostics) SetError(err error) error {
 // GetExitCode() is a helper for Cobra to retrieve the exit code, mainly
 // used by exec to make otel-cli return the child program's exit code.
 func GetExitCode() int {
-	return diagnostics.ExecExitCode
+	return Diag.ExecExitCode
 }
