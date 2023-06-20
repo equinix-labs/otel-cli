@@ -1,3 +1,5 @@
+// Package otlpclient implements a simple OTLP client, directly working with
+// protobuf, gRPC, and net/http with minimal abstractions.
 package otlpclient
 
 import (

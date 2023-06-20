@@ -1,3 +1,5 @@
+// Package otelcli implements the otel-cli subcommands and argument parsing
+// with Cobra and implements functionality using otlpclient and otlpserver.
 package otelcli
 
 import (
@@ -9,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// cliContextKey is a type for storing otelcli.Config in context.
+// cliContextKey is a type for storing an otlpclient.Config in context.
 type cliContextKey string
 
 // configContextKey returns the typed key for storing/retrieving config in context.
@@ -37,6 +39,8 @@ func getConfig(ctx context.Context) otlpclient.Config {
 	return *config
 }
 
+// createRootCmd builds up the Cobra command-line, calling through to subcommand
+// builder funcs to build the whole tree.
 func createRootCmd(config *otlpclient.Config) *cobra.Command {
 	// rootCmd represents the base command when called without any subcommands
 	var rootCmd = &cobra.Command{
@@ -82,8 +86,7 @@ func Execute(version string) {
 	config.Version = version
 
 	// Cobra can tunnel config through context, so set that up now
-	configKey := cliContextKey("config")
-	ctx := context.WithValue(context.Background(), configKey, &config)
+	ctx := context.WithValue(context.Background(), configContextKey(), &config)
 
 	rootCmd := createRootCmd(&config)
 	cobra.CheckErr(rootCmd.ExecuteContext(ctx))
