@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otelcli"
+	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/google/go-cmp/cmp"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -266,7 +266,7 @@ func checkStatusData(t *testing.T, fixture Fixture, results Results) {
 // fixture data.
 func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 	// check the expected span data against what was received by the OTLP server
-	gotSpan := otelcli.SpanToStringMap(results.Span, results.ResourceSpans)
+	gotSpan := otlpclient.SpanToStringMap(results.Span, results.ResourceSpans)
 	injectMapVars(fixture.Endpoint, gotSpan, fixture.TlsData)
 	wantSpan := map[string]string{} // to be passed to cmp.Diff
 
