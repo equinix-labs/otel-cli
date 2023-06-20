@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// HttpServer is a handle for otlp over http/protobuf.
 type HttpServer struct {
 	server   *http.Server
 	callback Callback
