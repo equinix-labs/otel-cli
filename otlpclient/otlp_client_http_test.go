@@ -1,4 +1,4 @@
-package otelcli
+package otlpclient
 
 import (
 	"fmt"

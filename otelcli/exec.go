@@ -9,14 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
 )
 
-// execCmd represents the span command
-var execCmd = &cobra.Command{
-	Use:   "exec",
-	Short: "execute the command provided",
-	Long: `execute the command provided after the subcommand inside a span, measuring
+// execCmd sets up the `otel-cli exec` command
+func execCmd(config *otlpclient.Config) *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "exec",
+		Short: "execute the command provided",
+		Long: `execute the command provided after the subcommand inside a span, measuring
 and reporting how long it took to run. The wrapping span's w3c traceparent is automatically
 passed to the child process's environment as TRACEPARENT.
 
@@ -28,20 +30,22 @@ otel-cli exec -s "outer span" 'otel-cli exec -s "inner span" sleep 1'
 
 WARNING: this does not clean or validate the command at all before passing it
 to sh -c and should not be passed any untrusted input`,
-	Run:  doExec,
-	Args: cobra.MinimumNArgs(1),
-}
+		Run:  doExec,
+		Args: cobra.MinimumNArgs(1),
+	}
 
-func init() {
-	rootCmd.AddCommand(execCmd)
-	addCommonParams(execCmd)
-	addSpanParams(execCmd)
-	addAttrParams(execCmd)
-	addClientParams(execCmd)
+	addCommonParams(&cmd, config)
+	addSpanParams(&cmd, config)
+	addAttrParams(&cmd, config)
+	addClientParams(&cmd, config)
+
+	return &cmd
 }
 
 func doExec(cmd *cobra.Command, args []string) {
-	ctx, client := StartClient(config)
+	ctx := cmd.Context()
+	config := getConfig(ctx)
+	ctx, client := otlpclient.StartClient(ctx, config)
 
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
@@ -69,40 +73,38 @@ func doExec(cmd *cobra.Command, args []string) {
 	child.Env = []string{}
 
 	// grab everything BUT the TRACEPARENT envvar
-	// read the cached env from config, because os.Environ() has to be modified
-	// to work around OTel libs reading envvars directly
-	for _, env := range config.envBackup {
+	for _, env := range os.Environ() {
 		if !strings.HasPrefix(env, "TRACEPARENT=") {
 			child.Env = append(child.Env, env)
 		}
 	}
 
-	span := NewProtobufSpanWithConfig(config)
+	span := otlpclient.NewProtobufSpanWithConfig(config)
 
 	// set the traceparent to the current span to be available to the child process
 	if config.IsRecording() {
-		tp := traceparentFromSpan(span)
+		tp := otlpclient.TraceparentFromSpan(span)
 		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
 		// when not recording, and a traceparent is available, pass it through
 	} else if !config.TraceparentIgnoreEnv {
-		tp := loadTraceparent(config.TraceparentCarrierFile)
-		if tp.initialized {
+		tp := otlpclient.LoadTraceparent(config)
+		if tp.Initialized {
 			child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
 		}
 	}
 
 	if err := child.Run(); err != nil {
-		softFail("command failed: %s", err)
+		config.SoftFail("command failed: %s", err)
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
-	err := SendSpan(ctx, client, config, span)
+	err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
-		softFail("unable to send span: %s", err)
+		config.SoftFail("unable to send span: %s", err)
 	}
 
 	// set the global exit code so main() can grab it and os.Exit() properly
-	diagnostics.ExecExitCode = child.ProcessState.ExitCode()
+	otlpclient.Diag.ExecExitCode = child.ProcessState.ExitCode()
 
-	propagateTraceparent(span, os.Stdout)
+	otlpclient.PropagateTraceparent(config, span, os.Stdout)
 }

@@ -8,49 +8,53 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "start up otel and dump status, optionally sending a canary span",
-	Long: `This subcommand is still experimental and the output format is not yet frozen.
-Example:
-	otel-cli status
-`,
-	Run: doStatus,
-}
-
 // StatusOutput captures all the data we want to print out for this subcommand
 // and is also used in ../main_test.go for automated testing.
 type StatusOutput struct {
-	Config      Config            `json:"config"`
-	SpanData    map[string]string `json:"span_data"`
-	Env         map[string]string `json:"env"`
-	Diagnostics Diagnostics       `json:"diagnostics"`
+	Config      otlpclient.Config      `json:"config"`
+	SpanData    map[string]string      `json:"span_data"`
+	Env         map[string]string      `json:"env"`
+	Diagnostics otlpclient.Diagnostics `json:"diagnostics"`
 }
 
-func init() {
-	rootCmd.AddCommand(statusCmd)
-	addCommonParams(statusCmd)
-	addClientParams(statusCmd)
-	addSpanParams(statusCmd)
+func statusCmd(config *otlpclient.Config) *cobra.Command {
+	cmd := cobra.Command{
+		Use:   "status",
+		Short: "start up otel and dump status, optionally sending a canary span",
+		Long: `This subcommand is still experimental and the output format is not yet frozen.
+Example:
+	otel-cli status
+`,
+		Run: doStatus,
+	}
+
+	addCommonParams(&cmd, config)
+	addClientParams(&cmd, config)
+	addSpanParams(&cmd, config)
+
+	return &cmd
 }
 
 func doStatus(cmd *cobra.Command, args []string) {
 	exitCode := 0
-	ctx, client := StartClient(config)
+	ctx := cmd.Context()
+	config := getConfig(ctx)
+	ctx, client := otlpclient.StartClient(ctx, config)
 
 	// TODO: this always canaries as it is, gotta find the right flags
 	// to try to stall sending at the end so as much as possible of the otel
 	// code still executes
-	span := NewProtobufSpanWithConfig(config)
+	span := otlpclient.NewProtobufSpanWithConfig(config)
 	span.Name = "otel-cli status"
 	span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
 
 	env := make(map[string]string)
-	for _, e := range config.envBackup {
+	for _, e := range os.Environ() {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 {
 			// TODO: this is just enough so I can sleep tonight.
@@ -62,20 +66,20 @@ func doStatus(cmd *cobra.Command, args []string) {
 				env[parts[0]] = parts[1]
 			}
 		} else {
-			softFail("BUG in otel-cli: this shouldn't happen")
+			config.SoftFail("BUG in otel-cli: this shouldn't happen")
 		}
 	}
 
 	// send the span out before printing anything
-	err := SendSpan(ctx, client, config, span)
+	err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
 		if config.Fail {
 			log.Fatalf("%s", err)
 		} else {
-			softLog("%s", err)
+			config.SoftLog("%s", err)
 		}
 	}
-	tp := traceparentFromSpan(span)
+	tp := otlpclient.TraceparentFromSpan(span)
 
 	outData := StatusOutput{
 		Config: config,
@@ -85,7 +89,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 			"span_id":    hex.EncodeToString(span.SpanId),
 			"is_sampled": strconv.FormatBool(tp.Sampling),
 		},
-		Diagnostics: diagnostics,
+		Diagnostics: otlpclient.Diag,
 	}
 
 	js, err := json.MarshalIndent(outData, "", "    ")

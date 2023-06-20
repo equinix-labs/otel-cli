@@ -1,4 +1,4 @@
-package otelcli
+package otlpclient
 
 import (
 	"bytes"
@@ -35,12 +35,14 @@ func NewHttpClient(config Config) *HttpClient {
 // TODO: see if there's a way to background start http2 connections?
 func (hc *HttpClient) Start(ctx context.Context) error {
 	tlsConf := tlsConfig(hc.config)
-	hc.timeout = parseCliTimeout(hc.config)
+	hc.timeout = hc.config.ParseCliTimeout()
 
-	endpointURL, _ := parseEndpoint(config)
-	if config.Insecure || (isLoopbackAddr(endpointURL) && !strings.HasPrefix(config.Endpoint, "https")) {
+	endpointURL, _ := ParseEndpoint(hc.config)
+	isLoopback, err := isLoopbackAddr(endpointURL)
+	hc.config.SoftFailIfErr(err)
+	if hc.config.Insecure || (isLoopback && !strings.HasPrefix(hc.config.Endpoint, "https")) {
 		hc.client = &http.Client{Timeout: hc.timeout}
-	} else if !isInsecureSchema(config.Endpoint) {
+	} else if !isInsecureSchema(hc.config.Endpoint) {
 		hc.client = &http.Client{
 			Timeout: hc.timeout,
 			Transport: &http.Transport{
@@ -50,7 +52,7 @@ func (hc *HttpClient) Start(ctx context.Context) error {
 			},
 		}
 	} else {
-		softFail("BUG in otel-cli: an invalid configuration made it too far. Please report to https://github.com/equinix-labs/otel-cli/issues.")
+		hc.config.SoftFail("BUG in otel-cli: an invalid configuration made it too far. Please report to https://github.com/equinix-labs/otel-cli/issues.")
 	}
 	return nil
 }
@@ -64,18 +66,18 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	}
 	body := bytes.NewBuffer(protoMsg)
 
-	endpointURL, _ := parseEndpoint(hc.config)
+	endpointURL, _ := ParseEndpoint(hc.config)
 	req, err := http.NewRequest("POST", endpointURL.String(), body)
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP POST request: %w", err)
 	}
 
-	for k, v := range config.Headers {
+	for k, v := range hc.config.Headers {
 		req.Header.Add(k, v)
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
-	return retry(hc.timeout, func() (bool, time.Duration, error) {
+	return retry(hc.config, hc.timeout, func() (bool, time.Duration, error) {
 		var body []byte
 		resp, err := hc.client.Do(req)
 		if uerr, ok := err.(*url.Error); ok {
