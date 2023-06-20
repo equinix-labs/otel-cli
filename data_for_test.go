@@ -185,7 +185,6 @@ var suites = []FixtureSuite{
 				ServerTLSEnabled: true,
 			},
 			Expect: Results{
-				// otel-cli should NOT set insecure when it auto-detects localhost
 				Config: otlpclient.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}").
 					WithProtocol("grpc").
