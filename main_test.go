@@ -160,7 +160,7 @@ func checkAll(t *testing.T, fixture Fixture, results Results) {
 	checkSpanCount(t, fixture, results)
 
 	// compares the data in each recorded span against expectations in the fixture
-	if len(fixture.Expect.SpanData) == 0 {
+	if len(fixture.Expect.SpanData) > 0 {
 		checkSpanData(t, fixture, results)
 	}
 
