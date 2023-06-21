@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 
 	"google.golang.org/grpc"
 )
@@ -19,7 +19,7 @@ type GrpcServer struct {
 	stopper  chan struct{}
 	stopdone chan struct{}
 	doneonce sync.Once
-	v1.UnimplementedTraceServiceServer
+	coltracepb.UnimplementedTraceServiceServer
 }
 
 // NewGrpcServer takes a callback and stop function and returns a Server ready
@@ -32,7 +32,7 @@ func NewGrpcServer(cb Callback, stop Stopper) *GrpcServer {
 		stopdone: make(chan struct{}, 1),
 	}
 
-	v1.RegisterTraceServiceServer(s.server, &s)
+	coltracepb.RegisterTraceServiceServer(s.server, &s)
 
 	// single place to stop the server, used by timeout and max-spans
 	go func() {
@@ -81,10 +81,10 @@ func (gs *GrpcServer) StopWait() {
 }
 
 // Export implements the gRPC server interface for exporting messages.
-func (gs *GrpcServer) Export(ctx context.Context, req *v1.ExportTraceServiceRequest) (*v1.ExportTraceServiceResponse, error) {
+func (gs *GrpcServer) Export(ctx context.Context, req *coltracepb.ExportTraceServiceRequest) (*coltracepb.ExportTraceServiceResponse, error) {
 	done := doCallback(gs.callback, req, map[string]string{"proto": "grpc"})
 	if done {
 		go gs.StopWait()
 	}
-	return &v1.ExportTraceServiceResponse{}, nil
+	return &coltracepb.ExportTraceServiceResponse{}, nil
 }

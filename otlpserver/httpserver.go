@@ -8,10 +8,11 @@ import (
 	"net"
 	"net/http"
 
-	v1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
 )
 
+// HttpServer is a handle for otlp over http/protobuf.
 type HttpServer struct {
 	server   *http.Server
 	callback Callback
@@ -38,7 +39,7 @@ func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		log.Fatalf("Error while reading request body: %s", err)
 	}
 
-	msg := v1.ExportTraceServiceRequest{}
+	msg := coltracepb.ExportTraceServiceRequest{}
 	switch req.Header.Get("Content-Type") {
 	case "application/x-protobuf":
 		proto.Unmarshal(data, &msg)

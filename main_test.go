@@ -160,7 +160,9 @@ func checkAll(t *testing.T, fixture Fixture, results Results) {
 	checkSpanCount(t, fixture, results)
 
 	// compares the data in each recorded span against expectations in the fixture
-	checkSpanData(t, fixture, results)
+	if len(fixture.Expect.SpanData) > 0 {
+		checkSpanData(t, fixture, results)
+	}
 
 	// many of the basic plumbing tests use status so it has its own set of checks
 	// but these shouldn't run for testing the other subcommands
