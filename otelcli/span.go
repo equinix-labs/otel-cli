@@ -2,17 +2,10 @@ package otelcli
 
 import (
 	"os"
-	"regexp"
 
 	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
 )
-
-var epochNanoTimeRE *regexp.Regexp
-
-func init() {
-	epochNanoTimeRE = regexp.MustCompile(`^\d+\.\d+$`)
-}
 
 // spanCmd represents the span command
 func spanCmd(config *otlpclient.Config) *cobra.Command {
