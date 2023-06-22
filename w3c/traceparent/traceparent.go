@@ -35,22 +35,42 @@ type Traceparent struct {
 // Encode returns the traceparent as a W3C formatted string.
 func (tp Traceparent) Encode() string {
 	var sampling int
+	var traceId, spanId string
 	if tp.Sampling {
 		sampling = 1
 	}
-	traceId := tp.TraceIdString()
-	spanId := tp.SpanIdString()
+
+	if len(tp.TraceId) == 0 {
+		traceId = hex.EncodeToString(emptyTraceId)
+	} else {
+		traceId = tp.TraceIdString()
+	}
+
+	if len(tp.SpanId) == 0 {
+		spanId = hex.EncodeToString(emptySpanId)
+	} else {
+		spanId = tp.SpanIdString()
+	}
+
 	return fmt.Sprintf("%02d-%s-%s-%02d", tp.Version, traceId, spanId, sampling)
 }
 
 // TraceIdString returns the trace id in string form.
 func (tp Traceparent) TraceIdString() string {
-	return hex.EncodeToString(tp.TraceId)
+	if len(tp.TraceId) == 0 {
+		return hex.EncodeToString(emptyTraceId)
+	} else {
+		return hex.EncodeToString(tp.TraceId)
+	}
 }
 
 // SpanIdString returns the span id in string form.
 func (tp Traceparent) SpanIdString() string {
-	return hex.EncodeToString(tp.SpanId)
+	if len(tp.SpanId) == 0 {
+		return hex.EncodeToString(emptySpanId)
+	} else {
+		return hex.EncodeToString(tp.SpanId)
+	}
 }
 
 // LoadFromFile reads a traceparent from filename and returns a
@@ -107,9 +127,6 @@ func (tp Traceparent) SaveToFile(carrierFile string, export bool) error {
 	defer file.Close()
 
 	return tp.Fprint(file, export)
-
-	// TODO: move this up or make a new method
-	//	PrintSpanData(file, tp, span, config.TraceparentPrintExport)
 }
 
 // Fprint formats a traceparent into otel-cli's shell-compatible text format.
@@ -125,12 +142,6 @@ func (tp Traceparent) Fprint(target io.Writer, export bool) error {
 
 	traceId := tp.TraceIdString()
 	spanId := tp.SpanIdString()
-
-	if tp.Sampling {
-		traceId = hex.EncodeToString(emptyTraceId)
-		spanId = hex.EncodeToString(emptySpanId)
-	}
-
 	_, err := fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp.Encode())
 	return err
 }

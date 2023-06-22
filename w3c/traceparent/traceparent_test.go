@@ -1,10 +1,75 @@
 package traceparent
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
+
+func TestFprint(t *testing.T) {
+	for _, tc := range []struct {
+		tp     Traceparent
+		export bool
+		want   string
+	}{
+		// unconfigured, all zeroes
+		{
+			tp: Traceparent{
+				Version:     0,
+				TraceId:     []byte{},
+				SpanId:      []byte{},
+				Sampling:    false,
+				Initialized: false,
+			},
+			export: false,
+			want: "# trace id: 00000000000000000000000000000000\n" +
+				"#  span id: 0000000000000000\n" +
+				"TRACEPARENT=00-00000000000000000000000000000000-0000000000000000-00\n",
+		},
+		// fully loaded, print all the things
+		{
+			tp: Traceparent{
+				Version:     0,
+				TraceId:     []byte{0xfe, 0xdc, 0xcb, 0xa9, 0x87, 0x65, 0x43, 0x21, 0xfe, 0xdc, 0xcb, 0xa9, 0x87, 0x65, 0x43, 0x21},
+				SpanId:      []byte{0xde, 0xea, 0xd6, 0xbb, 0xaa, 0xbb, 0xcc, 0xdd},
+				Sampling:    true,
+				Initialized: true,
+			},
+			export: true,
+			want: "# trace id: fedccba987654321fedccba987654321\n" +
+				"#  span id: deead6bbaabbccdd\n" +
+				"export TRACEPARENT=00-fedccba987654321fedccba987654321-deead6bbaabbccdd-01\n",
+		},
+		// have a traceparent, but sampling is off, the tp should propagate as-is
+		{
+			tp: Traceparent{
+				Version:     0,
+				TraceId:     []byte{0xfe, 0xdc, 0xcb, 0xa9, 0x87, 0x65, 0x43, 0x21, 0xfe, 0xdc, 0xcb, 0xa9, 0x87, 0x65, 0x43, 0x21},
+				SpanId:      []byte{0xde, 0xea, 0xd6, 0xbb, 0xaa, 0xbb, 0xcc, 0xdd},
+				Sampling:    false,
+				Initialized: true,
+			},
+			export: false,
+			want: "# trace id: fedccba987654321fedccba987654321\n" +
+				"#  span id: deead6bbaabbccdd\n" +
+				// the traceparent provided should get printed
+				"TRACEPARENT=00-fedccba987654321fedccba987654321-deead6bbaabbccdd-00\n",
+		},
+	} {
+		buf := bytes.NewBuffer([]byte{})
+		err := tc.tp.Fprint(buf, tc.export)
+		if err != nil {
+			t.Errorf("got an unexpected error: %s", err)
+		}
+
+		if diff := cmp.Diff(tc.want, buf.String()); diff != "" {
+			t.Errorf("printed tp didn't match expected: (-want +got):\n%s", diff)
+		}
+	}
+}
 
 func TestLoadTraceparent(t *testing.T) {
 	// make sure the environment variable isn't polluting test state
