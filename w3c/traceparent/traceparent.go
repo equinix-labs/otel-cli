@@ -1,8 +1,9 @@
+// Package traceparent contains a lightweight implementation of W3C
+// traceparent parsing, loading from files and environment, and the reverse.
 package traceparent
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -52,58 +53,17 @@ func (tp Traceparent) SpanIdString() string {
 	return hex.EncodeToString(tp.SpanId)
 }
 
-// LoadAll checks the environment for TRACEPARENT first and returns that if
-// it's available. Next it checks if carrierFile is empty. If not,
-// it will read a bare traceparent, ignoring comments starting with #.
-func LoadAll(carrierFile string, required, ignoreEnv bool) (Traceparent, error) {
-	var err error
-	tp := Traceparent{}
-
-	// don't load the envvar when --tp-ignore-env is set
-	if !ignoreEnv {
-		tp, err = LoadTraceparentFromEnv()
-		if err != nil {
-			return Traceparent{}, err
-		}
-	}
-	if carrierFile != "" {
-		fileTp, err := LoadFromFile(carrierFile, required)
-		if err != nil {
-			return Traceparent{}, err
-		}
-		if fileTp.Initialized {
-			tp = fileTp
-		}
-	}
-
-	if required {
-		if tp.Initialized {
-			// return from here if everything looks ok, otherwise fall through to error
-			if !bytes.Equal(tp.TraceId, emptyTraceId) && !bytes.Equal(tp.SpanId, emptySpanId) {
-				return tp, nil
-			}
-		}
-		return Traceparent{}, fmt.Errorf("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", carrierFile)
-	}
-
-	return tp, nil
-}
-
 // LoadFromFile reads a traceparent from filename and returns a
 // context with the traceparent set. The format for the file as written is
 // just a bare traceparent string. Whitespace, "export " and "TRACEPARENT=" are
 // stripped automatically so the file can also be a valid shell snippet.
-func LoadFromFile(filename string, tpRequired bool) (Traceparent, error) {
+func LoadFromFile(filename string) (Traceparent, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		errOut := fmt.Errorf("could not open file '%s' for read: %s", filename, err)
 		// only fatal when the tp carrier file is required explicitly, otherwise
 		// just silently return the unmodified context
-		if tpRequired {
-			return Traceparent{}, errOut
-		} else {
-			return Traceparent{}, nil // mask the error
-		}
+		return Traceparent{}, errOut
 	}
 	defer file.Close()
 
@@ -163,13 +123,21 @@ func (tp Traceparent) Fprint(target io.Writer, export bool) error {
 		exported = "export "
 	}
 
-	_, err := fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", tp.TraceIdString(), tp.SpanIdString(), exported, tp.Encode())
+	traceId := tp.TraceIdString()
+	spanId := tp.SpanIdString()
+
+	if tp.Sampling {
+		traceId = hex.EncodeToString(emptyTraceId)
+		spanId = hex.EncodeToString(emptySpanId)
+	}
+
+	_, err := fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp.Encode())
 	return err
 }
 
-// LoadTraceparentFromEnv loads the traceparent from the environment variable
+// LoadFromEnv loads the traceparent from the environment variable
 // TRACEPARENT and sets it in the returned Go context.
-func LoadTraceparentFromEnv() (Traceparent, error) {
+func LoadFromEnv() (Traceparent, error) {
 	tp := os.Getenv("TRACEPARENT")
 	if tp == "" {
 		return Traceparent{}, nil

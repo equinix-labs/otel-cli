@@ -11,9 +11,9 @@ func TestLoadTraceparent(t *testing.T) {
 	os.Unsetenv("TRACEPARENT")
 
 	// trace id should not change, because there's no envvar and no file
-	tp, err := LoadAll(os.DevNull, false, false)
+	tp, err := LoadFromFile(os.DevNull)
 	if err != nil {
-		t.Error("LoadAll returned an unexpected error: %w", err)
+		t.Error("LoadFromFile returned an unexpected error: %w", err)
 	}
 	if tp.Initialized {
 		t.Error("traceparent detected where there should be none")
@@ -32,33 +32,23 @@ func TestLoadTraceparent(t *testing.T) {
 	file.Close()
 
 	// actually do the test...
-	tp, err = LoadAll(file.Name(), false, false)
+	tp, err = LoadFromFile(file.Name())
 	if err != nil {
-		t.Error("LoadAll returned an unexpected error: %w", err)
+		t.Error("LoadFromFile returned an unexpected error: %w", err)
 	}
 	if tp.Encode() != testFileTp {
-		t.Errorf("loadTraceparent with file failed, expected '%s', got '%s'", testFileTp, tp.Encode())
+		t.Errorf("LoadFromFile failed, expected '%s', got '%s'", testFileTp, tp.Encode())
 	}
 
-	// load from environment only
+	// load from environment
 	testEnvTp := "00-b122b620341449410b9cd900c96d459d-aa21cda35388b694-01"
 	os.Setenv("TRACEPARENT", testEnvTp)
-	tp, err = LoadAll(os.DevNull, false, false)
+	tp, err = LoadFromEnv()
 	if err != nil {
-		t.Error("LoadAll returned an unexpected error: %w", err)
+		t.Error("LoadFromEnv() returned an unexpected error: %w", err)
 	}
 	if tp.Encode() != testEnvTp {
-		t.Errorf("loadTraceparent with envvar failed, expected '%s', got '%s'", testEnvTp, tp.Encode())
-	}
-
-	// now try with both file and envvar set by the previous tests
-	// the file is expected to win
-	tp, err = LoadAll(file.Name(), false, false)
-	if err != nil {
-		t.Error("LoadAll returned an unexpected error: %w", err)
-	}
-	if tp.Encode() != testFileTp {
-		t.Errorf("loadTraceparent with file and envvar set to different values failed, expected '%s', got '%s'", testFileTp, tp.Encode())
+		t.Errorf("LoadFromEnv() with envvar failed, expected '%s', got '%s'", testEnvTp, tp.Encode())
 	}
 }
 

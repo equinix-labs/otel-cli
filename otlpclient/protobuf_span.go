@@ -85,8 +85,7 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	}
 
 	if c.IsRecording() {
-		tp, err := traceparent.LoadAll(c.TraceparentCarrierFile, c.TraceparentRequired, c.TraceparentIgnoreEnv)
-		c.SoftFailIfErr(err)
+		tp := LoadTraceparent(c, span)
 		if tp.Initialized {
 			span.TraceId = tp.TraceId
 			span.ParentSpanId = tp.SpanId
@@ -307,12 +306,12 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]
 }
 
 // TraceparentFromProtobufSpan builds a Traceparent struct from the provided span.
-func TraceparentFromProtobufSpan(span *tracepb.Span) traceparent.Traceparent {
+func TraceparentFromProtobufSpan(c Config, span *tracepb.Span) traceparent.Traceparent {
 	return traceparent.Traceparent{
 		Version:     0,
 		TraceId:     span.TraceId,
 		SpanId:      span.SpanId,
-		Sampling:    true, // TODO: fix this: hax
+		Sampling:    c.IsRecording(),
 		Initialized: true,
 	}
 }
@@ -321,19 +320,60 @@ func TraceparentFromProtobufSpan(span *tracepb.Span) traceparent.Traceparent {
 // span info to the console according to command-line args.
 func PropagateTraceparent(c Config, span *tracepb.Span, target io.Writer) {
 	var tp traceparent.Traceparent
-	var err error
 	if c.IsRecording() {
-		tp = TraceparentFromProtobufSpan(span)
+		tp = TraceparentFromProtobufSpan(c, span)
 	} else {
 		// when in non-recording mode, and there is a TP available, propagate that
-		tp, err = traceparent.LoadAll(c.TraceparentCarrierFile, c.TraceparentRequired, c.TraceparentIgnoreEnv)
-		c.SoftFailIfErr(err)
+		tp = LoadTraceparent(c, span)
 	}
-	if c.TraceparentPrint {
-		tp.SaveToFile(c.TraceparentCarrierFile, c.TraceparentPrintExport)
+
+	if c.TraceparentCarrierFile != "" {
+		err := tp.SaveToFile(c.TraceparentCarrierFile, c.TraceparentPrintExport)
+		c.SoftFailIfErr(err)
 	}
 
 	if c.TraceparentPrint {
 		tp.Fprint(target, c.TraceparentPrintExport)
 	}
+}
+
+// LoadTraceparent follows otel-cli's loading rules, start with envvar then file.
+// If both are set, the file will override env.
+// When in non-recording mode, the previous traceparent will be returned if it's
+// available, otherwise, a zero-valued traceparent is returned.
+func LoadTraceparent(c Config, span *tracepb.Span) traceparent.Traceparent {
+	tp := traceparent.Traceparent{
+		Version:     0,
+		TraceId:     emptyTraceId,
+		SpanId:      emptySpanId,
+		Sampling:    false,
+		Initialized: true,
+	}
+
+	if !c.TraceparentIgnoreEnv {
+		var err error
+		tp, err = traceparent.LoadFromEnv()
+		if err != nil {
+			Diag.Error = err.Error()
+		}
+	}
+
+	if c.TraceparentCarrierFile != "" {
+		fileTp, err := traceparent.LoadFromFile(c.TraceparentCarrierFile)
+		if err != nil {
+			Diag.Error = err.Error()
+		} else if fileTp.Initialized {
+			tp = fileTp
+		}
+	}
+
+	if c.TraceparentRequired {
+		if tp.Initialized {
+			return tp
+		} else {
+			c.SoftFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", c.TraceparentCarrierFile)
+		}
+	}
+
+	return tp
 }
