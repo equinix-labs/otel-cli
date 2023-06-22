@@ -2,6 +2,9 @@ package otlpclient
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
+	"os"
 	"strconv"
 	"testing"
 
@@ -252,5 +255,45 @@ func TestCliAttrsToOtel(t *testing.T) {
 				t.Errorf("expected value '%s' for key '%s' but got %t", testAttrs[key], key, attr.Value.GetBoolValue())
 			}
 		}
+	}
+}
+
+func TestPropagateTraceparent(t *testing.T) {
+	// TODO: should this noop the tracing backend?
+
+	config := DefaultConfig().
+		WithTraceparentCarrierFile("").
+		WithTraceparentPrint(false).
+		WithTraceparentPrintExport(false)
+
+	tp := "00-3433d5ae39bdfee397f44be5146867b3-8a5518f1e5c54d0a-01"
+	tid := "3433d5ae39bdfee397f44be5146867b3"
+	sid := "8a5518f1e5c54d0a"
+	os.Setenv("TRACEPARENT", tp)
+	//tracer := otel.Tracer("testing/propagateOtelCliSpan")
+	//ctx, span := tracer.Start(context.Background(), "testing propagateOtelCliSpan")
+	span := NewProtobufSpan()
+	span.TraceId, _ = hex.DecodeString(tid)
+	span.SpanId, _ = hex.DecodeString(sid)
+
+	buf := new(bytes.Buffer)
+	// mostly smoke testing this, will validate printSpanData output
+	// TODO: maybe validate the file write works, but that's tested elsewhere...
+	PropagateTraceparent(config, span, buf)
+	if buf.Len() != 0 {
+		t.Errorf("nothing was supposed to be written but %d bytes were", buf.Len())
+	}
+
+	config.TraceparentPrint = true
+	config.TraceparentPrintExport = true
+	buf = new(bytes.Buffer)
+	//ptp, _ := traceparent.Parse(tp)
+	PropagateTraceparent(config, span, buf)
+	if buf.Len() == 0 {
+		t.Error("expected more than zero bytes but got none")
+	}
+	expected := fmt.Sprintf("# trace id: %s\n#  span id: %s\nexport TRACEPARENT=%s\n", tid, sid, tp)
+	if buf.String() != expected {
+		t.Errorf("got unexpected output, expected '%s', got '%s'", expected, buf.String())
 	}
 }

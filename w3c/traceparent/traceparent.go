@@ -10,8 +10,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var traceparentRe *regexp.Regexp
@@ -52,17 +50,6 @@ func (tp Traceparent) TraceIdString() string {
 // SpanIdString returns the span id in string form.
 func (tp Traceparent) SpanIdString() string {
 	return hex.EncodeToString(tp.SpanId)
-}
-
-// FromProtobufSpan builds a Traceparent struct from the provided span.
-func FromProtobufSpan(span *tracepb.Span) Traceparent {
-	return Traceparent{
-		Version:     0,
-		TraceId:     span.TraceId,
-		SpanId:      span.SpanId,
-		Sampling:    true, // TODO: fix this: hax
-		Initialized: true,
-	}
 }
 
 // LoadAll checks the environment for TRACEPARENT first and returns that if
@@ -179,45 +166,6 @@ func (tp Traceparent) Fprint(target io.Writer, export bool) error {
 	_, err := fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", tp.TraceIdString(), tp.SpanIdString(), exported, tp.Encode())
 	return err
 }
-
-// PropagateTraceparent saves the traceparent to file if necessary, then prints
-// span info to the console according to command-line args.
-/*
-func PropagateTraceparent(config Config, span *tracepb.Span, target io.Writer) {
-	var tp Traceparent
-	if config.IsRecording() {
-		tp = FromProtobufSpan(span)
-	} else {
-		// when in non-recording mode, and there is a TP available, propagate that
-		tp = LoadAll(config)
-	}
-	tp.saveToFile(config, span)
-
-	if config.TraceparentPrint {
-		PrintSpanData(target, tp, span, config.TraceparentPrintExport)
-	}
-}
-
-// PrintSpanData takes the provided strings and prints them in a consitent format,
-// depending on which command line arguments were set.
-func PrintSpanData(target io.Writer, tp Traceparent, span *tracepb.Span, export bool) {
-
-	var traceId, spanId string
-	if span != nil {
-		// when in non-recording mode, the printed trace/span id should be all zeroes
-		// and the input TP passes through
-		// NOTE: this is preserved behavior from before protobuf spans, maybe this isn't
-		// worth the trouble?
-		traceId = hex.EncodeToString(span.TraceId)
-		spanId = hex.EncodeToString(span.SpanId)
-	} else {
-		// in recording mode these will match the TP
-		traceId = tp.TraceIdString()
-		spanId = tp.SpanIdString()
-	}
-	fmt.Fprintf(target, "# trace id: %s\n#  span id: %s\n%sTRACEPARENT=%s\n", traceId, spanId, exported, tp.Encode())
-}
-*/
 
 // LoadTraceparentFromEnv loads the traceparent from the environment variable
 // TRACEPARENT and sets it in the returned Go context.

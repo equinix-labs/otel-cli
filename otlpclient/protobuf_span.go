@@ -10,12 +10,17 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
+
+var emptyTraceId = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var emptySpanId = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 
 // NewProtobufSpan returns an initialized OpenTelemetry protobuf Span.
 func NewProtobufSpan() *tracepb.Span {
@@ -80,11 +85,12 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	}
 
 	if c.IsRecording() {
-		if tp := LoadTraceparent(c); tp.Initialized {
+		tp, err := traceparent.LoadAll(c.TraceparentCarrierFile, c.TraceparentRequired, c.TraceparentIgnoreEnv)
+		c.SoftFailIfErr(err)
+		if tp.Initialized {
 			span.TraceId = tp.TraceId
 			span.ParentSpanId = tp.SpanId
 		}
-
 	} else {
 		span.TraceId = emptyTraceId
 		span.SpanId = emptySpanId
@@ -297,5 +303,37 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]
 		"service_attributes": flattenStringMap(ResourceAttributesToStringMap(rss), "{}"),
 		"status_code":        strconv.FormatInt(int64(span.Status.GetCode()), 10),
 		"status_description": span.Status.GetMessage(),
+	}
+}
+
+// TraceparentFromProtobufSpan builds a Traceparent struct from the provided span.
+func TraceparentFromProtobufSpan(span *tracepb.Span) traceparent.Traceparent {
+	return traceparent.Traceparent{
+		Version:     0,
+		TraceId:     span.TraceId,
+		SpanId:      span.SpanId,
+		Sampling:    true, // TODO: fix this: hax
+		Initialized: true,
+	}
+}
+
+// PropagateTraceparent saves the traceparent to file if necessary, then prints
+// span info to the console according to command-line args.
+func PropagateTraceparent(c Config, span *tracepb.Span, target io.Writer) {
+	var tp traceparent.Traceparent
+	var err error
+	if c.IsRecording() {
+		tp = TraceparentFromProtobufSpan(span)
+	} else {
+		// when in non-recording mode, and there is a TP available, propagate that
+		tp, err = traceparent.LoadAll(c.TraceparentCarrierFile, c.TraceparentRequired, c.TraceparentIgnoreEnv)
+		c.SoftFailIfErr(err)
+	}
+	if c.TraceparentPrint {
+		tp.SaveToFile(c.TraceparentCarrierFile, c.TraceparentPrintExport)
+	}
+
+	if c.TraceparentPrint {
+		tp.Fprint(target, c.TraceparentPrintExport)
 	}
 }
