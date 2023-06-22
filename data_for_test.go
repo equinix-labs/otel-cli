@@ -592,8 +592,8 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otlpclient.DefaultConfig(),
 				CliOutput: "" + // empty so the text below can indent and line up
-					"# trace id: 00000000000000000000000000000000\n" +
-					"#  span id: 0000000000000000\n" +
+					"# trace id: f6c109f48195b451c4def6ab32f47b61\n" +
+					"#  span id: a5d2a35f2483004e\n" +
 					"TRACEPARENT=00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01\n",
 			},
 		},
@@ -605,15 +605,15 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--tp-print", "--tp-export"},
 				Env: map[string]string{
-					"TRACEPARENT": "00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01",
+					"TRACEPARENT": "00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-00",
 				},
 			},
 			Expect: Results{
 				Config: otlpclient.DefaultConfig(),
 				CliOutput: "" +
-					"# trace id: 00000000000000000000000000000000\n" +
-					"#  span id: 0000000000000000\n" +
-					"export TRACEPARENT=00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01\n",
+					"# trace id: f6c109f48195b451c4def6ab32f47b61\n" +
+					"#  span id: a5d2a35f2483004e\n" +
+					"export TRACEPARENT=00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-00\n",
 			},
 		},
 	},
