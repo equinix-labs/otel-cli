@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
@@ -28,11 +29,19 @@ func statusCmd(config *otlpclient.Config) *cobra.Command {
 		Use:   "status",
 		Short: "start up otel and dump status, optionally sending a canary span",
 		Long: `This subcommand is still experimental and the output format is not yet frozen.
+
+By default just one canary span is sent. When --keepalive is set to some number of milliseconds,
+otel-cli status will try to send a span each n ms until the --timeout value is reached.
+
 Example:
 	otel-cli status
+	otel-cli status --keepalive 1000 --timeout 10
 `,
 		Run: doStatus,
 	}
+
+	defaults := otlpclient.DefaultConfig()
+	cmd.Flags().IntVar(&config.StatusKeepaliveMs, "keepalive", defaults.StatusKeepaliveMs, "number of milliseconds to wait between keepalive spans")
 
 	addCommonParams(&cmd, config)
 	addClientParams(&cmd, config)
@@ -42,7 +51,8 @@ Example:
 }
 
 func doStatus(cmd *cobra.Command, args []string) {
-	exitCode := 0
+	var err error
+	var exitCode int
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	ctx, client := otlpclient.StartClient(ctx, config)
@@ -71,15 +81,30 @@ func doStatus(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// send the span out before printing anything
-	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
-	if err != nil {
-		if config.Fail {
-			log.Fatalf("%s", err)
+	deadline := config.StartupTime.Add(config.ParseCliTimeout())
+	var canaryCount int
+	for {
+		// send the span out before printing anything
+		log.Printf("canary %d\n", canaryCount)
+		ctx, err = otlpclient.SendSpan(ctx, client, config, span)
+		if err != nil {
+			if config.Fail {
+				log.Fatalf("%s", err)
+			} else {
+				config.SoftLog("%s", err)
+			}
+		}
+		canaryCount++
+
+		if config.StatusKeepaliveMs == 0 || time.Now().After(deadline) {
+			log.Printf("breaking now...\n")
+			break
 		} else {
-			config.SoftLog("%s", err)
+			log.Printf("sleeping now...\n")
+			time.Sleep(time.Millisecond * time.Duration(config.StatusKeepaliveMs))
 		}
 	}
+	log.Printf("cleaning up now...\n")
 
 	ctx, err = client.Stop(ctx)
 	if err != nil {

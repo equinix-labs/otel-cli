@@ -92,7 +92,8 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 
 // Stop closes the connection to the gRPC server.
 func (gc *GrpcClient) Stop(ctx context.Context) (context.Context, error) {
-	return ctx, gc.conn.Close()
+	gc.conn.Close() // ignoring the error
+	return ctx, nil
 }
 
 func processGrpcStatus(ctx context.Context, etsr *coltracepb.ExportTraceServiceResponse, err error) (context.Context, bool, time.Duration, error) {

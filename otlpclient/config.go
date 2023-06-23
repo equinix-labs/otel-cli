@@ -52,6 +52,7 @@ func DefaultConfig() Config {
 		BackgroundSockdir:            "",
 		BackgroundWait:               false,
 		BackgroundSkipParentPidCheck: false,
+		StatusKeepaliveMs:            0,
 		SpanStartTime:                "now",
 		SpanEndTime:                  "now",
 		EventName:                    "todo-generate-default-event-names",
@@ -101,6 +102,8 @@ type Config struct {
 	BackgroundSockdir            string `json:"background_socket_directory" env:""`
 	BackgroundWait               bool   `json:"background_wait" env:""`
 	BackgroundSkipParentPidCheck bool   `json:"background_skip_parent_pid_check"`
+
+	StatusKeepaliveMs int `json:"status_keepalive_ms"`
 
 	SpanStartTime string `json:"span_start_time" env:""`
 	SpanEndTime   string `json:"span_end_time" env:""`
@@ -585,6 +588,12 @@ func (c Config) WithBackgroundWait(with bool) Config {
 // WithBackgroundSkipParentPidCheck returns the config with BackgroundSkipParentPidCheck set to the provided value.
 func (c Config) WithBackgroundSkipParentPidCheck(with bool) Config {
 	c.BackgroundSkipParentPidCheck = with
+	return c
+}
+
+// WithStatusKeepliaveMs returns the config with StatusKeepaliveMs set to the provided value.
+func (c Config) WithStatusKeepaliveMs(with int) Config {
+	c.StatusKeepaliveMs = with
 	return c
 }
 
