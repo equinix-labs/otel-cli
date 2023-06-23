@@ -96,8 +96,9 @@ var suites = []FixtureSuite{
 			Expect: Results{
 				Config: otlpclient.DefaultConfig(),
 				Diagnostics: otlpclient.Diagnostics{
-					IsRecording: false,
-					NumArgs:     1,
+					IsRecording:     false,
+					NumArgs:         1,
+					ParsedTimeoutMs: 1000,
 				},
 			},
 		},
