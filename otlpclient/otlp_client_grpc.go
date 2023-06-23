@@ -30,7 +30,7 @@ func NewGrpcClient(config Config) *GrpcClient {
 }
 
 // Start configures and starts the connection to the gRPC server in the background.
-func (gc *GrpcClient) Start(ctx context.Context) error {
+func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 	var err error
 	endpointURL, _ := ParseEndpoint(gc.config)
 	host := endpointURL.Hostname()
@@ -69,12 +69,12 @@ func (gc *GrpcClient) Start(ctx context.Context) error {
 
 	gc.client = coltracepb.NewTraceServiceClient(gc.conn)
 
-	return nil
+	return ctx, nil
 }
 
 // UploadTraces takes a list of protobuf spans and sends them out, doing retries
 // on some errors as needed.
-func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) error {
+func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) (context.Context, error) {
 	// add headers onto the request
 	md := metadata.New(gc.config.Headers)
 	grpcOpts := []grpc.CallOption{grpc.HeaderCallOption{HeaderAddr: &md}}
@@ -84,27 +84,27 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	defer cancel()
 
 	timeout := gc.config.ParseCliTimeout()
-	return retry(gc.config, timeout, func() (bool, time.Duration, error) {
-		etsr, err := gc.client.Export(ctx, &req, grpcOpts...)
-		return processGrpcStatus(etsr, err)
+	return retry(ctx, gc.config, timeout, func(innerCtx context.Context) (context.Context, bool, time.Duration, error) {
+		etsr, err := gc.client.Export(innerCtx, &req, grpcOpts...)
+		return processGrpcStatus(innerCtx, etsr, err)
 	})
 }
 
 // Stop closes the connection to the gRPC server.
-func (gc *GrpcClient) Stop(ctx context.Context) error {
-	return gc.conn.Close()
+func (gc *GrpcClient) Stop(ctx context.Context) (context.Context, error) {
+	return ctx, gc.conn.Close()
 }
 
-func processGrpcStatus(etsr *coltracepb.ExportTraceServiceResponse, err error) (bool, time.Duration, error) {
+func processGrpcStatus(ctx context.Context, etsr *coltracepb.ExportTraceServiceResponse, err error) (context.Context, bool, time.Duration, error) {
 	if err == nil {
 		// success!
-		return false, 0, nil
+		return ctx, false, 0, nil
 	}
 
 	st := status.Convert(err)
 	if st.Code() == codes.OK {
 		// apparently this can happen and is a success
-		return false, 0, nil
+		return ctx, false, 0, nil
 	}
 
 	var ri *errdetails.RetryInfo
@@ -122,20 +122,20 @@ func processGrpcStatus(etsr *coltracepb.ExportTraceServiceResponse, err error) (
 		codes.DeadlineExceeded,
 		codes.OutOfRange,
 		codes.Unavailable:
-		return true, 0, err
+		return ctx, true, 0, err
 	case codes.ResourceExhausted:
 		// only retry this one if RetryInfo was set
 		if ri != nil && ri.RetryDelay != nil {
 			// when RetryDelay is available, pass it back to the retry loop
 			// so it can sleep that duration
 			wait := time.Duration(ri.RetryDelay.Seconds)*time.Second + time.Duration(ri.RetryDelay.Nanos)*time.Nanosecond
-			return true, wait, err
+			return ctx, true, wait, err
 		} else {
-			return false, 0, err
+			return ctx, false, 0, err
 		}
 	default:
 		// don't retry anything else
-		return false, 0, err
+		return ctx, false, 0, err
 	}
 
 }

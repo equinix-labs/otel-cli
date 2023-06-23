@@ -24,11 +24,10 @@ import (
 
 // OTLPClient is an interface that allows for StartClient to return either
 // gRPC or HTTP clients.
-// matches the OTel collector's similar interface
 type OTLPClient interface {
-	Start(context.Context) error
-	UploadTraces(context.Context, []*tracepb.ResourceSpans) error
-	Stop(context.Context) error
+	Start(context.Context) (context.Context, error)
+	UploadTraces(context.Context, []*tracepb.ResourceSpans) (context.Context, error)
+	Stop(context.Context) (context.Context, error)
 }
 
 // StartClient uses the Config to setup and start either a gRPC or HTTP client,
@@ -56,7 +55,7 @@ func StartClient(ctx context.Context, config Config) (context.Context, OTLPClien
 		client = NewGrpcClient(config)
 	}
 
-	err := client.Start(ctx)
+	ctx, err := client.Start(ctx)
 	if err != nil {
 		Diag.Error = err.Error()
 		config.SoftFail("Failed to start OTLP client: %s", err)
@@ -93,13 +92,13 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 		},
 	}
 
-	err = client.UploadTraces(ctx, rsps)
+	ctx, err = client.UploadTraces(ctx, rsps)
 	if err != nil {
 		Diag.Error = err.Error()
 		return err
 	}
 
-	err = client.Stop(ctx)
+	_, err = client.Stop(ctx)
 	if err != nil {
 		Diag.Error = err.Error()
 		return err
@@ -305,6 +304,12 @@ func resourceAttributes(ctx context.Context, serviceName string) ([]*commonpb.Ke
 	return attrs, nil
 }
 
+func saveError(ctx context.Context, err error) (context.Context, error) {
+	Diag.SetError(err) // legacy, will go away when Diag is removed
+	// TODO: write to a list of errors in context
+	return ctx, err
+}
+
 // retry calls the provided function and expects it to return (true, wait, err)
 // to keep retrying, and (false, wait, err) to stop retrying and return.
 // The wait value is a time.Duration so the server can recommend a backoff
@@ -320,18 +325,18 @@ func resourceAttributes(ctx context.Context, serviceName string) ([]*commonpb.Ke
 // TODO: --otlp-retry-sleep? --otlp-retry-timeout?
 // TODO: span events? hmm... feels weird to plumb spans this deep into the client
 // but it's probably fine?
-func retry(config Config, timeout time.Duration, fun retryFun) error {
+func retry(ctx context.Context, config Config, timeout time.Duration, fun retryFun) (context.Context, error) {
 	deadline := config.StartupTime.Add(timeout)
 	sleep := time.Duration(0)
 	for {
-		if keepGoing, wait, err := fun(); err != nil {
+		if ctx, keepGoing, wait, err := fun(ctx); err != nil {
 			config.SoftLog("error on retry %d: %s", Diag.Retries, err)
 
 			if keepGoing {
 				if wait > 0 {
 					if time.Now().Add(wait).After(deadline) {
 						// wait will be after deadline, give up now
-						return Diag.SetError(err)
+						return saveError(ctx, err)
 					}
 					time.Sleep(wait)
 				} else {
@@ -339,7 +344,7 @@ func retry(config Config, timeout time.Duration, fun retryFun) error {
 				}
 
 				if time.Now().After(deadline) {
-					return Diag.SetError(err)
+					return saveError(ctx, err)
 				}
 
 				// linearly increase sleep time up to 5 seconds
@@ -347,10 +352,10 @@ func retry(config Config, timeout time.Duration, fun retryFun) error {
 					sleep = sleep + time.Millisecond*100
 				}
 			} else {
-				return Diag.SetError(err)
+				return saveError(ctx, err)
 			}
 		} else {
-			return nil
+			return ctx, nil
 		}
 
 		// It's retries instead of "tries" because "tries" means other things
@@ -364,4 +369,4 @@ func retry(config Config, timeout time.Duration, fun retryFun) error {
 // Return (false, 0, err) to stop retrying. Return (true, 0, err) to continue
 // retrying until timeout. Set the middle wait arg to a time.Duration to
 // sleep a requested amount of time before next try
-type retryFun func() (keepGoing bool, wait time.Duration, err error)
+type retryFun func(ctx context.Context) (ctxOut context.Context, keepGoing bool, wait time.Duration, err error)
