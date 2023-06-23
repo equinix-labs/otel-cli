@@ -3,7 +3,7 @@ package otelcli
 import (
 	"encoding/hex"
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -57,13 +57,6 @@ func doStatus(cmd *cobra.Command, args []string) {
 	config := getConfig(ctx)
 	ctx, client := otlpclient.StartClient(ctx, config)
 
-	// TODO: this always canaries as it is, gotta find the right flags
-	// to try to stall sending at the end so as much as possible of the otel
-	// code still executes
-	span := otlpclient.NewProtobufSpanWithConfig(config)
-	span.Name = "otel-cli status"
-	span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
-
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
 		parts := strings.SplitN(e, "=", 2)
@@ -81,30 +74,41 @@ func doStatus(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	deadline := config.StartupTime.Add(config.ParseCliTimeout())
+	// subtract one keepalive from the timeout so the canarying loop will stop
+	// before the deadline and subsequent timeouts
+	// TODO: handle cases where keepalive > timeout, but not worried since this tool
+	// is mostly for testing use cases
+	keepalive := time.Millisecond * time.Duration(config.StatusKeepaliveMs)
+	deadline := config.StartupTime.Add(config.ParseCliTimeout() - keepalive)
 	var canaryCount int
+	var lastSpan *tracepb.Span
 	for {
-		// send the span out before printing anything
-		log.Printf("canary %d\n", canaryCount)
-		ctx, err = otlpclient.SendSpan(ctx, client, config, span)
-		if err != nil {
-			if config.Fail {
-				log.Fatalf("%s", err)
-			} else {
-				config.SoftLog("%s", err)
-			}
+		// TODO: this always canaries as it is, gotta find the right flags
+		// to try to stall sending at the end so as much as possible of the otel
+		// code still executes
+		span := otlpclient.NewProtobufSpanWithConfig(config)
+		span.Name = "otel-cli status"
+		if canaryCount > 0 {
+			span.Name = fmt.Sprintf("otel-cli status canary %d", canaryCount)
 		}
+		span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
+
+		// when doing --keepalive, child each new span to the previous one
+		if lastSpan != nil {
+			span.ParentSpanId = lastSpan.SpanId
+		}
+		lastSpan = span
+
+		// send the span out before printing anything
+		ctx, _ = otlpclient.SendSpan(ctx, client, config, span)
 		canaryCount++
 
 		if config.StatusKeepaliveMs == 0 || time.Now().After(deadline) {
-			log.Printf("breaking now...\n")
 			break
 		} else {
-			log.Printf("sleeping now...\n")
-			time.Sleep(time.Millisecond * time.Duration(config.StatusKeepaliveMs))
+			time.Sleep(keepalive)
 		}
 	}
-	log.Printf("cleaning up now...\n")
 
 	ctx, err = client.Stop(ctx)
 	if err != nil {
@@ -117,8 +121,8 @@ func doStatus(cmd *cobra.Command, args []string) {
 		Config: config,
 		Env:    env,
 		SpanData: map[string]string{
-			"trace_id":   hex.EncodeToString(span.TraceId),
-			"span_id":    hex.EncodeToString(span.SpanId),
+			"trace_id":   hex.EncodeToString(lastSpan.TraceId),
+			"span_id":    hex.EncodeToString(lastSpan.SpanId),
 			"is_sampled": strconv.FormatBool(config.IsRecording()),
 		},
 		Diagnostics: otlpclient.Diag,
@@ -126,9 +130,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	}
 
 	js, err := json.MarshalIndent(outData, "", "    ")
-	if err != nil {
-		log.Fatal(err)
-	}
+	config.SoftFailIfErr(err)
 
 	os.Stdout.Write(js)
 	os.Stdout.WriteString("\n")
