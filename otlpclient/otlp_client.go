@@ -97,11 +97,6 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 		return SaveError(ctx, err)
 	}
 
-	_, err = client.Stop(ctx)
-	if err != nil {
-		return SaveError(ctx, err)
-	}
-
 	return ctx, nil
 }
 
