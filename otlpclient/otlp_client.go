@@ -336,6 +336,10 @@ func GetErrorList(ctx context.Context) ErrorList {
 // SaveError writes the provided error to the ErrorList in ctx, returning an
 // updated ctx.
 func SaveError(ctx context.Context, err error) (context.Context, error) {
+	if err == nil {
+		return ctx, nil
+	}
+
 	Diag.SetError(err) // legacy, will go away when Diag is removed
 
 	te := TimestampedError{
