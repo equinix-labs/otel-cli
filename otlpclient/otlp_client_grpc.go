@@ -80,8 +80,6 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	grpcOpts := []grpc.CallOption{grpc.HeaderCallOption{HeaderAddr: &md}}
 
 	req := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
-	ctx, cancel := deadlineCtx(ctx, gc.config, gc.config.StartupTime)
-	defer cancel()
 
 	timeout := gc.config.ParseCliTimeout()
 	return retry(ctx, gc.config, timeout, func(innerCtx context.Context) (context.Context, bool, time.Duration, error) {
@@ -92,8 +90,7 @@ func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 
 // Stop closes the connection to the gRPC server.
 func (gc *GrpcClient) Stop(ctx context.Context) (context.Context, error) {
-	gc.conn.Close() // ignoring the error
-	return ctx, nil
+	return ctx, gc.conn.Close()
 }
 
 func processGrpcStatus(ctx context.Context, etsr *coltracepb.ExportTraceServiceResponse, err error) (context.Context, bool, time.Duration, error) {
