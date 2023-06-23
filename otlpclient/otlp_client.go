@@ -370,6 +370,9 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 	sleep := time.Duration(0)
 	for {
 		if ctx, keepGoing, wait, err := fun(ctx); err != nil {
+			if err != nil {
+				ctx, _ = SaveError(ctx, err)
+			}
 			config.SoftLog("error on retry %d: %s", Diag.Retries, err)
 
 			if keepGoing {
