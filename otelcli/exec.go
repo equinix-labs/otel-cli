@@ -98,9 +98,14 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
-	err := otlpclient.SendSpan(ctx, client, config, span)
+	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
 		config.SoftFail("unable to send span: %s", err)
+	}
+
+	_, err = client.Stop(ctx)
+	if err != nil {
+		config.SoftFail("client.Stop() failed: %s", err)
 	}
 
 	// set the global exit code so main() can grab it and os.Exit() properly

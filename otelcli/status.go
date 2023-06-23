@@ -20,6 +20,7 @@ type StatusOutput struct {
 	SpanData    map[string]string      `json:"span_data"`
 	Env         map[string]string      `json:"env"`
 	Diagnostics otlpclient.Diagnostics `json:"diagnostics"`
+	Errors      otlpclient.ErrorList   `json:"errors"`
 }
 
 func statusCmd(config *otlpclient.Config) *cobra.Command {
@@ -71,7 +72,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	}
 
 	// send the span out before printing anything
-	err := otlpclient.SendSpan(ctx, client, config, span)
+	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
 		if config.Fail {
 			log.Fatalf("%s", err)
@@ -79,6 +80,13 @@ func doStatus(cmd *cobra.Command, args []string) {
 			config.SoftLog("%s", err)
 		}
 	}
+
+	ctx, err = client.Stop(ctx)
+	if err != nil {
+		config.SoftFail("client.Stop() failed: %s", err)
+	}
+
+	_, errorList := otlpclient.GetErrorList(ctx)
 
 	outData := StatusOutput{
 		Config: config,
@@ -89,6 +97,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 			"is_sampled": strconv.FormatBool(config.IsRecording()),
 		},
 		Diagnostics: otlpclient.Diag,
+		Errors:      errorList,
 	}
 
 	js, err := json.MarshalIndent(outData, "", "    ")
