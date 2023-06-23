@@ -302,38 +302,51 @@ func resourceAttributes(ctx context.Context, serviceName string) ([]*commonpb.Ke
 	return attrs, nil
 }
 
+// otlpClientCtxKey is a type for storing otlp client information in context.Context safely.
 type otlpClientCtxKey string
-type ErrorList []error
 
+// TimestampedError is a timestamp + error string, to be stored in an ErrorList
+type TimestampedError struct {
+	Timestamp time.Time
+	Error     string
+}
+
+// ErrorList is a list of TimestampedError
+type ErrorList []TimestampedError
+
+// errorListKey() returns the typed key used to store the error list in context.
 func errorListKey() otlpClientCtxKey {
 	return otlpClientCtxKey("otlp_errors")
 }
 
-func GetErrorList(ctx context.Context) (context.Context, ErrorList) {
+// GetErrorList retrieves the error list from context and returns it. If the list
+// is uninitialized, it initializes it in the returned context.
+func GetErrorList(ctx context.Context) ErrorList {
 	if cv := ctx.Value(errorListKey()); cv != nil {
 		if l, ok := cv.(ErrorList); ok {
-			return ctx, l
+			return l
 		} else {
 			panic("BUG: failed to unwrap error list, please report an issue")
 		}
 	} else {
-		l := ErrorList{}
-		ctx = context.WithValue(ctx, errorListKey(), l)
-		return ctx, l
+		return ErrorList{}
 	}
 }
 
-// SaveError writes
+// SaveError writes the provided error to the ErrorList in ctx, returning an
+// updated ctx.
 func SaveError(ctx context.Context, err error) (context.Context, error) {
 	Diag.SetError(err) // legacy, will go away when Diag is removed
 
-	if ctx, errorList := GetErrorList(ctx); errorList != nil {
-		newList := append(errorList, err)
-		ctx = context.WithValue(ctx, errorListKey(), newList)
-		return ctx, err
+	te := TimestampedError{
+		Timestamp: time.Now(),
+		Error:     err.Error(),
 	}
 
-	// TODO: write to a list of errors in context
+	errorList := GetErrorList(ctx)
+	newList := append(errorList, te)
+	ctx = context.WithValue(ctx, errorListKey(), newList)
+
 	return ctx, err
 }
 

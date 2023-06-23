@@ -86,7 +86,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 		config.SoftFail("client.Stop() failed: %s", err)
 	}
 
-	_, errorList := otlpclient.GetErrorList(ctx)
+	errorList := otlpclient.GetErrorList(ctx)
 
 	outData := StatusOutput{
 		Config: config,
