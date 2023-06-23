@@ -10,12 +10,17 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
+	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
+
+var emptyTraceId = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var emptySpanId = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 
 // NewProtobufSpan returns an initialized OpenTelemetry protobuf Span.
 func NewProtobufSpan() *tracepb.Span {
@@ -80,11 +85,11 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	}
 
 	if c.IsRecording() {
-		if tp := LoadTraceparent(c); tp.Initialized {
+		tp := LoadTraceparent(c, span)
+		if tp.Initialized {
 			span.TraceId = tp.TraceId
 			span.ParentSpanId = tp.SpanId
 		}
-
 	} else {
 		span.TraceId = emptyTraceId
 		span.SpanId = emptySpanId
@@ -298,4 +303,77 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]
 		"status_code":        strconv.FormatInt(int64(span.Status.GetCode()), 10),
 		"status_description": span.Status.GetMessage(),
 	}
+}
+
+// TraceparentFromProtobufSpan builds a Traceparent struct from the provided span.
+func TraceparentFromProtobufSpan(c Config, span *tracepb.Span) traceparent.Traceparent {
+	return traceparent.Traceparent{
+		Version:     0,
+		TraceId:     span.TraceId,
+		SpanId:      span.SpanId,
+		Sampling:    c.IsRecording(),
+		Initialized: true,
+	}
+}
+
+// PropagateTraceparent saves the traceparent to file if necessary, then prints
+// span info to the console according to command-line args.
+func PropagateTraceparent(c Config, span *tracepb.Span, target io.Writer) {
+	var tp traceparent.Traceparent
+	if c.IsRecording() {
+		tp = TraceparentFromProtobufSpan(c, span)
+	} else {
+		// when in non-recording mode, and there is a TP available, propagate that
+		tp = LoadTraceparent(c, span)
+	}
+
+	if c.TraceparentCarrierFile != "" {
+		err := tp.SaveToFile(c.TraceparentCarrierFile, c.TraceparentPrintExport)
+		c.SoftFailIfErr(err)
+	}
+
+	if c.TraceparentPrint {
+		tp.Fprint(target, c.TraceparentPrintExport)
+	}
+}
+
+// LoadTraceparent follows otel-cli's loading rules, start with envvar then file.
+// If both are set, the file will override env.
+// When in non-recording mode, the previous traceparent will be returned if it's
+// available, otherwise, a zero-valued traceparent is returned.
+func LoadTraceparent(c Config, span *tracepb.Span) traceparent.Traceparent {
+	tp := traceparent.Traceparent{
+		Version:     0,
+		TraceId:     emptyTraceId,
+		SpanId:      emptySpanId,
+		Sampling:    false,
+		Initialized: true,
+	}
+
+	if !c.TraceparentIgnoreEnv {
+		var err error
+		tp, err = traceparent.LoadFromEnv()
+		if err != nil {
+			Diag.Error = err.Error()
+		}
+	}
+
+	if c.TraceparentCarrierFile != "" {
+		fileTp, err := traceparent.LoadFromFile(c.TraceparentCarrierFile)
+		if err != nil {
+			Diag.Error = err.Error()
+		} else if fileTp.Initialized {
+			tp = fileTp
+		}
+	}
+
+	if c.TraceparentRequired {
+		if tp.Initialized {
+			return tp
+		} else {
+			c.SoftFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", c.TraceparentCarrierFile)
+		}
+	}
+
+	return tp
 }

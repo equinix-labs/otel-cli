@@ -44,7 +44,7 @@ type BgEnd struct {
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	reply.TraceID = hex.EncodeToString(bs.span.TraceId)
 	reply.SpanID = hex.EncodeToString(bs.span.SpanId)
-	reply.Traceparent = otlpclient.TraceparentFromSpan(bs.span).Encode()
+	reply.Traceparent = otlpclient.TraceparentFromProtobufSpan(bs.config, bs.span).Encode()
 
 	ts, err := time.Parse(time.RFC3339Nano, bse.Timestamp)
 	if err != nil {

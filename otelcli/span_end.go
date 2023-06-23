@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/equinix-labs/otel-cli/otlpclient"
+	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
 )
 
@@ -52,8 +53,8 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 	}
 	shutdown()
 
-	tp, _ := otlpclient.ParseTraceparent(res.Traceparent)
+	tp, _ := traceparent.Parse(res.Traceparent)
 	if config.TraceparentPrint {
-		otlpclient.PrintSpanData(os.Stdout, tp, nil, config.TraceparentPrintExport)
+		tp.Fprint(os.Stdout, config.TraceparentPrintExport)
 	}
 }

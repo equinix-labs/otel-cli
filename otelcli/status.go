@@ -79,7 +79,6 @@ func doStatus(cmd *cobra.Command, args []string) {
 			config.SoftLog("%s", err)
 		}
 	}
-	tp := otlpclient.TraceparentFromSpan(span)
 
 	outData := StatusOutput{
 		Config: config,
@@ -87,7 +86,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 		SpanData: map[string]string{
 			"trace_id":   hex.EncodeToString(span.TraceId),
 			"span_id":    hex.EncodeToString(span.SpanId),
-			"is_sampled": strconv.FormatBool(tp.Sampling),
+			"is_sampled": strconv.FormatBool(config.IsRecording()),
 		},
 		Diagnostics: otlpclient.Diag,
 	}
