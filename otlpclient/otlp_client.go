@@ -34,7 +34,7 @@ type OTLPClient interface {
 // and returns the OTLPClient interface to them.
 func StartClient(ctx context.Context, config Config) (context.Context, OTLPClient) {
 	if !config.IsRecording() {
-		return ctx, nil
+		return ctx, NewNullClient(config)
 	}
 
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
@@ -65,9 +65,9 @@ func StartClient(ctx context.Context, config Config) (context.Context, OTLPClien
 }
 
 // SendSpan connects to the OTLP server, sends the span, and disconnects.
-func SendSpan(ctx context.Context, client OTLPClient, config Config, span *tracepb.Span) error {
+func SendSpan(ctx context.Context, client OTLPClient, config Config, span *tracepb.Span) (context.Context, error) {
 	if !config.IsRecording() {
-		return nil
+		return ctx, nil
 	}
 
 	resourceAttrs, err := resourceAttributes(ctx, config.ServiceName)
@@ -94,17 +94,15 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 
 	ctx, err = client.UploadTraces(ctx, rsps)
 	if err != nil {
-		Diag.Error = err.Error()
-		return err
+		return SaveError(ctx, err)
 	}
 
 	_, err = client.Stop(ctx)
 	if err != nil {
-		Diag.Error = err.Error()
-		return err
+		return SaveError(ctx, err)
 	}
 
-	return nil
+	return ctx, nil
 }
 
 // ParseEndpoint takes the endpoint or signal endpoint, augments as needed
@@ -304,8 +302,37 @@ func resourceAttributes(ctx context.Context, serviceName string) ([]*commonpb.Ke
 	return attrs, nil
 }
 
-func saveError(ctx context.Context, err error) (context.Context, error) {
+type otlpClientCtxKey string
+type ErrorList []error
+
+func errorListKey() otlpClientCtxKey {
+	return otlpClientCtxKey("otlp_errors")
+}
+
+func GetErrorList(ctx context.Context) (context.Context, ErrorList) {
+	if cv := ctx.Value(errorListKey()); cv != nil {
+		if l, ok := cv.(ErrorList); ok {
+			return ctx, l
+		} else {
+			panic("BUG: failed to unwrap error list, please report an issue")
+		}
+	} else {
+		l := ErrorList{}
+		ctx = context.WithValue(ctx, errorListKey(), l)
+		return ctx, l
+	}
+}
+
+// SaveError writes
+func SaveError(ctx context.Context, err error) (context.Context, error) {
 	Diag.SetError(err) // legacy, will go away when Diag is removed
+
+	if ctx, errorList := GetErrorList(ctx); errorList != nil {
+		newList := append(errorList, err)
+		ctx = context.WithValue(ctx, errorListKey(), newList)
+		return ctx, err
+	}
+
 	// TODO: write to a list of errors in context
 	return ctx, err
 }
@@ -336,7 +363,7 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 				if wait > 0 {
 					if time.Now().Add(wait).After(deadline) {
 						// wait will be after deadline, give up now
-						return saveError(ctx, err)
+						return SaveError(ctx, err)
 					}
 					time.Sleep(wait)
 				} else {
@@ -344,7 +371,7 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 				}
 
 				if time.Now().After(deadline) {
-					return saveError(ctx, err)
+					return SaveError(ctx, err)
 				}
 
 				// linearly increase sleep time up to 5 seconds
@@ -352,7 +379,7 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 					sleep = sleep + time.Millisecond*100
 				}
 			} else {
-				return saveError(ctx, err)
+				return SaveError(ctx, err)
 			}
 		} else {
 			return ctx, nil
