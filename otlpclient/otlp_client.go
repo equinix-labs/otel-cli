@@ -302,8 +302,8 @@ type otlpClientCtxKey string
 
 // TimestampedError is a timestamp + error string, to be stored in an ErrorList
 type TimestampedError struct {
-	Timestamp time.Time
-	Error     string
+	Timestamp time.Time `json:"timestamp"`
+	Error     string    `json:"error"`
 }
 
 // ErrorList is a list of TimestampedError
