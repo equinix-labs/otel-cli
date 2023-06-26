@@ -95,6 +95,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 
 		// when doing --keepalive, child each new span to the previous one
 		if lastSpan != nil {
+			span.TraceId = lastSpan.TraceId
 			span.ParentSpanId = lastSpan.SpanId
 		}
 		lastSpan = span
