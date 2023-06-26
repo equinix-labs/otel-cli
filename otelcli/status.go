@@ -117,6 +117,8 @@ func doStatus(cmd *cobra.Command, args []string) {
 		config.SoftFail("client.Stop() failed: %s", err)
 	}
 
+	// otlpclient saves all errors to a key in context so they can be used
+	// to validate assumptions here & in tests
 	errorList := otlpclient.GetErrorList(ctx)
 
 	// TODO: does it make sense to turn SpanData into a list of spans?
