@@ -249,6 +249,7 @@ func (c Config) IsRecording() bool {
 // ParseCliTimeout parses the --timeout string value to a time.Duration.
 func (c Config) ParseCliTimeout() time.Duration {
 	out, err := parseDuration(c.Timeout)
+	Diag.ParsedTimeoutMs = out.Milliseconds()
 	c.SoftFailIfErr(err)
 	return out
 }
@@ -275,7 +276,6 @@ func parseDuration(d string) (time.Duration, error) {
 		return time.Duration(0), fmt.Errorf("unable to parse duration string %q: %s", d, err)
 	}
 
-	Diag.ParsedTimeoutMs = out.Milliseconds()
 	return out, nil
 }
 
