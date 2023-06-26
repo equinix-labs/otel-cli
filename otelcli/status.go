@@ -91,7 +91,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 		}
 		span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
 
-		// when doing --keepalive, child each new span to the previous one
+		// when doing multiple canaries, child each new span to the previous one
 		if lastSpan != nil {
 			span.TraceId = lastSpan.TraceId
 			span.ParentSpanId = lastSpan.SpanId
