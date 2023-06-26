@@ -261,6 +261,10 @@ func SpanAttributesToStringMap(span *tracepb.Span) map[string]string {
 // ResourceAttributesToStringMap converts the ResourceSpan's resource attributes to a string map.
 // Only used by tests for now.
 func ResourceAttributesToStringMap(rss *tracepb.ResourceSpans) map[string]string {
+	if rss == nil {
+		return map[string]string{}
+	}
+
 	out := make(map[string]string)
 	for _, attr := range rss.Resource.Attributes {
 		out[attr.Key] = AttrValueToString(attr)

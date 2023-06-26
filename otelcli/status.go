@@ -18,6 +18,7 @@ import (
 // and is also used in ../main_test.go for automated testing.
 type StatusOutput struct {
 	Config      otlpclient.Config      `json:"config"`
+	Spans       []map[string]string    `json:"spans"`
 	SpanData    map[string]string      `json:"span_data"`
 	Env         map[string]string      `json:"env"`
 	Diagnostics otlpclient.Diagnostics `json:"diagnostics"`
@@ -53,6 +54,7 @@ Example:
 func doStatus(cmd *cobra.Command, args []string) {
 	var err error
 	var exitCode int
+	allSpans := []map[string]string{}
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	ctx, client := otlpclient.StartClient(ctx, config)
@@ -83,9 +85,6 @@ func doStatus(cmd *cobra.Command, args []string) {
 	var canaryCount int
 	var lastSpan *tracepb.Span
 	for {
-		// TODO: this always canaries as it is, gotta find the right flags
-		// to try to stall sending at the end so as much as possible of the otel
-		// code still executes
 		span := otlpclient.NewProtobufSpanWithConfig(config)
 		span.Name = "otel-cli status"
 		if canaryCount > 0 {
@@ -99,8 +98,10 @@ func doStatus(cmd *cobra.Command, args []string) {
 			span.ParentSpanId = lastSpan.SpanId
 		}
 		lastSpan = span
+		allSpans = append(allSpans, otlpclient.SpanToStringMap(span, nil))
 
-		// send the span out before printing anything
+		// send it to the server. ignore errors here, they'll happen for sure
+		// and the base errors will be tunneled up through otlpclient.GetErrorList()
 		ctx, _ = otlpclient.SendSpan(ctx, client, config, span)
 		canaryCount++
 
@@ -118,14 +119,21 @@ func doStatus(cmd *cobra.Command, args []string) {
 
 	errorList := otlpclient.GetErrorList(ctx)
 
+	// TODO: does it make sense to turn SpanData into a list of spans?
 	outData := StatusOutput{
 		Config: config,
 		Env:    env,
+		Spans:  allSpans,
+		// use only the last span's data here, leftover from when status only
+		// ever sent one canary
+		// legacy, will be removed once test suite is updated
 		SpanData: map[string]string{
 			"trace_id":   hex.EncodeToString(lastSpan.TraceId),
 			"span_id":    hex.EncodeToString(lastSpan.SpanId),
 			"is_sampled": strconv.FormatBool(config.IsRecording()),
 		},
+		// Diagnostics is deprecated, being replaced by Errors below and eventually
+		// another stringmap of stuff that was tunneled through context.Context
 		Diagnostics: otlpclient.Diag,
 		Errors:      errorList,
 	}
