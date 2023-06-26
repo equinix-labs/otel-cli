@@ -311,8 +311,8 @@ func TestWithStatusCanaryCount(t *testing.T) {
 		t.Fail()
 	}
 }
-func TestWithStatusCanaryIntervalMs(t *testing.T) {
-	if DefaultConfig().WithStatusCanaryIntervalMs(1337).StatusCanaryIntervalMs != 1337 {
+func TestWithStatusCanaryInterval(t *testing.T) {
+	if DefaultConfig().WithStatusCanaryInterval("1337ms").StatusCanaryInterval != "1337ms" {
 		t.Fail()
 	}
 }

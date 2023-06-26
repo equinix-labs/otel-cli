@@ -53,7 +53,7 @@ func DefaultConfig() Config {
 		BackgroundWait:               false,
 		BackgroundSkipParentPidCheck: false,
 		StatusCanaryCount:            0,
-		StatusCanaryIntervalMs:       0,
+		StatusCanaryInterval:         "",
 		SpanStartTime:                "now",
 		SpanEndTime:                  "now",
 		EventName:                    "todo-generate-default-event-names",
@@ -104,8 +104,8 @@ type Config struct {
 	BackgroundWait               bool   `json:"background_wait" env:""`
 	BackgroundSkipParentPidCheck bool   `json:"background_skip_parent_pid_check"`
 
-	StatusCanaryCount      int `json:"status_canary_count"`
-	StatusCanaryIntervalMs int `json:"status_canary_interval_ms"`
+	StatusCanaryCount    int    `json:"status_canary_count"`
+	StatusCanaryInterval string `json:"status_canary_interval"`
 
 	SpanStartTime string `json:"span_start_time" env:""`
 	SpanEndTime   string `json:"span_end_time" env:""`
@@ -246,24 +246,37 @@ func (c Config) IsRecording() bool {
 	return true
 }
 
-// ParseCliTimeout parses the cliTimeout global string value to a time.Duration.
+// ParseCliTimeout parses the --timeout string value to a time.Duration.
+func (c Config) ParseCliTimeout() time.Duration {
+	out, err := parseDuration(c.Timeout)
+	c.SoftFailIfErr(err)
+	return out
+}
+
+// ParseStatusCanaryInterval parses the --canary-interval string value to a time.Duration.
+func (c Config) ParseStatusCanaryInterval() time.Duration {
+	out, err := parseDuration(c.StatusCanaryInterval)
+	c.SoftFailIfErr(err)
+	return out
+}
+
+// parseDuration parses a string duration into a time.Duration.
 // When no duration letter is provided (e.g. ms, s, m, h), seconds are assumed.
 // It logs an error and returns time.Duration(0) if the string is empty or unparseable.
-func (c Config) ParseCliTimeout() time.Duration {
+func parseDuration(d string) (time.Duration, error) {
 	var out time.Duration
-	if c.Timeout == "" {
+	if d == "" {
 		out = time.Duration(0)
-	} else if d, err := time.ParseDuration(c.Timeout); err == nil {
-		out = d
-	} else if secs, serr := strconv.ParseInt(c.Timeout, 10, 0); serr == nil {
+	} else if parsed, err := time.ParseDuration(d); err == nil {
+		out = parsed
+	} else if secs, serr := strconv.ParseInt(d, 10, 0); serr == nil {
 		out = time.Second * time.Duration(secs)
 	} else {
-		c.SoftLog("unable to parse --timeout %q: %s", c.Timeout, err)
-		out = time.Duration(0)
+		return time.Duration(0), fmt.Errorf("unable to parse duration string %q: %s", d, err)
 	}
 
 	Diag.ParsedTimeoutMs = out.Milliseconds()
-	return out
+	return out, nil
 }
 
 // SoftLog only calls through to log if otel-cli was run with the --verbose flag.
@@ -599,9 +612,9 @@ func (c Config) WithStatusCanaryCount(with int) Config {
 	return c
 }
 
-// WithStatusCanaryIntervalMs returns the config with StatusCanaryIntervalMs set to the provided value.
-func (c Config) WithStatusCanaryIntervalMs(with int) Config {
-	c.StatusCanaryIntervalMs = with
+// WithStatusCanaryInterval returns the config with StatusCanaryInterval set to the provided value.
+func (c Config) WithStatusCanaryInterval(with string) Config {
+	c.StatusCanaryInterval = with
 	return c
 }
 

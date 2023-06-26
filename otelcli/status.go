@@ -32,7 +32,7 @@ func statusCmd(config *otlpclient.Config) *cobra.Command {
 		Long: `This subcommand is still experimental and the output format is not yet frozen.
 
 By default just one canary is sent. When --canary-count is set, that number of canaries
-are sent. If --canary-interval is set, status will sleep that number of milliseconds
+are sent. If --canary-interval is set, status will sleep the specified duration
 between canaries, up to --timeout (default 1s).
 
 Example:
@@ -44,7 +44,7 @@ Example:
 
 	defaults := otlpclient.DefaultConfig()
 	cmd.Flags().IntVar(&config.StatusCanaryCount, "canary-count", defaults.StatusCanaryCount, "number of canaries to send")
-	cmd.Flags().IntVar(&config.StatusCanaryIntervalMs, "canary-interval", defaults.StatusCanaryIntervalMs, "number of milliseconds to wait between canaries")
+	cmd.Flags().StringVar(&config.StatusCanaryInterval, "canary-interval", defaults.StatusCanaryInterval, "number of milliseconds to wait between canaries")
 
 	addCommonParams(&cmd, config)
 	addClientParams(&cmd, config)
@@ -82,6 +82,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	var canaryCount int
 	var lastSpan *tracepb.Span
 	deadline := config.StartupTime.Add(config.ParseCliTimeout())
+	interval := config.ParseStatusCanaryInterval()
 	for {
 		span := otlpclient.NewProtobufSpanWithConfig(config)
 		span.Name = "otel-cli status"
@@ -108,7 +109,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 		} else if time.Now().After(deadline) {
 			break
 		} else {
-			time.Sleep(time.Duration(config.StatusCanaryIntervalMs) * time.Millisecond)
+			time.Sleep(interval)
 		}
 	}
 
