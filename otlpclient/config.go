@@ -52,7 +52,7 @@ func DefaultConfig() Config {
 		BackgroundSockdir:            "",
 		BackgroundWait:               false,
 		BackgroundSkipParentPidCheck: false,
-		StatusCanaryCount:            0,
+		StatusCanaryCount:            1,
 		StatusCanaryInterval:         "",
 		SpanStartTime:                "now",
 		SpanEndTime:                  "now",

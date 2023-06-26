@@ -84,6 +84,15 @@ func doStatus(cmd *cobra.Command, args []string) {
 	deadline := config.StartupTime.Add(config.ParseCliTimeout())
 	interval := config.ParseStatusCanaryInterval()
 	for {
+		// should be rare but a caller could request 0 canaries, in which case the
+		// client will be started and stopped, but no canaries sent
+		if config.StatusCanaryCount == 0 {
+			// TODO: remove this after SpanData is eliminated
+			lastSpan = otlpclient.NewProtobufSpan()
+			lastSpan.Name = "unsent canary"
+			break
+		}
+
 		span := otlpclient.NewProtobufSpanWithConfig(config)
 		span.Name = "otel-cli status"
 		if canaryCount > 0 {
@@ -104,7 +113,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 		ctx, _ = otlpclient.SendSpan(ctx, client, config, span)
 		canaryCount++
 
-		if config.StatusCanaryCount == 0 || canaryCount == config.StatusCanaryCount {
+		if canaryCount == config.StatusCanaryCount {
 			break
 		} else if time.Now().After(deadline) {
 			break
