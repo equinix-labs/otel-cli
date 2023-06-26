@@ -28,21 +28,23 @@ type StatusOutput struct {
 func statusCmd(config *otlpclient.Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "status",
-		Short: "start up otel and dump status, optionally sending a canary span",
+		Short: "send at least one canary and dump status",
 		Long: `This subcommand is still experimental and the output format is not yet frozen.
 
-By default just one canary span is sent. When --keepalive is set to some number of milliseconds,
-otel-cli status will try to send a span each n ms until the --timeout value is reached.
+By default just one canary is sent. When --canary-count is set, that number of canaries
+are sent. If --canary-interval is set, status will sleep that number of milliseconds
+between canaries, up to --timeout (default 1s).
 
 Example:
 	otel-cli status
-	otel-cli status --keepalive 1000 --timeout 10
+	otel-cli status --canary-count 10 --canary-interval 10 --timeout 10s
 `,
 		Run: doStatus,
 	}
 
 	defaults := otlpclient.DefaultConfig()
-	cmd.Flags().IntVar(&config.StatusKeepaliveMs, "keepalive", defaults.StatusKeepaliveMs, "number of milliseconds to wait between keepalive spans")
+	cmd.Flags().IntVar(&config.StatusCanaryCount, "canary-count", defaults.StatusCanaryCount, "number of canaries to send")
+	cmd.Flags().IntVar(&config.StatusCanaryIntervalMs, "canary-interval", defaults.StatusCanaryIntervalMs, "number of milliseconds to wait between canaries")
 
 	addCommonParams(&cmd, config)
 	addClientParams(&cmd, config)
@@ -55,6 +57,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 	var err error
 	var exitCode int
 	allSpans := []map[string]string{}
+
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	ctx, client := otlpclient.StartClient(ctx, config)
@@ -76,14 +79,9 @@ func doStatus(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// subtract one keepalive from the timeout so the canarying loop will stop
-	// before the deadline and subsequent timeouts
-	// TODO: handle cases where keepalive > timeout, but not worried since this tool
-	// is mostly for testing use cases
-	keepalive := time.Millisecond * time.Duration(config.StatusKeepaliveMs)
-	deadline := config.StartupTime.Add(config.ParseCliTimeout() - keepalive)
 	var canaryCount int
 	var lastSpan *tracepb.Span
+	deadline := config.StartupTime.Add(config.ParseCliTimeout())
 	for {
 		span := otlpclient.NewProtobufSpanWithConfig(config)
 		span.Name = "otel-cli status"
@@ -105,10 +103,12 @@ func doStatus(cmd *cobra.Command, args []string) {
 		ctx, _ = otlpclient.SendSpan(ctx, client, config, span)
 		canaryCount++
 
-		if config.StatusKeepaliveMs == 0 || time.Now().After(deadline) {
+		if config.StatusCanaryCount == 0 || canaryCount == config.StatusCanaryCount {
+			break
+		} else if time.Now().After(deadline) {
 			break
 		} else {
-			time.Sleep(keepalive)
+			time.Sleep(time.Duration(config.StatusCanaryIntervalMs) * time.Millisecond)
 		}
 	}
 

@@ -52,7 +52,8 @@ func DefaultConfig() Config {
 		BackgroundSockdir:            "",
 		BackgroundWait:               false,
 		BackgroundSkipParentPidCheck: false,
-		StatusKeepaliveMs:            0,
+		StatusCanaryCount:            0,
+		StatusCanaryIntervalMs:       0,
 		SpanStartTime:                "now",
 		SpanEndTime:                  "now",
 		EventName:                    "todo-generate-default-event-names",
@@ -103,7 +104,8 @@ type Config struct {
 	BackgroundWait               bool   `json:"background_wait" env:""`
 	BackgroundSkipParentPidCheck bool   `json:"background_skip_parent_pid_check"`
 
-	StatusKeepaliveMs int `json:"status_keepalive_ms"`
+	StatusCanaryCount      int `json:"status_canary_count"`
+	StatusCanaryIntervalMs int `json:"status_canary_interval_ms"`
 
 	SpanStartTime string `json:"span_start_time" env:""`
 	SpanEndTime   string `json:"span_end_time" env:""`
@@ -591,9 +593,15 @@ func (c Config) WithBackgroundSkipParentPidCheck(with bool) Config {
 	return c
 }
 
-// WithStatusKeepliaveMs returns the config with StatusKeepaliveMs set to the provided value.
-func (c Config) WithStatusKeepaliveMs(with int) Config {
-	c.StatusKeepaliveMs = with
+// WithStatusCanaryCount returns the config with StatusCanaryCount set to the provided value.
+func (c Config) WithStatusCanaryCount(with int) Config {
+	c.StatusCanaryCount = with
+	return c
+}
+
+// WithStatusCanaryIntervalMs returns the config with StatusCanaryIntervalMs set to the provided value.
+func (c Config) WithStatusCanaryIntervalMs(with int) Config {
+	c.StatusCanaryIntervalMs = with
 	return c
 }
 
