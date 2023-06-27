@@ -1,6 +1,7 @@
 package otelcli
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -58,7 +59,7 @@ func doServerJson(cmd *cobra.Command, args []string) {
 
 // writeFile takes the spans and events and writes them out to json files in the
 // tid/sid/span.json and tid/sid/events.json files.
-func renderJson(span *tracepb.Span, events []*tracepb.Span_Event, ss *tracepb.ResourceSpans, meta map[string]string) bool {
+func renderJson(ctx context.Context, span *tracepb.Span, events []*tracepb.Span_Event, ss *tracepb.ResourceSpans, headers map[string]string, meta map[string]string) bool {
 	jsonSvr.spansSeen++ // count spans for exiting on --max-spans
 
 	// TODO: check for existence of outdir and error when it doesn't exist

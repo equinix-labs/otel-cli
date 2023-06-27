@@ -5,6 +5,7 @@
 package otlpserver
 
 import (
+	"context"
 	"net"
 
 	colv1 "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -13,7 +14,7 @@ import (
 
 // Callback is a type for the function passed to newServer that is
 // called for each incoming span.
-type Callback func(*tracepb.Span, []*tracepb.Span_Event, *tracepb.ResourceSpans, map[string]string) bool
+type Callback func(context.Context, *tracepb.Span, []*tracepb.Span_Event, *tracepb.ResourceSpans, map[string]string, map[string]string) bool
 
 // Stopper is the function passed to newServer to be called when the
 // server is shut down.
@@ -43,7 +44,7 @@ func NewServer(protocol string, cb Callback, stop Stopper) OtlpServer {
 
 // doCallback unwraps the OTLP service request and calls the callback
 // for each span in the request.
-func doCallback(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta map[string]string) bool {
+func doCallback(ctx context.Context, cb Callback, req *colv1.ExportTraceServiceRequest, headers map[string]string, serverMeta map[string]string) bool {
 	rss := req.GetResourceSpans()
 	for _, resource := range rss {
 		scopeSpans := resource.GetScopeSpans()
@@ -53,7 +54,8 @@ func doCallback(cb Callback, req *colv1.ExportTraceServiceRequest, serverMeta ma
 				if events == nil {
 					events = []*tracepb.Span_Event{}
 				}
-				done := cb(span, events, resource, serverMeta)
+
+				done := cb(ctx, span, events, resource, headers, serverMeta)
 				if done {
 					return true
 				}

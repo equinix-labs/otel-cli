@@ -7,6 +7,7 @@ package main_test
 // see TESTING.md for details
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"log"
@@ -173,6 +174,10 @@ func checkAll(t *testing.T, fixture Fixture, results Results) {
 		checkOutput(t, fixture, results)
 	}
 
+	if len(fixture.Expect.Headers) > 0 {
+		checkHeaders(t, fixture, results)
+	}
+
 	if len(fixture.Expect.ServerMeta) > 0 {
 		checkServerMeta(t, fixture, results)
 	}
@@ -324,6 +329,16 @@ func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 	}
 }
 
+// checkHeaders compares the expected and received headers.
+func checkHeaders(t *testing.T, fixture Fixture, results Results) {
+	injectMapVars(fixture.Endpoint, fixture.Expect.Headers, fixture.TlsData)
+	injectMapVars(fixture.Endpoint, results.Headers, fixture.TlsData)
+
+	if diff := cmp.Diff(fixture.Expect.Headers, results.Headers); diff != "" {
+		t.Errorf("[%s] headers did not match expected (-want +got):\n%s", fixture.Name, diff)
+	}
+}
+
 // checkServerMeta compares the expected and received server metadata.
 func checkServerMeta(t *testing.T, fixture Fixture, results Results) {
 	injectMapVars(fixture.Endpoint, fixture.Expect.ServerMeta, fixture.TlsData)
@@ -358,7 +373,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 	rcvEvents := make(chan []*tracepb.Span_Event, 100)
 
 	// otlpserver calls this function for each span received
-	cb := func(span *tracepb.Span, events []*tracepb.Span_Event, rss *tracepb.ResourceSpans, meta map[string]string) bool {
+	cb := func(ctx context.Context, span *tracepb.Span, events []*tracepb.Span_Event, rss *tracepb.ResourceSpans, headers map[string]string, meta map[string]string) bool {
 		rcvSpan <- span
 		rcvEvents <- events
 
@@ -366,6 +381,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 		results.ResourceSpans = rss
 		results.SpanCount++
 		results.EventCount += len(events)
+		results.Headers = headers
 
 		// true tells the server we're done and it can exit its loop
 		return results.SpanCount >= fixture.Expect.SpanCount

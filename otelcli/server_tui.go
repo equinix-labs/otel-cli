@@ -1,6 +1,7 @@
 package otelcli
 
 import (
+	"context"
 	"encoding/hex"
 	"log"
 	"math"
@@ -56,7 +57,7 @@ func doServerTui(cmd *cobra.Command, args []string) {
 
 // renderTui takes the given span and events, appends them to the in-memory
 // event list, sorts that, then prints it as a pterm table.
-func renderTui(span *tracepb.Span, events []*tracepb.Span_Event, rss *tracepb.ResourceSpans, meta map[string]string) bool {
+func renderTui(ctx context.Context, span *tracepb.Span, events []*tracepb.Span_Event, rss *tracepb.ResourceSpans, headers map[string]string, meta map[string]string) bool {
 	spanTraceId := hex.EncodeToString(span.TraceId)
 	if _, ok := tuiServer.traces[spanTraceId]; !ok {
 		tuiServer.traces[spanTraceId] = span

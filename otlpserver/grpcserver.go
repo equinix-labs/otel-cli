@@ -1,7 +1,9 @@
 package otlpserver
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"log"
 	"net"
 	"sync"
@@ -9,6 +11,7 @@ import (
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // GrpcServer is a gRPC/OTLP server handle.
@@ -82,7 +85,19 @@ func (gs *GrpcServer) StopWait() {
 
 // Export implements the gRPC server interface for exporting messages.
 func (gs *GrpcServer) Export(ctx context.Context, req *coltracepb.ExportTraceServiceRequest) (*coltracepb.ExportTraceServiceResponse, error) {
-	done := doCallback(gs.callback, req, map[string]string{"proto": "grpc"})
+	// OTLP/gRPC headers are passed in metadata, copy them to serverMeta
+	// for now. This isn't ideal but gets them exposed to the test suite.
+	headers := make(map[string]string)
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		for mdk := range md {
+			vals := md.Get(mdk)
+			buf := bytes.NewBuffer([]byte{})
+			csv.NewWriter(buf).WriteAll([][]string{vals})
+			headers[mdk] = buf.String()
+		}
+	}
+
+	done := doCallback(ctx, gs.callback, req, headers, map[string]string{"proto": "grpc"})
 	if done {
 		go gs.StopWait()
 	}
