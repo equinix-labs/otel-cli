@@ -1,8 +1,39 @@
 package otlpclient
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 )
+
+func TestErrorLists(t *testing.T) {
+	now := time.Now()
+
+	for _, tc := range []struct {
+		call func(context.Context) context.Context
+		want ErrorList
+	}{
+		{
+			call: func(ctx context.Context) context.Context {
+				err := fmt.Errorf("")
+				ctx, _ = SaveError(ctx, err)
+				return ctx
+			},
+			want: ErrorList{
+				TimestampedError{now, ""},
+			},
+		},
+	} {
+		ctx := context.Background()
+		ctx = tc.call(ctx)
+		list := GetErrorList(ctx)
+
+		if len(list) < len(tc.want) {
+			t.Error("not enough entries")
+		}
+	}
+}
 
 func TestParseEndpoint(t *testing.T) {
 	// func parseEndpoint(config Config) (*url.URL, string) {
@@ -71,5 +102,4 @@ func TestParseEndpoint(t *testing.T) {
 			t.Errorf("Expected source %q for test url %q but got %q", tc.wantSource, u.String(), src)
 		}
 	}
-
 }
