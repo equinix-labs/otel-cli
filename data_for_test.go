@@ -973,6 +973,12 @@ var suites = []FixtureSuite{
 					WithHeaders(map[string]string{
 						"x-otel-cli-otlpserver-token": "abcdefgabcdefg",
 					}),
+				Headers: map[string]string{
+					":authority":                  "{{endpoint}}\n",
+					"content-type":                "application/grpc\n",
+					"user-agent":                  "*",
+					"x-otel-cli-otlpserver-token": "abcdefgabcdefg\n",
+				},
 				Diagnostics: otlpclient.Diagnostics{
 					IsRecording:       true,
 					DetectedLocalhost: true,
@@ -1002,6 +1008,13 @@ var suites = []FixtureSuite{
 					WithHeaders(map[string]string{
 						"x-otel-cli-otlpserver-token": "abcdefgabcdefg",
 					}),
+				Headers: map[string]string{
+					"Content-Type":                "application/x-protobuf",
+					"Accept-Encoding":             "gzip",
+					"User-Agent":                  "Go-http-client/1.1",
+					"Content-Length":              "232",
+					"X-Otel-Cli-Otlpserver-Token": "abcdefgabcdefg",
+				},
 				Diagnostics: otlpclient.Diagnostics{
 					IsRecording:       true,
 					DetectedLocalhost: true,

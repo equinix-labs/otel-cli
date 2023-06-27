@@ -334,6 +334,13 @@ func checkHeaders(t *testing.T, fixture Fixture, results Results) {
 	injectMapVars(fixture.Endpoint, fixture.Expect.Headers, fixture.TlsData)
 	injectMapVars(fixture.Endpoint, results.Headers, fixture.TlsData)
 
+	for k, v := range fixture.Expect.Headers {
+		if v == "*" {
+			// overwrite value so cmp.Diff will ignore
+			results.Headers[k] = "*"
+		}
+	}
+
 	if diff := cmp.Diff(fixture.Expect.Headers, results.Headers); diff != "" {
 		t.Errorf("[%s] headers did not match expected (-want +got):\n%s", fixture.Name, diff)
 	}
