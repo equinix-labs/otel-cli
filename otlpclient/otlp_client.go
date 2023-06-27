@@ -94,7 +94,7 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 
 	ctx, err = client.UploadTraces(ctx, rsps)
 	if err != nil {
-		return SaveError(ctx, err)
+		return SaveError(ctx, time.Now(), err)
 	}
 
 	return ctx, nil
@@ -330,7 +330,7 @@ func GetErrorList(ctx context.Context) ErrorList {
 
 // SaveError writes the provided error to the ErrorList in ctx, returning an
 // updated ctx.
-func SaveError(ctx context.Context, err error) (context.Context, error) {
+func SaveError(ctx context.Context, t time.Time, err error) (context.Context, error) {
 	if err == nil {
 		return ctx, nil
 	}
@@ -338,7 +338,7 @@ func SaveError(ctx context.Context, err error) (context.Context, error) {
 	Diag.SetError(err) // legacy, will go away when Diag is removed
 
 	te := TimestampedError{
-		Timestamp: time.Now(),
+		Timestamp: t,
 		Error:     err.Error(),
 	}
 
@@ -370,7 +370,7 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 	for {
 		if ctx, keepGoing, wait, err := fun(ctx); err != nil {
 			if err != nil {
-				ctx, _ = SaveError(ctx, err)
+				ctx, _ = SaveError(ctx, time.Now(), err)
 			}
 			config.SoftLog("error on retry %d: %s", Diag.Retries, err)
 
@@ -378,7 +378,7 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 				if wait > 0 {
 					if time.Now().Add(wait).After(deadline) {
 						// wait will be after deadline, give up now
-						return SaveError(ctx, err)
+						return SaveError(ctx, time.Now(), err)
 					}
 					time.Sleep(wait)
 				} else {
@@ -386,7 +386,7 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 				}
 
 				if time.Now().After(deadline) {
-					return SaveError(ctx, err)
+					return SaveError(ctx, time.Now(), err)
 				}
 
 				// linearly increase sleep time up to 5 seconds
@@ -394,7 +394,7 @@ func retry(ctx context.Context, config Config, timeout time.Duration, fun retryF
 					sleep = sleep + time.Millisecond*100
 				}
 			} else {
-				return SaveError(ctx, err)
+				return SaveError(ctx, time.Now(), err)
 			}
 		} else {
 			return ctx, nil
