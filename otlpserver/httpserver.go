@@ -57,7 +57,12 @@ func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		"uri":          req.RequestURI,
 	}
 
-	done := doCallback(hs.callback, &msg, meta)
+	headers := make(map[string]string)
+	for k := range req.Header {
+		headers[k] = req.Header.Get(k)
+	}
+
+	done := doCallback(req.Context(), hs.callback, &msg, headers, meta)
 	if done {
 		go hs.StopWait()
 	}

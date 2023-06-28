@@ -74,16 +74,19 @@ func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 
 // UploadTraces takes a list of protobuf spans and sends them out, doing retries
 // on some errors as needed.
+// TODO: look into grpc.WaitForReady(), esp for status use cases
 func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) (context.Context, error) {
 	// add headers onto the request
-	md := metadata.New(gc.config.Headers)
-	grpcOpts := []grpc.CallOption{grpc.HeaderCallOption{HeaderAddr: &md}}
+	if len(gc.config.Headers) > 0 {
+		md := metadata.New(gc.config.Headers)
+		ctx = metadata.NewOutgoingContext(ctx, md)
+	}
 
 	req := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
 
 	timeout := gc.config.ParseCliTimeout()
 	return retry(ctx, gc.config, timeout, func(innerCtx context.Context) (context.Context, bool, time.Duration, error) {
-		etsr, err := gc.client.Export(innerCtx, &req, grpcOpts...)
+		etsr, err := gc.client.Export(innerCtx, &req)
 		return processGrpcStatus(innerCtx, etsr, err)
 	})
 }

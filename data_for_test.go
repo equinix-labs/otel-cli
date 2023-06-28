@@ -61,6 +61,7 @@ type Results struct {
 	Diagnostics otlpclient.Diagnostics `json:"diagnostics"`
 	// these are specific to tests...
 	ServerMeta    map[string]string
+	Headers       map[string]string // headers sent by the client
 	ResourceSpans *tracepb.ResourceSpans
 	CliOutput     string         // merged stdout and stderr
 	CliOutputRe   *regexp.Regexp // regular expression to clean the output before comparison
@@ -947,6 +948,80 @@ var suites = []FixtureSuite{
 					ParsedTimeoutMs:   1000,
 					Endpoint:          "*",
 					EndpointSource:    "*",
+				},
+			},
+		},
+	},
+	// full-system test --otlp-headers makes it to grpc/http servers
+	{
+		{
+			Name: "#231 gRPC headers for authentication",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"status",
+					"--endpoint", "{{endpoint}}",
+					"--protocol", "grpc",
+					"--otlp-headers", "x-otel-cli-otlpserver-token=abcdefgabcdefg",
+				},
+				ServerProtocol: grpcProtocol,
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config: otlpclient.DefaultConfig().
+					WithEndpoint("{{endpoint}}").
+					WithProtocol("grpc").
+					WithHeaders(map[string]string{
+						"x-otel-cli-otlpserver-token": "abcdefgabcdefg",
+					}),
+				Headers: map[string]string{
+					":authority":                  "{{endpoint}}\n",
+					"content-type":                "application/grpc\n",
+					"user-agent":                  "*",
+					"x-otel-cli-otlpserver-token": "abcdefgabcdefg\n",
+				},
+				Diagnostics: otlpclient.Diagnostics{
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					NumArgs:           7,
+					ParsedTimeoutMs:   1000,
+					Endpoint:          "grpc://{{endpoint}}",
+					EndpointSource:    "general",
+				},
+			},
+		},
+		{
+			Name: "#231 http headers for authentication",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"status",
+					"--endpoint", "http://{{endpoint}}",
+					"--protocol", "http/protobuf",
+					"--otlp-headers", "x-otel-cli-otlpserver-token=abcdefgabcdefg",
+				},
+				ServerProtocol: httpProtocol,
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config: otlpclient.DefaultConfig().
+					WithEndpoint("http://{{endpoint}}").
+					WithProtocol("http/protobuf").
+					WithHeaders(map[string]string{
+						"x-otel-cli-otlpserver-token": "abcdefgabcdefg",
+					}),
+				Headers: map[string]string{
+					"Content-Type":                "application/x-protobuf",
+					"Accept-Encoding":             "gzip",
+					"User-Agent":                  "Go-http-client/1.1",
+					"Content-Length":              "232",
+					"X-Otel-Cli-Otlpserver-Token": "abcdefgabcdefg",
+				},
+				Diagnostics: otlpclient.Diagnostics{
+					IsRecording:       true,
+					DetectedLocalhost: true,
+					NumArgs:           7,
+					ParsedTimeoutMs:   1000,
+					Endpoint:          "http://{{endpoint}}/v1/traces",
+					EndpointSource:    "general",
 				},
 			},
 		},
