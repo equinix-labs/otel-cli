@@ -3,10 +3,11 @@ package otelcli
 import (
 	"encoding/hex"
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
@@ -17,21 +18,33 @@ import (
 // and is also used in ../main_test.go for automated testing.
 type StatusOutput struct {
 	Config      otlpclient.Config      `json:"config"`
+	Spans       []map[string]string    `json:"spans"`
 	SpanData    map[string]string      `json:"span_data"`
 	Env         map[string]string      `json:"env"`
 	Diagnostics otlpclient.Diagnostics `json:"diagnostics"`
+	Errors      otlpclient.ErrorList   `json:"errors"`
 }
 
 func statusCmd(config *otlpclient.Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "status",
-		Short: "start up otel and dump status, optionally sending a canary span",
+		Short: "send at least one canary and dump status",
 		Long: `This subcommand is still experimental and the output format is not yet frozen.
+
+By default just one canary is sent. When --canary-count is set, that number of canaries
+are sent. If --canary-interval is set, status will sleep the specified duration
+between canaries, up to --timeout (default 1s).
+
 Example:
 	otel-cli status
+	otel-cli status --canary-count 10 --canary-interval 10 --timeout 10s
 `,
 		Run: doStatus,
 	}
+
+	defaults := otlpclient.DefaultConfig()
+	cmd.Flags().IntVar(&config.StatusCanaryCount, "canary-count", defaults.StatusCanaryCount, "number of canaries to send")
+	cmd.Flags().StringVar(&config.StatusCanaryInterval, "canary-interval", defaults.StatusCanaryInterval, "number of milliseconds to wait between canaries")
 
 	addCommonParams(&cmd, config)
 	addClientParams(&cmd, config)
@@ -41,17 +54,13 @@ Example:
 }
 
 func doStatus(cmd *cobra.Command, args []string) {
-	exitCode := 0
+	var err error
+	var exitCode int
+	allSpans := []map[string]string{}
+
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	ctx, client := otlpclient.StartClient(ctx, config)
-
-	// TODO: this always canaries as it is, gotta find the right flags
-	// to try to stall sending at the end so as much as possible of the otel
-	// code still executes
-	span := otlpclient.NewProtobufSpanWithConfig(config)
-	span.Name = "otel-cli status"
-	span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
 
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
@@ -70,31 +79,79 @@ func doStatus(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// send the span out before printing anything
-	err := otlpclient.SendSpan(ctx, client, config, span)
-	if err != nil {
-		if config.Fail {
-			log.Fatalf("%s", err)
+	var canaryCount int
+	var lastSpan *tracepb.Span
+	deadline := config.StartupTime.Add(config.ParseCliTimeout())
+	interval := config.ParseStatusCanaryInterval()
+	for {
+		// should be rare but a caller could request 0 canaries, in which case the
+		// client will be started and stopped, but no canaries sent
+		if config.StatusCanaryCount == 0 {
+			// TODO: remove this after SpanData is eliminated
+			lastSpan = otlpclient.NewProtobufSpan()
+			lastSpan.Name = "unsent canary"
+			break
+		}
+
+		span := otlpclient.NewProtobufSpanWithConfig(config)
+		span.Name = "otel-cli status"
+		if canaryCount > 0 {
+			span.Name = fmt.Sprintf("otel-cli status canary %d", canaryCount)
+		}
+		span.Kind = tracepb.Span_SPAN_KIND_INTERNAL
+
+		// when doing multiple canaries, child each new span to the previous one
+		if lastSpan != nil {
+			span.TraceId = lastSpan.TraceId
+			span.ParentSpanId = lastSpan.SpanId
+		}
+		lastSpan = span
+		allSpans = append(allSpans, otlpclient.SpanToStringMap(span, nil))
+
+		// send it to the server. ignore errors here, they'll happen for sure
+		// and the base errors will be tunneled up through otlpclient.GetErrorList()
+		ctx, _ = otlpclient.SendSpan(ctx, client, config, span)
+		canaryCount++
+
+		if canaryCount == config.StatusCanaryCount {
+			break
+		} else if time.Now().After(deadline) {
+			break
 		} else {
-			config.SoftLog("%s", err)
+			time.Sleep(interval)
 		}
 	}
 
+	ctx, err = client.Stop(ctx)
+	if err != nil {
+		config.SoftFail("client.Stop() failed: %s", err)
+	}
+
+	// otlpclient saves all errors to a key in context so they can be used
+	// to validate assumptions here & in tests
+	errorList := otlpclient.GetErrorList(ctx)
+
+	// TODO: does it make sense to turn SpanData into a list of spans?
 	outData := StatusOutput{
 		Config: config,
 		Env:    env,
+		Spans:  allSpans,
+		// use only the last span's data here, leftover from when status only
+		// ever sent one canary
+		// legacy, will be removed once test suite is updated
 		SpanData: map[string]string{
-			"trace_id":   hex.EncodeToString(span.TraceId),
-			"span_id":    hex.EncodeToString(span.SpanId),
+			"trace_id":   hex.EncodeToString(lastSpan.TraceId),
+			"span_id":    hex.EncodeToString(lastSpan.SpanId),
 			"is_sampled": strconv.FormatBool(config.IsRecording()),
 		},
+		// Diagnostics is deprecated, being replaced by Errors below and eventually
+		// another stringmap of stuff that was tunneled through context.Context
 		Diagnostics: otlpclient.Diag,
+		Errors:      errorList,
 	}
 
 	js, err := json.MarshalIndent(outData, "", "    ")
-	if err != nil {
-		log.Fatal(err)
-	}
+	config.SoftFailIfErr(err)
 
 	os.Stdout.Write(js)
 	os.Stdout.WriteString("\n")

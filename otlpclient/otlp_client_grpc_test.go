@@ -1,6 +1,7 @@
 package otlpclient
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -56,7 +57,8 @@ func TestProcessGrpcStatus(t *testing.T) {
 			wait:      time.Second,
 		},
 	} {
-		kg, wait, err := processGrpcStatus(tc.etsr, tc.err)
+		ctx := context.Background()
+		_, kg, wait, err := processGrpcStatus(ctx, tc.etsr, tc.err)
 
 		if kg != tc.keepgoing {
 			t.Errorf("keepgoing value returned %t but expected %t in test %d", kg, tc.keepgoing, i)

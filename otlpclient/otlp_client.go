@@ -24,18 +24,17 @@ import (
 
 // OTLPClient is an interface that allows for StartClient to return either
 // gRPC or HTTP clients.
-// matches the OTel collector's similar interface
 type OTLPClient interface {
-	Start(context.Context) error
-	UploadTraces(context.Context, []*tracepb.ResourceSpans) error
-	Stop(context.Context) error
+	Start(context.Context) (context.Context, error)
+	UploadTraces(context.Context, []*tracepb.ResourceSpans) (context.Context, error)
+	Stop(context.Context) (context.Context, error)
 }
 
 // StartClient uses the Config to setup and start either a gRPC or HTTP client,
 // and returns the OTLPClient interface to them.
 func StartClient(ctx context.Context, config Config) (context.Context, OTLPClient) {
 	if !config.IsRecording() {
-		return ctx, nil
+		return ctx, NewNullClient(config)
 	}
 
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
@@ -56,7 +55,7 @@ func StartClient(ctx context.Context, config Config) (context.Context, OTLPClien
 		client = NewGrpcClient(config)
 	}
 
-	err := client.Start(ctx)
+	ctx, err := client.Start(ctx)
 	if err != nil {
 		Diag.Error = err.Error()
 		config.SoftFail("Failed to start OTLP client: %s", err)
@@ -66,9 +65,9 @@ func StartClient(ctx context.Context, config Config) (context.Context, OTLPClien
 }
 
 // SendSpan connects to the OTLP server, sends the span, and disconnects.
-func SendSpan(ctx context.Context, client OTLPClient, config Config, span *tracepb.Span) error {
+func SendSpan(ctx context.Context, client OTLPClient, config Config, span *tracepb.Span) (context.Context, error) {
 	if !config.IsRecording() {
-		return nil
+		return ctx, nil
 	}
 
 	resourceAttrs, err := resourceAttributes(ctx, config.ServiceName)
@@ -93,19 +92,12 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 		},
 	}
 
-	err = client.UploadTraces(ctx, rsps)
+	ctx, err = client.UploadTraces(ctx, rsps)
 	if err != nil {
-		Diag.Error = err.Error()
-		return err
+		return SaveError(ctx, err)
 	}
 
-	err = client.Stop(ctx)
-	if err != nil {
-		Diag.Error = err.Error()
-		return err
-	}
-
-	return nil
+	return ctx, nil
 }
 
 // ParseEndpoint takes the endpoint or signal endpoint, augments as needed
@@ -305,6 +297,58 @@ func resourceAttributes(ctx context.Context, serviceName string) ([]*commonpb.Ke
 	return attrs, nil
 }
 
+// otlpClientCtxKey is a type for storing otlp client information in context.Context safely.
+type otlpClientCtxKey string
+
+// TimestampedError is a timestamp + error string, to be stored in an ErrorList
+type TimestampedError struct {
+	Timestamp time.Time `json:"timestamp"`
+	Error     string    `json:"error"`
+}
+
+// ErrorList is a list of TimestampedError
+type ErrorList []TimestampedError
+
+// errorListKey() returns the typed key used to store the error list in context.
+func errorListKey() otlpClientCtxKey {
+	return otlpClientCtxKey("otlp_errors")
+}
+
+// GetErrorList retrieves the error list from context and returns it. If the list
+// is uninitialized, it initializes it in the returned context.
+func GetErrorList(ctx context.Context) ErrorList {
+	if cv := ctx.Value(errorListKey()); cv != nil {
+		if l, ok := cv.(ErrorList); ok {
+			return l
+		} else {
+			panic("BUG: failed to unwrap error list, please report an issue")
+		}
+	} else {
+		return ErrorList{}
+	}
+}
+
+// SaveError writes the provided error to the ErrorList in ctx, returning an
+// updated ctx.
+func SaveError(ctx context.Context, err error) (context.Context, error) {
+	if err == nil {
+		return ctx, nil
+	}
+
+	Diag.SetError(err) // legacy, will go away when Diag is removed
+
+	te := TimestampedError{
+		Timestamp: time.Now(),
+		Error:     err.Error(),
+	}
+
+	errorList := GetErrorList(ctx)
+	newList := append(errorList, te)
+	ctx = context.WithValue(ctx, errorListKey(), newList)
+
+	return ctx, err
+}
+
 // retry calls the provided function and expects it to return (true, wait, err)
 // to keep retrying, and (false, wait, err) to stop retrying and return.
 // The wait value is a time.Duration so the server can recommend a backoff
@@ -320,18 +364,21 @@ func resourceAttributes(ctx context.Context, serviceName string) ([]*commonpb.Ke
 // TODO: --otlp-retry-sleep? --otlp-retry-timeout?
 // TODO: span events? hmm... feels weird to plumb spans this deep into the client
 // but it's probably fine?
-func retry(config Config, timeout time.Duration, fun retryFun) error {
+func retry(ctx context.Context, config Config, timeout time.Duration, fun retryFun) (context.Context, error) {
 	deadline := config.StartupTime.Add(timeout)
 	sleep := time.Duration(0)
 	for {
-		if keepGoing, wait, err := fun(); err != nil {
+		if ctx, keepGoing, wait, err := fun(ctx); err != nil {
+			if err != nil {
+				ctx, _ = SaveError(ctx, err)
+			}
 			config.SoftLog("error on retry %d: %s", Diag.Retries, err)
 
 			if keepGoing {
 				if wait > 0 {
 					if time.Now().Add(wait).After(deadline) {
 						// wait will be after deadline, give up now
-						return Diag.SetError(err)
+						return SaveError(ctx, err)
 					}
 					time.Sleep(wait)
 				} else {
@@ -339,7 +386,7 @@ func retry(config Config, timeout time.Duration, fun retryFun) error {
 				}
 
 				if time.Now().After(deadline) {
-					return Diag.SetError(err)
+					return SaveError(ctx, err)
 				}
 
 				// linearly increase sleep time up to 5 seconds
@@ -347,10 +394,10 @@ func retry(config Config, timeout time.Duration, fun retryFun) error {
 					sleep = sleep + time.Millisecond*100
 				}
 			} else {
-				return Diag.SetError(err)
+				return SaveError(ctx, err)
 			}
 		} else {
-			return nil
+			return ctx, nil
 		}
 
 		// It's retries instead of "tries" because "tries" means other things
@@ -364,4 +411,4 @@ func retry(config Config, timeout time.Duration, fun retryFun) error {
 // Return (false, 0, err) to stop retrying. Return (true, 0, err) to continue
 // retrying until timeout. Set the middle wait arg to a time.Duration to
 // sleep a requested amount of time before next try
-type retryFun func() (keepGoing bool, wait time.Duration, err error)
+type retryFun func(ctx context.Context) (ctxOut context.Context, keepGoing bool, wait time.Duration, err error)

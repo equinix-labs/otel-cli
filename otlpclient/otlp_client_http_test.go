@@ -1,6 +1,7 @@
 package otlpclient
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -97,7 +98,8 @@ func TestProcessHTTPStatus(t *testing.T) {
 			err:       fmt.Errorf("BUG: fell through error checking with status code 0"),
 		},
 	} {
-		kg, _, err := processHTTPStatus(tc.resp, tc.body)
+		ctx := context.Background()
+		_, kg, _, err := processHTTPStatus(ctx, tc.resp, tc.body)
 
 		if kg != tc.keepgoing {
 			t.Errorf("keepgoing value returned %t but expected %t", kg, tc.keepgoing)

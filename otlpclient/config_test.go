@@ -306,6 +306,16 @@ func TestWithBackgroundWait(t *testing.T) {
 		t.Fail()
 	}
 }
+func TestWithStatusCanaryCount(t *testing.T) {
+	if DefaultConfig().WithStatusCanaryCount(1337).StatusCanaryCount != 1337 {
+		t.Fail()
+	}
+}
+func TestWithStatusCanaryInterval(t *testing.T) {
+	if DefaultConfig().WithStatusCanaryInterval("1337ms").StatusCanaryInterval != "1337ms" {
+		t.Fail()
+	}
+}
 func TestWithSpanStartTime(t *testing.T) {
 	if DefaultConfig().WithSpanStartTime("foobar").SpanStartTime != "foobar" {
 		t.Fail()
