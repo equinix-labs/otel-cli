@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 	os.Exit(result)
 }
 
-// TestOtelCli loads all the json fixtures and executes the tests.
+// TestOtelCli iterates over all defined fixtures and executes the tests.
 func TestOtelCli(t *testing.T) {
 	_, err := os.Stat("./otel-cli")
 	if os.IsNotExist(err) {
