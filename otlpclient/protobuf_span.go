@@ -95,7 +95,7 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 		span.SpanId = emptySpanId
 	}
 
-	// --force-trace-id and --force-span-id let the user set their own trace & span ids
+	// --force-trace-id, --force-span-id and --force-parent-span-id let the user set their own trace, span & parent span ids
 	// these work in non-recording mode and will stomp trace id from the traceparent
 	var err error
 	if c.ForceTraceId != "" {
@@ -104,6 +104,10 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	}
 	if c.ForceSpanId != "" {
 		span.SpanId, err = parseHex(c.ForceSpanId, 8)
+		c.SoftFailIfErr(err)
+	}
+	if c.ForceParentSpanId != "" {
+		span.ParentSpanId, err = parseHex(c.ForceParentSpanId, 8)
 		c.SoftFailIfErr(err)
 	}
 

@@ -42,6 +42,7 @@ func DefaultConfig() Config {
 		Kind:                         "client",
 		ForceTraceId:                 "",
 		ForceSpanId:                  "",
+		ForceParentSpanId:            "",
 		Attributes:                   map[string]string{},
 		TraceparentCarrierFile:       "",
 		TraceparentIgnoreEnv:         false,
@@ -91,6 +92,7 @@ type Config struct {
 	StatusCode        string            `json:"span_status_code" env:"OTEL_CLI_STATUS_CODE"`
 	StatusDescription string            `json:"span_status_description" env:"OTEL_CLI_STATUS_DESCRIPTION"`
 	ForceSpanId       string            `json:"force_span_id" env:"OTEL_CLI_FORCE_SPAN_ID"`
+	ForceParentSpanId string            `json:"force_parent_span_id" env:"OTEL_CLI_FORCE_PARENT_SPAN_ID"`
 	ForceTraceId      string            `json:"force_trace_id" env:"OTEL_CLI_FORCE_TRACE_ID"`
 
 	TraceparentCarrierFile string `json:"traceparent_carrier_file" env:"OTEL_CLI_CARRIER_FILE"`

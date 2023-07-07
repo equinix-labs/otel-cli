@@ -150,9 +150,10 @@ func addSpanParams(cmd *cobra.Command, config *otlpclient.Config) {
 	// --kind / -k
 	cmd.Flags().StringVarP(&config.Kind, "kind", "k", defaults.Kind, "set the trace kind, e.g. internal, server, client, producer, consumer")
 
-	// expert options: --force-trace-id, --force-span-id allow setting custom trace & span ids
+	// expert options: --force-trace-id, --force-span-id, --force-parent-span-id allow setting custom trace, span and parent span ids
 	cmd.Flags().StringVar(&config.ForceTraceId, "force-trace-id", defaults.ForceTraceId, "expert: force the trace id to be the one provided in hex")
 	cmd.Flags().StringVar(&config.ForceSpanId, "force-span-id", defaults.ForceSpanId, "expert: force the span id to be the one provided in hex")
+	cmd.Flags().StringVar(&config.ForceParentSpanId, "force-parent-span-id", defaults.ForceParentSpanId, "expert: force the parent span id to be the one provided in hex")
 
 	addSpanStatusParams(cmd, config)
 }

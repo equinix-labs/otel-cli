@@ -922,23 +922,25 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
-	// --force-trace-id and --force-span-id allow setting/forcing custom trace & span ids
+	// --force-trace-id, --force-span-id and --force-parent-span-id allow setting/forcing custom trace, span and parent span ids
 	{
 		{
-			Name: "forced trace & span ids",
+			Name: "forced trace, span and parent span ids",
 			Config: FixtureConfig{
 				CliArgs: []string{
 					"status",
 					"--endpoint", "{{endpoint}}",
 					"--force-trace-id", "00112233445566778899aabbccddeeff",
 					"--force-span-id", "beefcafefacedead",
+					"--force-parent-span-id", "parentbeefcafede",
 				},
 			},
 			Expect: Results{
 				Config: otlpclient.DefaultConfig().WithEndpoint("{{endpoint}}"),
 				SpanData: map[string]string{
-					"trace_id": "00112233445566778899aabbccddeeff",
-					"span_id":  "beefcafefacedead",
+					"trace_id":       "00112233445566778899aabbccddeeff",
+					"span_id":        "beefcafefacedead",
+					"parent_span_id": "parentbeefcafede",
 				},
 				SpanCount: 1,
 				Diagnostics: otlpclient.Diagnostics{
