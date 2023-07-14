@@ -10,10 +10,10 @@ require (
 	github.com/spf13/cobra v1.7.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/sdk v1.16.0
-	go.opentelemetry.io/proto/otlp v0.20.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230628200519-e449d1ea0e82
-	google.golang.org/grpc v1.55.0
-	google.golang.org/protobuf v1.30.0
+	go.opentelemetry.io/proto/otlp v1.0.0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98
+	google.golang.org/grpc v1.56.2
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
@@ -37,5 +37,5 @@ require (
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230629202037-9506855d4529 // indirect
 )

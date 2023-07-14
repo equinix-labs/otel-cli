@@ -120,7 +120,7 @@ func processHTTPStatus(ctx context.Context, resp *http.Response, body []byte) (c
 		// 429, 502, 503, and 504 must be retried according to spec
 		return ctx, true, 0, fmt.Errorf("server responded with retriable code %d", resp.StatusCode)
 	} else if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		// spec doesn't say anything 300's, ignore body and assume they're errors and unretriable
+		// spec doesn't say anything about 300's, ignore body and assume they're errors and unretriable
 		return ctx, false, 0, fmt.Errorf("server returned unsupported code %d", resp.StatusCode)
 	} else if resp.StatusCode >= 400 {
 		// https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/specification.md#failures-1

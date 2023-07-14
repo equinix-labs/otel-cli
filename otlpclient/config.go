@@ -68,7 +68,6 @@ func DefaultConfig() Config {
 }
 
 // Config stores the runtime configuration for otel-cli.
-// This is used as a singleton as "config" and accessed from many other files.
 // Data structure is public so that it can serialize to json easily.
 type Config struct {
 	Endpoint       string            `json:"endpoint" env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
