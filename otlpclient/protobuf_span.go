@@ -301,7 +301,7 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]
 	return map[string]string{
 		"trace_id":           hex.EncodeToString(span.GetTraceId()),
 		"span_id":            hex.EncodeToString(span.GetSpanId()),
-		"parent":             hex.EncodeToString(span.GetParentSpanId()),
+		"parent_span_id":     hex.EncodeToString(span.GetParentSpanId()),
 		"name":               span.Name,
 		"kind":               SpanKindIntToString(span.GetKind()),
 		"start":              strconv.FormatUint(span.StartTimeUnixNano, 10),

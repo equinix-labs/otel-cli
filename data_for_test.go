@@ -930,6 +930,7 @@ var suites = []FixtureSuite{
 				CliArgs: []string{
 					"status",
 					"--endpoint", "{{endpoint}}",
+					"--fail",
 					"--force-trace-id", "00112233445566778899aabbccddeeff",
 					"--force-span-id", "beefcafefacedead",
 					"--force-parent-span-id", "e4e3eeb33fc4f3d3",
@@ -944,7 +945,7 @@ var suites = []FixtureSuite{
 				},
 				SpanCount: 1,
 				Diagnostics: otlpclient.Diagnostics{
-					NumArgs:           7,
+					NumArgs:           10,
 					IsRecording:       true,
 					DetectedLocalhost: true,
 					ParsedTimeoutMs:   1000,
