@@ -95,7 +95,7 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 		span.SpanId = emptySpanId
 	}
 
-	// --force-trace-id and --force-span-id let the user set their own trace & span ids
+	// --force-trace-id, --force-span-id and --force-parent-span-id let the user set their own trace, span & parent span ids
 	// these work in non-recording mode and will stomp trace id from the traceparent
 	var err error
 	if c.ForceTraceId != "" {
@@ -104,6 +104,10 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 	}
 	if c.ForceSpanId != "" {
 		span.SpanId, err = parseHex(c.ForceSpanId, 8)
+		c.SoftFailIfErr(err)
+	}
+	if c.ForceParentSpanId != "" {
+		span.ParentSpanId, err = parseHex(c.ForceParentSpanId, 8)
 		c.SoftFailIfErr(err)
 	}
 
@@ -297,7 +301,7 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]
 	return map[string]string{
 		"trace_id":           hex.EncodeToString(span.GetTraceId()),
 		"span_id":            hex.EncodeToString(span.GetSpanId()),
-		"parent":             hex.EncodeToString(span.GetParentSpanId()),
+		"parent_span_id":     hex.EncodeToString(span.GetParentSpanId()),
 		"name":               span.Name,
 		"kind":               SpanKindIntToString(span.GetKind()),
 		"start":              strconv.FormatUint(span.StartTimeUnixNano, 10),
