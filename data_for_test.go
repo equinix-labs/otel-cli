@@ -932,7 +932,7 @@ var suites = []FixtureSuite{
 					"--endpoint", "{{endpoint}}",
 					"--force-trace-id", "00112233445566778899aabbccddeeff",
 					"--force-span-id", "beefcafefacedead",
-					"--force-parent-span-id", "parentbeefcafede",
+					"--force-parent-span-id", "p4r3ntb33fc4f3d3",
 				},
 			},
 			Expect: Results{
@@ -940,7 +940,7 @@ var suites = []FixtureSuite{
 				SpanData: map[string]string{
 					"trace_id":       "00112233445566778899aabbccddeeff",
 					"span_id":        "beefcafefacedead",
-					"parent_span_id": "parentbeefcafede",
+					"parent_span_id": "p4r3ntb33fc4f3d3",
 				},
 				SpanCount: 1,
 				Diagnostics: otlpclient.Diagnostics{

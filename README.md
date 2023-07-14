@@ -119,7 +119,7 @@ then config file, then environment variables.
 | --attrs              | OTEL_CLI_ATTRIBUTES                   | span_attributes          | k=v,a=b        |
 | --force-trace-id     | OTEL_CLI_FORCE_TRACE_ID               | force_trace_id           | 00112233445566778899aabbccddeeff |
 | --force-span-id      | OTEL_CLI_FORCE_SPAN_ID                | force_span_id            | beefcafefacedead |
-| --force-parent-span-id | OTEL_CLI_FORCE_PARENT_SPAN_ID       | force_parent_span_id     | parentbeefcafede |
+| --force-parent-span-id | OTEL_CLI_FORCE_PARENT_SPAN_ID       | force_parent_span_id     | p4r3ntb33fc4f3d3 |
 | --tp-required        | OTEL_CLI_TRACEPARENT_REQUIRED         | traceparent_required     | false          |
 | --tp-carrier         | OTEL_CLI_CARRIER_FILE                 | traceparent_carrier_file | filename.txt   |
 | --tp-ignore-env      | OTEL_CLI_IGNORE_ENV                   | traceparent_ignore_env   | false          |
