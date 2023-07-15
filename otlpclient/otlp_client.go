@@ -4,6 +4,7 @@ package otlpclient
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/url"
@@ -19,12 +20,22 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+const otlpClientVersion = `otel-cli 0.0.4`
+
 // OTLPClient is an interface that allows for StartClient to return either
 // gRPC or HTTP clients.
 type OTLPClient interface {
 	Start(context.Context) (context.Context, error)
 	UploadTraces(context.Context, []*tracepb.ResourceSpans) (context.Context, error)
 	Stop(context.Context) (context.Context, error)
+}
+
+// TODO: rename to Config once the otelcli Config moves out
+type OTLPConfig interface {
+	TlsConfig() *tls.Config
+	IsRecording() bool
+	GetVersion() string
+	GetServiceName() string
 }
 
 // StartClient uses the Config to setup and start either a gRPC or HTTP client,
@@ -62,13 +73,15 @@ func StartClient(ctx context.Context, config Config) (context.Context, OTLPClien
 }
 
 // SendSpan connects to the OTLP server, sends the span, and disconnects.
-func SendSpan(ctx context.Context, client OTLPClient, config Config, span *tracepb.Span) (context.Context, error) {
+func SendSpan(ctx context.Context, client OTLPClient, config OTLPConfig, span *tracepb.Span) (context.Context, error) {
 	if !config.IsRecording() {
 		return ctx, nil
 	}
 
-	resourceAttrs, err := resourceAttributes(ctx, config.ServiceName)
-	config.SoftFailIfErr(err)
+	resourceAttrs, err := resourceAttributes(ctx, config.GetServiceName())
+	if err != nil {
+		return ctx, err
+	}
 
 	rsps := []*tracepb.ResourceSpans{
 		{
@@ -78,7 +91,7 @@ func SendSpan(ctx context.Context, client OTLPClient, config Config, span *trace
 			ScopeSpans: []*tracepb.ScopeSpans{{
 				Scope: &commonpb.InstrumentationScope{
 					Name:                   "github.com/equinix-labs/otel-cli",
-					Version:                config.Version,
+					Version:                config.GetVersion(),
 					Attributes:             []*commonpb.KeyValue{},
 					DroppedAttributesCount: 0,
 				},

@@ -517,6 +517,11 @@ func (c Config) WithTlsClientCert(with string) Config {
 	return c
 }
 
+// GetServiceName returns the configured OTel service name.
+func (c Config) GetServiceName() string {
+	return c.ServiceName
+}
+
 // WithServiceName returns the config with ServiceName set to the provided value.
 func (c Config) WithServiceName(with string) Config {
 	c.ServiceName = with
@@ -658,5 +663,16 @@ func (c Config) WithVerbose(with bool) Config {
 // WithFail returns the config with Fail set to the provided value.
 func (c Config) WithFail(with bool) Config {
 	c.Fail = with
+	return c
+}
+
+// Version returns the program version stored in the config.
+func (c Config) GetVersion() string {
+	return c.Version
+}
+
+// WithVersion returns the config with Version set to the provided value.
+func (c Config) WithVersion(with string) Config {
+	c.Version = with
 	return c
 }
