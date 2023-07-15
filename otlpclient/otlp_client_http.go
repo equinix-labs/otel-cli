@@ -34,7 +34,7 @@ func NewHttpClient(config Config) *HttpClient {
 // Start sets up the client configuration.
 // TODO: see if there's a way to background start http2 connections?
 func (hc *HttpClient) Start(ctx context.Context) (context.Context, error) {
-	tlsConf := TlsConfig(hc.config)
+	tlsConf := hc.config.TlsConfig()
 	hc.timeout = hc.config.ParseCliTimeout()
 
 	endpointURL, _ := ParseEndpoint(hc.config)

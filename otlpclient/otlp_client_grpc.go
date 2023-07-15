@@ -50,7 +50,7 @@ func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 	if gc.config.Insecure || (isLoopback && !strings.HasPrefix(gc.config.Endpoint, "https")) {
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else if !isInsecureSchema(gc.config.Endpoint) {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(TlsConfig(gc.config))))
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(gc.config.TlsConfig())))
 	}
 
 	// OTLP examples usually show this with the grpc.WithBlock() dial option to

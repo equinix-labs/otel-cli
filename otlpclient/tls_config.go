@@ -8,7 +8,7 @@ import (
 
 // TlsConfig evaluates otel-cli configuration and returns a tls.Config
 // that can be used by grpc or https.
-func TlsConfig(config Config) *tls.Config {
+func (config Config) TlsConfig() *tls.Config {
 	tlsConfig := &tls.Config{}
 
 	if config.TlsNoVerify {
