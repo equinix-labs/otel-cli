@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/equinix-labs/otel-cli/otelcli"
+	"github.com/equinix-labs/otel-cli/otlpclient"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -55,10 +56,11 @@ type FixtureConfig struct {
 // mostly mirrors otelcli.StatusOutput but we need more
 type Results struct {
 	// same as otelcli.StatusOutput but copied because embedding doesn't work for this
-	Config      otelcli.Config      `json:"config"`
-	SpanData    map[string]string   `json:"span_data"`
-	Env         map[string]string   `json:"env"`
-	Diagnostics otelcli.Diagnostics `json:"diagnostics"`
+	Config      otelcli.Config       `json:"config"`
+	SpanData    map[string]string    `json:"span_data"`
+	Env         map[string]string    `json:"env"`
+	Diagnostics otelcli.Diagnostics  `json:"diagnostics"`
+	Errors      otlpclient.ErrorList `json:"errors"`
 	// these are specific to tests...
 	ServerMeta    map[string]string
 	Headers       map[string]string // headers sent by the client
@@ -349,9 +351,21 @@ var suites = []FixtureSuite{
 					ParsedTimeoutMs:   1000,
 					Endpoint:          "*",
 					EndpointSource:    "*",
-					Error:             `Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`,
 				},
 				SpanCount: 0,
+			},
+			CheckFuncs: []CheckFunc{
+				func(t *testing.T, f Fixture, r Results) {
+					want := injectVars(`Post "https://{{endpoint}}/v1/traces": http: server gave HTTP response to HTTPS client`, f.Endpoint, f.TlsData)
+					if len(r.Errors) >= 1 {
+						if r.Errors[0].Error != want {
+							t.Errorf("Got the wrong error: %q", r.Errors[0].Error)
+						}
+					} else {
+						t.Errorf("Expected at least one error but got %d.", len(r.Errors))
+					}
+
+				},
 			},
 		},
 	},

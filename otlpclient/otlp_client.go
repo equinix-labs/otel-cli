@@ -25,7 +25,7 @@ type OTLPClient interface {
 	Stop(context.Context) (context.Context, error)
 }
 
-// TODO: rename to Config once the otelcli Config moves out
+// OTLPConfig interface defines all of the methods required to configure OTLP clients.
 type OTLPConfig interface {
 	GetTlsConfig() *tls.Config
 	GetIsRecording() bool
