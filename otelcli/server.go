@@ -31,7 +31,7 @@ func runServer(config otlpclient.Config, cb otlpserver.Callback, stop otlpserver
 	if config.Endpoint == "" {
 		config.Endpoint = defaultOtlpEndpoint
 	}
-	endpointURL, _ := otlpclient.ParseEndpoint(config)
+	endpointURL, _ := config.ParseEndpoint()
 
 	var cs otlpserver.OtlpServer
 	if config.Protocol != "grpc" &&

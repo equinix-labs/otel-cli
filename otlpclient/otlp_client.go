@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"path"
 	"strings"
 	"time"
 
@@ -34,6 +33,7 @@ type OTLPClient interface {
 type OTLPConfig interface {
 	TlsConfig() *tls.Config
 	IsRecording() bool
+	GetEndpoint() *url.URL
 	GetVersion() string
 	GetServiceName() string
 }
@@ -51,7 +51,7 @@ func StartClient(ctx context.Context, config Config) (context.Context, OTLPClien
 		config.SoftFail(err.Error())
 	}
 
-	endpointURL, _ := ParseEndpoint(config)
+	endpointURL := config.GetEndpoint()
 
 	var client OTLPClient
 	if config.Protocol != "grpc" &&
@@ -108,60 +108,6 @@ func SendSpan(ctx context.Context, client OTLPClient, config OTLPConfig, span *t
 	}
 
 	return ctx, nil
-}
-
-// ParseEndpoint takes the endpoint or signal endpoint, augments as needed
-// (e.g. bare host:port for gRPC) and then parses as a URL.
-// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md#endpoint-urls-for-otlphttp
-func ParseEndpoint(config Config) (*url.URL, string) {
-	var endpoint, source string
-	var epUrl *url.URL
-	var err error
-
-	// signal-specific configs get precedence over general endpoint per OTel spec
-	if config.TracesEndpoint != "" {
-		endpoint = config.TracesEndpoint
-		source = "signal"
-	} else if config.Endpoint != "" {
-		endpoint = config.Endpoint
-		source = "general"
-	} else {
-		config.SoftFail("no endpoint configuration available")
-	}
-
-	parts := strings.Split(endpoint, ":")
-	// bare hostname? can only be grpc, prepend
-	if len(parts) == 1 {
-		epUrl, err = url.Parse("grpc://" + endpoint + ":4317")
-		if err != nil {
-			config.SoftFail("error parsing (assumed) gRPC bare host address '%s': %s", endpoint, err)
-		}
-	} else if len(parts) > 1 { // could be URI or host:port
-		// actual URIs
-		// grpc:// is only an otel-cli thing, maybe should drop it?
-		if parts[0] == "grpc" || parts[0] == "http" || parts[0] == "https" {
-			epUrl, err = url.Parse(endpoint)
-			if err != nil {
-				config.SoftFail("error parsing provided %s URI '%s': %s", source, endpoint, err)
-			}
-		} else {
-			// gRPC host:port
-			epUrl, err = url.Parse("grpc://" + endpoint)
-			if err != nil {
-				config.SoftFail("error parsing (assumed) gRPC host:port address '%s': %s", endpoint, err)
-			}
-		}
-	}
-
-	// Per spec, /v1/traces is the default, appended to any url passed
-	// to the general endpoint
-	if strings.HasPrefix(epUrl.Scheme, "http") && source != "signal" && !strings.HasSuffix(epUrl.Path, "/v1/traces") {
-		epUrl.Path = path.Join(epUrl.Path, "/v1/traces")
-	}
-
-	Diag.EndpointSource = source
-	Diag.Endpoint = epUrl.String()
-	return epUrl, source
 }
 
 // deadlineCtx sets timeout on the context if the duration is non-zero.

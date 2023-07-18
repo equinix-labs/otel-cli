@@ -37,7 +37,7 @@ func (hc *HttpClient) Start(ctx context.Context) (context.Context, error) {
 	tlsConf := hc.config.TlsConfig()
 	hc.timeout = hc.config.ParseCliTimeout()
 
-	endpointURL, _ := ParseEndpoint(hc.config)
+	endpointURL := hc.config.GetEndpoint()
 	isLoopback, err := isLoopbackAddr(endpointURL)
 	hc.config.SoftFailIfErr(err)
 	if hc.config.Insecure || (isLoopback && !strings.HasPrefix(hc.config.Endpoint, "https")) {
@@ -66,7 +66,7 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 	}
 	body := bytes.NewBuffer(protoMsg)
 
-	endpointURL, _ := ParseEndpoint(hc.config)
+	endpointURL := hc.config.GetEndpoint()
 	req, err := http.NewRequest("POST", endpointURL.String(), body)
 	if err != nil {
 		return ctx, fmt.Errorf("failed to create HTTP POST request: %w", err)

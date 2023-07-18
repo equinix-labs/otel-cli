@@ -32,7 +32,7 @@ func NewGrpcClient(config Config) *GrpcClient {
 // Start configures and starts the connection to the gRPC server in the background.
 func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 	var err error
-	endpointURL, _ := ParseEndpoint(gc.config)
+	endpointURL := gc.config.GetEndpoint()
 	host := endpointURL.Hostname()
 	if endpointURL.Port() != "" {
 		host = host + ":" + endpointURL.Port()

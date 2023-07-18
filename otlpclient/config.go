@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"path"
 	"reflect"
 	"regexp"
 	"sort"
@@ -280,6 +282,60 @@ func parseDuration(d string) (time.Duration, error) {
 	return out, nil
 }
 
+// ParseEndpoint takes the endpoint or signal endpoint, augments as needed
+// (e.g. bare host:port for gRPC) and then parses as a URL.
+// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md#endpoint-urls-for-otlphttp
+func (config Config) ParseEndpoint() (*url.URL, string) {
+	var endpoint, source string
+	var epUrl *url.URL
+	var err error
+
+	// signal-specific configs get precedence over general endpoint per OTel spec
+	if config.TracesEndpoint != "" {
+		endpoint = config.TracesEndpoint
+		source = "signal"
+	} else if config.Endpoint != "" {
+		endpoint = config.Endpoint
+		source = "general"
+	} else {
+		config.SoftFail("no endpoint configuration available")
+	}
+
+	parts := strings.Split(endpoint, ":")
+	// bare hostname? can only be grpc, prepend
+	if len(parts) == 1 {
+		epUrl, err = url.Parse("grpc://" + endpoint + ":4317")
+		if err != nil {
+			config.SoftFail("error parsing (assumed) gRPC bare host address '%s': %s", endpoint, err)
+		}
+	} else if len(parts) > 1 { // could be URI or host:port
+		// actual URIs
+		// grpc:// is only an otel-cli thing, maybe should drop it?
+		if parts[0] == "grpc" || parts[0] == "http" || parts[0] == "https" {
+			epUrl, err = url.Parse(endpoint)
+			if err != nil {
+				config.SoftFail("error parsing provided %s URI '%s': %s", source, endpoint, err)
+			}
+		} else {
+			// gRPC host:port
+			epUrl, err = url.Parse("grpc://" + endpoint)
+			if err != nil {
+				config.SoftFail("error parsing (assumed) gRPC host:port address '%s': %s", endpoint, err)
+			}
+		}
+	}
+
+	// Per spec, /v1/traces is the default, appended to any url passed
+	// to the general endpoint
+	if strings.HasPrefix(epUrl.Scheme, "http") && source != "signal" && !strings.HasSuffix(epUrl.Path, "/v1/traces") {
+		epUrl.Path = path.Join(epUrl.Path, "/v1/traces")
+	}
+
+	Diag.EndpointSource = source
+	Diag.Endpoint = epUrl.String()
+	return epUrl, source
+}
+
 // SoftLog only calls through to log if otel-cli was run with the --verbose flag.
 // TODO: does it make any sense to support %w? probably yes, can clean up some
 // diagnostics.Error touch points.
@@ -449,6 +505,11 @@ func (c Config) parseTime(ts, which string) (time.Time, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("could not parse span %s time %q as any supported format", which, ts)
+}
+
+func (c Config) GetEndpoint() *url.URL {
+	ep, _ := c.ParseEndpoint()
+	return ep
 }
 
 // WithEndpoint returns the config with Endpoint set to the provided value.
