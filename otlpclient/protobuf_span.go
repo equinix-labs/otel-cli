@@ -9,8 +9,7 @@ package otlpclient
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
-	"io"
+	"sort"
 	"strconv"
 	"time"
 
@@ -22,15 +21,12 @@ import (
 type SpanConfig interface {
 }
 
-var emptyTraceId = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-var emptySpanId = []byte{0, 0, 0, 0, 0, 0, 0, 0}
-
 // NewProtobufSpan returns an initialized OpenTelemetry protobuf Span.
 func NewProtobufSpan() *tracepb.Span {
 	now := time.Now()
 	span := tracepb.Span{
-		TraceId:                emptyTraceId,
-		SpanId:                 emptySpanId,
+		TraceId:                GetEmptyTraceId(),
+		SpanId:                 GetEmptySpanId(),
 		TraceState:             "",
 		ParentSpanId:           []byte{},
 		Name:                   "BUG IN OTEL-CLI: unset",
@@ -74,8 +70,18 @@ func SetSpanStatus(span *tracepb.Span, status string, message string) {
 	}
 }
 
-// generateTraceId generates a random 16 byte trace id
-func generateTraceId() []byte {
+// GetEmptyTraceId returns a 16-byte trace id that's all zeroes.
+func GetEmptyTraceId() []byte {
+	return []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+}
+
+// GetEmptySpanId returns an 8-byte span id that's all zeroes.
+func GetEmptySpanId() []byte {
+	return []byte{0, 0, 0, 0, 0, 0, 0, 0}
+}
+
+// GenerateTraceId generates a random 16 byte trace id
+func GenerateTraceId() []byte {
 	buf := make([]byte, 16)
 	_, err := rand.Read(buf)
 	if err != nil {
@@ -85,8 +91,8 @@ func generateTraceId() []byte {
 	return buf
 }
 
-// generateSpanId generates a random 8 byte span id
-func generateSpanId() []byte {
+// GenerateSpanId generates a random 8 byte span id
+func GenerateSpanId() []byte {
 	buf := make([]byte, 8)
 	_, err := rand.Read(buf)
 	if err != nil {
@@ -94,19 +100,6 @@ func generateSpanId() []byte {
 		panic("failed to generate random data for span id: " + err.Error())
 	}
 	return buf
-}
-
-// parseHex parses hex into a []byte of length provided. Errors if the input is
-// not valid hex or the converted hex is not the right number of bytes.
-func parseHex(in string, expectedLen int) ([]byte, error) {
-	out, err := hex.DecodeString(in)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing hex string %q: %w", in, err)
-	}
-	if len(out) != expectedLen {
-		return nil, fmt.Errorf("hex string %q is the wrong length, expected %d bytes but got %d", in, expectedLen, len(out))
-	}
-	return out, nil
 }
 
 // SpanKindIntToString takes an integer/constant protobuf span kind value
@@ -254,74 +247,40 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]
 }
 
 // TraceparentFromProtobufSpan builds a Traceparent struct from the provided span.
-func TraceparentFromProtobufSpan(c Config, span *tracepb.Span) traceparent.Traceparent {
+func TraceparentFromProtobufSpan(span *tracepb.Span, recording bool) traceparent.Traceparent {
 	return traceparent.Traceparent{
 		Version:     0,
 		TraceId:     span.TraceId,
 		SpanId:      span.SpanId,
-		Sampling:    c.GetIsRecording(),
+		Sampling:    recording,
 		Initialized: true,
 	}
 }
 
-// PropagateTraceparent saves the traceparent to file if necessary, then prints
-// span info to the console according to command-line args.
-func PropagateTraceparent(c Config, span *tracepb.Span, target io.Writer) {
-	var tp traceparent.Traceparent
-	if c.GetIsRecording() {
-		tp = TraceparentFromProtobufSpan(c, span)
-	} else {
-		// when in non-recording mode, and there is a TP available, propagate that
-		tp = LoadTraceparent(c, span)
+// flattenStringMap takes a string map and returns it flattened into a string with
+// keys sorted lexically so it should be mostly consistent enough for comparisons
+// and printing. Output is k=v,k=v style like attributes input.
+func flattenStringMap(mp map[string]string, emptyValue string) string {
+	if len(mp) == 0 {
+		return emptyValue
 	}
 
-	if c.TraceparentCarrierFile != "" {
-		err := tp.SaveToFile(c.TraceparentCarrierFile, c.TraceparentPrintExport)
-		c.SoftFailIfErr(err)
+	var out string
+	keys := make([]string, len(mp)) // for sorting
+	var i int
+	for k := range mp {
+		keys[i] = k
+		i++
 	}
+	sort.Strings(keys)
 
-	if c.TraceparentPrint {
-		tp.Fprint(target, c.TraceparentPrintExport)
-	}
-}
-
-// LoadTraceparent follows otel-cli's loading rules, start with envvar then file.
-// If both are set, the file will override env.
-// When in non-recording mode, the previous traceparent will be returned if it's
-// available, otherwise, a zero-valued traceparent is returned.
-func LoadTraceparent(c Config, span *tracepb.Span) traceparent.Traceparent {
-	tp := traceparent.Traceparent{
-		Version:     0,
-		TraceId:     emptyTraceId,
-		SpanId:      emptySpanId,
-		Sampling:    false,
-		Initialized: true,
-	}
-
-	if !c.TraceparentIgnoreEnv {
-		var err error
-		tp, err = traceparent.LoadFromEnv()
-		if err != nil {
-			Diag.Error = err.Error()
+	for i, k := range keys {
+		out = out + k + "=" + mp[k]
+		if i == len(keys)-1 {
+			break
 		}
+		out = out + ","
 	}
 
-	if c.TraceparentCarrierFile != "" {
-		fileTp, err := traceparent.LoadFromFile(c.TraceparentCarrierFile)
-		if err != nil {
-			Diag.Error = err.Error()
-		} else if fileTp.Initialized {
-			tp = fileTp
-		}
-	}
-
-	if c.TraceparentRequired {
-		if tp.Initialized {
-			return tp
-		} else {
-			c.SoftFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", c.TraceparentCarrierFile)
-		}
-	}
-
-	return tp
+	return out
 }

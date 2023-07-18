@@ -11,7 +11,7 @@ import (
 type NullClient struct{}
 
 // NewNullClient returns a fresh NullClient ready to Start.
-func NewNullClient(config Config) *NullClient {
+func NewNullClient(config OTLPConfig) *NullClient {
 	return &NullClient{}
 }
 

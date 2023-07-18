@@ -22,7 +22,7 @@ type BgSpan struct {
 	SpanID      string `json:"span_id"`
 	Traceparent string `json:"traceparent"`
 	Error       string `json:"error"`
-	config      otlpclient.Config
+	config      Config
 	span        *tracepb.Span
 	shutdown    func()
 }
@@ -44,7 +44,7 @@ type BgEnd struct {
 func (bs BgSpan) AddEvent(bse *BgSpanEvent, reply *BgSpan) error {
 	reply.TraceID = hex.EncodeToString(bs.span.TraceId)
 	reply.SpanID = hex.EncodeToString(bs.span.SpanId)
-	reply.Traceparent = otlpclient.TraceparentFromProtobufSpan(bs.config, bs.span).Encode()
+	reply.Traceparent = otlpclient.TraceparentFromProtobufSpan(bs.span, bs.config.GetIsRecording()).Encode()
 
 	ts, err := time.Parse(time.RFC3339Nano, bse.Timestamp)
 	if err != nil {
@@ -86,7 +86,7 @@ type bgServer struct {
 	listener net.Listener
 	quit     chan struct{}
 	wg       sync.WaitGroup
-	config   otlpclient.Config
+	config   Config
 }
 
 // createBgServer opens a new span background server on a unix socket and
@@ -160,7 +160,7 @@ func (bgs *bgServer) Shutdown() {
 // createBgClient sets up a client connection to the unix socket jsonrpc server
 // and returns the rpc client handle and a shutdown function that should be
 // deferred.
-func createBgClient(config otlpclient.Config) (*rpc.Client, func()) {
+func createBgClient(config Config) (*rpc.Client, func()) {
 	sockfile := path.Join(config.BackgroundSockdir, spanBgSockfilename)
 	started := time.Now()
 	timeout := config.ParseCliTimeout()

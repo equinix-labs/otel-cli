@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
+	"github.com/equinix-labs/otel-cli/otelcli"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -55,10 +55,10 @@ type FixtureConfig struct {
 // mostly mirrors otelcli.StatusOutput but we need more
 type Results struct {
 	// same as otelcli.StatusOutput but copied because embedding doesn't work for this
-	Config      otlpclient.Config      `json:"config"`
-	SpanData    map[string]string      `json:"span_data"`
-	Env         map[string]string      `json:"env"`
-	Diagnostics otlpclient.Diagnostics `json:"diagnostics"`
+	Config      otelcli.Config      `json:"config"`
+	SpanData    map[string]string   `json:"span_data"`
+	Env         map[string]string   `json:"env"`
+	Diagnostics otelcli.Diagnostics `json:"diagnostics"`
 	// these are specific to tests...
 	ServerMeta    map[string]string
 	Headers       map[string]string // headers sent by the client
@@ -95,8 +95,8 @@ var suites = []FixtureSuite{
 				CliArgs: []string{"status"},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
-				Diagnostics: otlpclient.Diagnostics{
+				Config: otelcli.DefaultConfig(),
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:     false,
 					NumArgs:         1,
 					ParsedTimeoutMs: 1000,
@@ -115,13 +115,13 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("{{endpoint}}").
 					WithInsecure(false),
 				ServerMeta: map[string]string{
 					"proto": "grpc",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
@@ -140,7 +140,7 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("http://{{endpoint}}").
 					WithInsecure(false),
 				ServerMeta: map[string]string{
@@ -150,7 +150,7 @@ var suites = []FixtureSuite{
 					"proto":        "HTTP/1.1",
 					"uri":          "/v1/traces",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
@@ -179,12 +179,12 @@ var suites = []FixtureSuite{
 				ServerTLSEnabled: true,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}").
 					WithProtocol("grpc").
 					WithVerbose(true).
 					WithTlsNoVerify(true),
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:        true,
 					NumArgs:            8,
 					DetectedLocalhost:  true,
@@ -206,10 +206,10 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				// otel-cli should NOT set insecure when it auto-detects localhost
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithTlsNoVerify(true).
 					WithEndpoint("https://{{endpoint}}"),
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           4,
 					DetectedLocalhost: true,
@@ -238,14 +238,14 @@ var suites = []FixtureSuite{
 				ServerTLSAuthEnabled: true,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}").
 					WithProtocol("grpc").
 					WithTlsCACert("{{tls_ca_cert}}").
 					WithTlsClientKey("{{tls_client_key}}").
 					WithTlsClientCert("{{tls_client_cert}}").
 					WithVerbose(true),
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:        true,
 					NumArgs:            13,
 					DetectedLocalhost:  true,
@@ -274,13 +274,13 @@ var suites = []FixtureSuite{
 				ServerTLSAuthEnabled: true,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}").
 					WithTlsCACert("{{tls_ca_cert}}").
 					WithTlsClientKey("{{tls_client_key}}").
 					WithTlsClientCert("{{tls_client_cert}}").
 					WithVerbose(true),
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           11,
 					DetectedLocalhost: true,
@@ -308,7 +308,7 @@ var suites = []FixtureSuite{
 				StopServerBeforeExec: true, // there will be no server listening
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				// we want and expect a timeout and failure
 				TimedOut:      true,
 				CommandFailed: true,
@@ -324,7 +324,7 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config:        otlpclient.DefaultConfig(),
+				Config:        otelcli.DefaultConfig(),
 				CommandFailed: true,
 				// strips the date off the log line before comparing to expectation
 				CliOutputRe: regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
@@ -340,9 +340,9 @@ var suites = []FixtureSuite{
 				TestTimeoutMs:  1000,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("https://{{endpoint}}"),
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
@@ -370,7 +370,7 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				SpanCount: 1,
-				Config:    otlpclient.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
+				Config:    otelcli.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
 			},
 			CheckFuncs: []CheckFunc{
 				func(t *testing.T, f Fixture, r Results) {
@@ -395,14 +395,14 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				SpanCount: 1,
-				Config:    otlpclient.DefaultConfig().WithEndpoint("{{endpoint}}").WithTlsCACert("{{tls_ca_cert}}"),
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}").WithTlsCACert("{{tls_ca_cert}}"),
 				Env: map[string]string{
 					"OTEL_FAKE_VARIABLE":             "fake value",
 					"OTEL_EXPORTER_OTLP_ENDPOINT":    "{{endpoint}}",
 					"OTEL_EXPORTER_OTLP_CERTIFICATE": "{{tls_ca_cert}}",
 					"X_WHATEVER":                     "whatever",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					DetectedLocalhost: true,
 					NumArgs:           1,
@@ -420,8 +420,8 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				SpanCount: 1,
-				Config:    otlpclient.DefaultConfig().WithEndpoint("http://{{endpoint}}/mycollector"),
-				Diagnostics: otlpclient.Diagnostics{
+				Config:    otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}/mycollector"),
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					DetectedLocalhost: true,
 					NumArgs:           3,
@@ -440,8 +440,8 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				SpanCount: 1,
-				Config:    otlpclient.DefaultConfig().WithTracesEndpoint("http://{{endpoint}}/mycollector/x/1"),
-				Diagnostics: otlpclient.Diagnostics{
+				Config:    otelcli.DefaultConfig().WithTracesEndpoint("http://{{endpoint}}/mycollector/x/1"),
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					DetectedLocalhost: true,
 					NumArgs:           3,
@@ -459,7 +459,7 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "--service", "main_test.go", "--name", "test-span-123", "--kind", "server"},
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
 	// config file
@@ -476,7 +476,7 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				SpanCount: 1,
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					ParsedTimeoutMs:   1000,
@@ -488,7 +488,7 @@ var suites = []FixtureSuite{
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}",
 				},
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("{{endpoint}}"). // tells the test framework to ignore/overwrite
 					WithTimeout("1s").
 					WithHeaders(map[string]string{"header1": "header1-value"}).
@@ -534,7 +534,7 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				Config:    otlpclient.DefaultConfig(),
+				Config:    otelcli.DefaultConfig(),
 				SpanCount: 1,
 			},
 		},
@@ -553,7 +553,7 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
 					"span_id":            "*",
 					"trace_id":           "*",
@@ -575,7 +575,7 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
 					"service_attributes": "service.name=test-service-123abc",
 				},
@@ -592,7 +592,7 @@ var suites = []FixtureSuite{
 				Env:     map[string]string{"TRACEPARENT": "00-f6c109f48195b451c4def6ab32f47b61-a5d2a35f2483004e-01"},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				CliOutput: "" + // empty so the text below can indent and line up
 					"# trace id: f6c109f48195b451c4def6ab32f47b61\n" +
 					"#  span id: a5d2a35f2483004e\n" +
@@ -611,7 +611,7 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				CliOutput: "" +
 					"# trace id: f6c109f48195b451c4def6ab32f47b61\n" +
 					"#  span id: a5d2a35f2483004e\n" +
@@ -630,21 +630,21 @@ var suites = []FixtureSuite{
 				Background:    true,  // sorta like & in shell
 				Foreground:    false, // must be true later, like `fg` in shell
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span event",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "event", "--name", "an event happened", "--attrs", "ima=now,mondai=problem", "--sockdir", "."},
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span end",
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "end", "--sockdir", "."},
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			// Name on foreground *must* match the backgrounded job
@@ -653,7 +653,7 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				Foreground: true, // bring it back (fg) and finish up
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
 	// otel-cli span background, in recording mode
@@ -668,7 +668,7 @@ var suites = []FixtureSuite{
 				Foreground:    false,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
 					"span_id":    "*",
 					"trace_id":   "*",
@@ -694,7 +694,7 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{"span", "event", "--name", "an event happened", "--attrs", "ima=now,mondai=problem", "--sockdir", "."},
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span end",
@@ -707,14 +707,14 @@ var suites = []FixtureSuite{
 					"--status-description", "I can't do that Dave.",
 				},
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 		{
 			Name: "otel-cli span background (recording)",
 			Config: FixtureConfig{
 				Foreground: true, // fg
 			},
-			Expect: Results{Config: otlpclient.DefaultConfig()},
+			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
 	// otel-cli exec runs echo
@@ -730,7 +730,7 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig(),
+				Config: otelcli.DefaultConfig(),
 				SpanData: map[string]string{
 					"span_id":  "*",
 					"trace_id": "edededededededededededededed9000",
@@ -750,7 +750,7 @@ var suites = []FixtureSuite{
 					"./otel-cli", "exec", "--name", "inner", "--endpoint", "{{endpoint}}", "--tp-required", "--fail", "--verbose", "echo", "hello world"},
 			},
 			Expect: Results{
-				Config:    otlpclient.DefaultConfig(),
+				Config:    otelcli.DefaultConfig(),
 				CliOutput: "hello world\n",
 				SpanCount: 2,
 			},
@@ -767,11 +767,11 @@ var suites = []FixtureSuite{
 				TestTimeoutMs:  1000,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().WithEndpoint("{{endpoint}}").WithProtocol("grpc"),
+				Config: otelcli.DefaultConfig().WithEndpoint("{{endpoint}}").WithProtocol("grpc"),
 				ServerMeta: map[string]string{
 					"proto": "grpc",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           5,
 					DetectedLocalhost: true,
@@ -790,7 +790,7 @@ var suites = []FixtureSuite{
 				TestTimeoutMs:  1000,
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
+				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
 				ServerMeta: map[string]string{
 					"content-type": "application/x-protobuf",
 					"host":         "{{endpoint}}",
@@ -798,7 +798,7 @@ var suites = []FixtureSuite{
 					"proto":        "HTTP/1.1",
 					"uri":          "/v1/traces",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           5,
 					DetectedLocalhost: true,
@@ -819,8 +819,8 @@ var suites = []FixtureSuite{
 				CommandFailed: true,
 				CliOutputRe:   regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
 				CliOutput:     "invalid protocol setting \"xxx\"\n",
-				Config:        otlpclient.DefaultConfig().WithEndpoint("{{endpoint}}"),
-				Diagnostics: otlpclient.Diagnostics{
+				Config:        otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       false,
 					NumArgs:           7,
 					DetectedLocalhost: true,
@@ -844,14 +844,14 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("grpc"),
+				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("grpc"),
 				ServerMeta: map[string]string{
 					"proto": "grpc",
 				},
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
@@ -873,7 +873,7 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
+				Config: otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}").WithProtocol("http/protobuf"),
 				ServerMeta: map[string]string{
 					"content-type": "application/x-protobuf",
 					"host":         "{{endpoint}}",
@@ -884,7 +884,7 @@ var suites = []FixtureSuite{
 				Env: map[string]string{
 					"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					NumArgs:           3,
 					DetectedLocalhost: true,
@@ -908,8 +908,8 @@ var suites = []FixtureSuite{
 				CommandFailed: true,
 				CliOutputRe:   regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
 				CliOutput:     "invalid protocol setting \"roflcopter\"\n",
-				Config:        otlpclient.DefaultConfig().WithEndpoint("http://{{endpoint}}"),
-				Diagnostics: otlpclient.Diagnostics{
+				Config:        otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}"),
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       false,
 					NumArgs:           3,
 					DetectedLocalhost: true,
@@ -937,14 +937,14 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config: otlpclient.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				Config: otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
 				SpanData: map[string]string{
 					"trace_id":       "00112233445566778899aabbccddeeff",
 					"span_id":        "beefcafefacedead",
 					"parent_span_id": "e4e3eeb33fc4f3d3",
 				},
 				SpanCount: 1,
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					NumArgs:           10,
 					IsRecording:       true,
 					DetectedLocalhost: true,
@@ -970,7 +970,7 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				SpanCount: 1,
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("{{endpoint}}").
 					WithProtocol("grpc").
 					WithHeaders(map[string]string{
@@ -982,7 +982,7 @@ var suites = []FixtureSuite{
 					"user-agent":                  "*",
 					"x-otel-cli-otlpserver-token": "abcdefgabcdefg\n",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					DetectedLocalhost: true,
 					NumArgs:           7,
@@ -1005,7 +1005,7 @@ var suites = []FixtureSuite{
 			},
 			Expect: Results{
 				SpanCount: 1,
-				Config: otlpclient.DefaultConfig().
+				Config: otelcli.DefaultConfig().
 					WithEndpoint("http://{{endpoint}}").
 					WithProtocol("http/protobuf").
 					WithHeaders(map[string]string{
@@ -1018,7 +1018,7 @@ var suites = []FixtureSuite{
 					"Content-Length":              "232",
 					"X-Otel-Cli-Otlpserver-Token": "abcdefgabcdefg",
 				},
-				Diagnostics: otlpclient.Diagnostics{
+				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       true,
 					DetectedLocalhost: true,
 					NumArgs:           7,

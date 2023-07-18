@@ -1,4 +1,4 @@
-package otlpclient
+package otelcli
 
 import (
 	"testing"

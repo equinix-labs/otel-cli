@@ -10,14 +10,14 @@ import (
 
 // StartClient uses the Config to setup and start either a gRPC or HTTP client,
 // and returns the OTLPClient interface to them.
-func StartClient(ctx context.Context, config otlpclient.Config) (context.Context, otlpclient.OTLPClient) {
+func StartClient(ctx context.Context, config Config) (context.Context, otlpclient.OTLPClient) {
 	if !config.GetIsRecording() {
 		return ctx, otlpclient.NewNullClient(config)
 	}
 
 	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
 		err := fmt.Errorf("invalid protocol setting %q", config.Protocol)
-		otlpclient.Diag.Error = err.Error()
+		Diag.Error = err.Error()
 		config.SoftFail(err.Error())
 	}
 
@@ -35,7 +35,7 @@ func StartClient(ctx context.Context, config otlpclient.Config) (context.Context
 
 	ctx, err := client.Start(ctx)
 	if err != nil {
-		otlpclient.Diag.Error = err.Error()
+		Diag.Error = err.Error()
 		config.SoftFail("Failed to start OTLP client: %s", err)
 	}
 

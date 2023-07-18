@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -24,7 +23,7 @@ var jsonSvr struct {
 	spansSeen int
 }
 
-func serverJsonCmd(config *otlpclient.Config) *cobra.Command {
+func serverJsonCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "json",
 		Short: "write spans to json or stdout",

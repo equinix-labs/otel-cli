@@ -173,7 +173,7 @@ func SaveError(ctx context.Context, t time.Time, err error) (context.Context, er
 		return ctx, nil
 	}
 
-	Diag.SetError(err) // legacy, will go away when Diag is removed
+	//otelcli.Diag.SetError(err) // legacy, will go away when Diag is removed
 
 	te := TimestampedError{
 		Timestamp: t,
@@ -241,7 +241,7 @@ func retry(ctx context.Context, config OTLPConfig, fun retryFun) (context.Contex
 		// It's retries instead of "tries" because "tries" means other things
 		// too. Also, retries can default to 0 and it makes sense, saving
 		// copying in test data.
-		Diag.Retries++
+		//otelcli.Diag.Retries++
 	}
 }
 

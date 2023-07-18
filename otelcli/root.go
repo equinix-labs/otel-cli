@@ -7,11 +7,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
 )
 
-// cliContextKey is a type for storing an otlpclient.Config in context.
+// cliContextKey is a type for storing an Config in context.
 type cliContextKey string
 
 // configContextKey returns the typed key for storing/retrieving config in context.
@@ -21,9 +20,9 @@ func configContextKey() cliContextKey {
 
 // getConfigRef retrieves the otelcli.Config from the context and returns a
 // pointer to it.
-func getConfigRef(ctx context.Context) *otlpclient.Config {
+func getConfigRef(ctx context.Context) *Config {
 	if cv := ctx.Value(configContextKey()); cv != nil {
-		if c, ok := cv.(*otlpclient.Config); ok {
+		if c, ok := cv.(*Config); ok {
 			return c
 		} else {
 			panic("BUG: failed to unwrap config that was in context, please report an issue")
@@ -34,14 +33,14 @@ func getConfigRef(ctx context.Context) *otlpclient.Config {
 }
 
 // getConfig retrieves the otelcli.Config from context and returns a copy.
-func getConfig(ctx context.Context) otlpclient.Config {
+func getConfig(ctx context.Context) Config {
 	config := getConfigRef(ctx)
 	return *config
 }
 
 // createRootCmd builds up the Cobra command-line, calling through to subcommand
 // builder funcs to build the whole tree.
-func createRootCmd(config *otlpclient.Config) *cobra.Command {
+func createRootCmd(config *Config) *cobra.Command {
 	// rootCmd represents the base command when called without any subcommands
 	var rootCmd = &cobra.Command{
 		Use:   "otel-cli",
@@ -62,10 +61,10 @@ func createRootCmd(config *otlpclient.Config) *cobra.Command {
 	cobra.EnableCommandSorting = false
 	rootCmd.Flags().SortFlags = false
 
-	otlpclient.Diag.NumArgs = len(os.Args) - 1
-	otlpclient.Diag.CliArgs = []string{}
+	Diag.NumArgs = len(os.Args) - 1
+	Diag.CliArgs = []string{}
 	if len(os.Args) > 1 {
-		otlpclient.Diag.CliArgs = os.Args[1:]
+		Diag.CliArgs = os.Args[1:]
 	}
 
 	// add all the subcommands to rootCmd
@@ -81,7 +80,7 @@ func createRootCmd(config *otlpclient.Config) *cobra.Command {
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once.
 func Execute(version string) {
-	config := otlpclient.DefaultConfig()
+	config := DefaultConfig()
 	config.StartupTime = time.Now() // record startup time as early as possible timeouts
 	config.Version = version
 
@@ -93,8 +92,8 @@ func Execute(version string) {
 }
 
 // addCommonParams adds the --config and --endpoint params to the command.
-func addCommonParams(cmd *cobra.Command, config *otlpclient.Config) {
-	defaults := otlpclient.DefaultConfig()
+func addCommonParams(cmd *cobra.Command, config *Config) {
+	defaults := DefaultConfig()
 
 	// --config / -c a JSON configuration file
 	cmd.Flags().StringVarP(&config.CfgFile, "config", "c", defaults.CfgFile, "JSON configuration file")
@@ -116,8 +115,8 @@ func addCommonParams(cmd *cobra.Command, config *otlpclient.Config) {
 // envvars are named according to the otel specs, others use the OTEL_CLI prefix
 // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/sdk-environment-variables.md
 // https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md
-func addClientParams(cmd *cobra.Command, config *otlpclient.Config) {
-	defaults := otlpclient.DefaultConfig()
+func addClientParams(cmd *cobra.Command, config *Config) {
+	defaults := DefaultConfig()
 	config.Headers = make(map[string]string)
 
 	// OTEL_EXPORTER standard env and variable params
@@ -143,8 +142,8 @@ func addClientParams(cmd *cobra.Command, config *otlpclient.Config) {
 	cmd.Flags().BoolVarP(&config.TraceparentPrintExport, "tp-export", "p", defaults.TraceparentPrintExport, "same as --tp-print but it puts an 'export ' in front so it's more convinenient to source in scripts")
 }
 
-func addSpanParams(cmd *cobra.Command, config *otlpclient.Config) {
-	defaults := otlpclient.DefaultConfig()
+func addSpanParams(cmd *cobra.Command, config *Config) {
+	defaults := DefaultConfig()
 
 	// --name / -s
 	cmd.Flags().StringVarP(&config.SpanName, "name", "n", defaults.SpanName, "set the name of the span")
@@ -161,8 +160,8 @@ func addSpanParams(cmd *cobra.Command, config *otlpclient.Config) {
 	addSpanStatusParams(cmd, config)
 }
 
-func addSpanStartEndParams(cmd *cobra.Command, config *otlpclient.Config) {
-	defaults := otlpclient.DefaultConfig()
+func addSpanStartEndParams(cmd *cobra.Command, config *Config) {
+	defaults := DefaultConfig()
 
 	// --start $timestamp (RFC3339 or Unix_Epoch.Nanos)
 	cmd.Flags().StringVar(&config.SpanStartTime, "start", defaults.SpanStartTime, "a Unix epoch or RFC3339 timestamp for the start of the span")
@@ -171,8 +170,8 @@ func addSpanStartEndParams(cmd *cobra.Command, config *otlpclient.Config) {
 	cmd.Flags().StringVar(&config.SpanEndTime, "end", defaults.SpanEndTime, "an Unix epoch or RFC3339 timestamp for the end of the span")
 }
 
-func addSpanStatusParams(cmd *cobra.Command, config *otlpclient.Config) {
-	defaults := otlpclient.DefaultConfig()
+func addSpanStatusParams(cmd *cobra.Command, config *Config) {
+	defaults := DefaultConfig()
 
 	// --status-code / -sc
 	cmd.Flags().StringVar(&config.StatusCode, "status-code", defaults.StatusCode, "set the span status code, e.g. unset|ok|error")
@@ -180,8 +179,8 @@ func addSpanStatusParams(cmd *cobra.Command, config *otlpclient.Config) {
 	cmd.Flags().StringVar(&config.StatusDescription, "status-description", defaults.StatusDescription, "set the span status description when a span status code of error is set, e.g. 'cancelled'")
 }
 
-func addAttrParams(cmd *cobra.Command, config *otlpclient.Config) {
-	defaults := otlpclient.DefaultConfig()
+func addAttrParams(cmd *cobra.Command, config *Config) {
+	defaults := DefaultConfig()
 	// --attrs key=value,foo=bar
 	config.Attributes = make(map[string]string)
 	cmd.Flags().StringToStringVarP(&config.Attributes, "attrs", "a", defaults.Attributes, "a comma-separated list of key=value attributes")

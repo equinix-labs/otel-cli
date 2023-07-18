@@ -21,7 +21,7 @@ var tuiServer struct {
 	area   *pterm.AreaPrinter
 }
 
-func serverTuiCmd(config *otlpclient.Config) *cobra.Command {
+func serverTuiCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "tui",
 		Short: "display spans in a terminal UI",

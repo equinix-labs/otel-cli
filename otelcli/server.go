@@ -3,7 +3,6 @@ package otelcli
 import (
 	"strings"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
 )
@@ -11,7 +10,7 @@ import (
 const defaultOtlpEndpoint = "grpc://localhost:4317"
 const spanBgSockfilename = "otel-cli-background.sock"
 
-func serverCmd(config *otlpclient.Config) *cobra.Command {
+func serverCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "server",
 		Short: "run an embedded OTLP server",
@@ -26,7 +25,7 @@ func serverCmd(config *otlpclient.Config) *cobra.Command {
 
 // runServer runs the server on either grpc or http and blocks until the server
 // stops or is killed.
-func runServer(config otlpclient.Config, cb otlpserver.Callback, stop otlpserver.Stopper) {
+func runServer(config Config, cb otlpserver.Callback, stop otlpserver.Stopper) {
 	// unlike the rest of otel-cli, server should default to localhost:4317
 	if config.Endpoint == "" {
 		config.Endpoint = defaultOtlpEndpoint

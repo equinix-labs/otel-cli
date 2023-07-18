@@ -17,15 +17,15 @@ import (
 // StatusOutput captures all the data we want to print out for this subcommand
 // and is also used in ../main_test.go for automated testing.
 type StatusOutput struct {
-	Config      otlpclient.Config      `json:"config"`
-	Spans       []map[string]string    `json:"spans"`
-	SpanData    map[string]string      `json:"span_data"`
-	Env         map[string]string      `json:"env"`
-	Diagnostics otlpclient.Diagnostics `json:"diagnostics"`
-	Errors      otlpclient.ErrorList   `json:"errors"`
+	Config      Config               `json:"config"`
+	Spans       []map[string]string  `json:"spans"`
+	SpanData    map[string]string    `json:"span_data"`
+	Env         map[string]string    `json:"env"`
+	Diagnostics Diagnostics          `json:"diagnostics"`
+	Errors      otlpclient.ErrorList `json:"errors"`
 }
 
-func statusCmd(config *otlpclient.Config) *cobra.Command {
+func statusCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "status",
 		Short: "send at least one canary and dump status",
@@ -42,7 +42,7 @@ Example:
 		Run: doStatus,
 	}
 
-	defaults := otlpclient.DefaultConfig()
+	defaults := DefaultConfig()
 	cmd.Flags().IntVar(&config.StatusCanaryCount, "canary-count", defaults.StatusCanaryCount, "number of canaries to send")
 	cmd.Flags().StringVar(&config.StatusCanaryInterval, "canary-interval", defaults.StatusCanaryInterval, "number of milliseconds to wait between canaries")
 
@@ -146,7 +146,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 		},
 		// Diagnostics is deprecated, being replaced by Errors below and eventually
 		// another stringmap of stuff that was tunneled through context.Context
-		Diagnostics: otlpclient.Diag,
+		Diagnostics: Diag,
 		Errors:      errorList,
 	}
 
