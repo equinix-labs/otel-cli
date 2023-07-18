@@ -122,7 +122,10 @@ func addClientParams(cmd *cobra.Command, config *otlpclient.Config) {
 
 	// OTEL_EXPORTER standard env and variable params
 	cmd.Flags().StringToStringVar(&config.Headers, "otlp-headers", defaults.Headers, "a comma-sparated list of key=value headers to send on OTLP connection")
-	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", defaults.Blocking, "block on connecting to the OTLP server before proceeding")
+
+	// DEPRECATED
+	// TODO: remove before 1.0
+	cmd.Flags().BoolVar(&config.Blocking, "otlp-blocking", defaults.Blocking, "DEPRECATED: does nothing, please file an issue if you need this.")
 
 	cmd.Flags().BoolVar(&config.Insecure, "insecure", defaults.Insecure, "allow connecting to cleartext endpoints")
 	cmd.Flags().StringVar(&config.TlsCACert, "tls-ca-cert", defaults.TlsCACert, "a file containing the certificate authority bundle")

@@ -3,12 +3,16 @@ package otlpclient
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
+	"net"
+	"net/url"
 	"os"
+	"strings"
 )
 
 // TlsConfig evaluates otel-cli configuration and returns a tls.Config
 // that can be used by grpc or https.
-func (config Config) TlsConfig() *tls.Config {
+func (config Config) GetTlsConfig() *tls.Config {
 	tlsConfig := &tls.Config{}
 
 	if config.TlsNoVerify {
@@ -51,4 +55,61 @@ func (config Config) TlsConfig() *tls.Config {
 	}
 
 	return tlsConfig
+}
+
+func (c Config) GetInsecure() bool {
+	endpointURL := c.GetEndpoint()
+
+	isLoopback, err := isLoopbackAddr(endpointURL)
+	c.SoftFailIfErr(err)
+
+	// Go's TLS does the right thing and forces us to say we want to disable encryption,
+	// but I expect most users of this program to point at a localhost endpoint that might not
+	// have any encryption available, or setting it up raises the bar of entry too high.
+	// The compromise is to automatically flip this flag to true when endpoint contains an
+	// an obvious "localhost", "127.0.0.x", or "::1" address.
+	if c.Insecure || (isLoopback && endpointURL.Scheme != "https") {
+		return true
+	} else if endpointURL.Scheme == "http" || endpointURL.Scheme == "unix" {
+		return true
+	}
+
+	return false
+}
+
+// isLoopbackAddr takes a url.URL, looks up the address, then returns true
+// if it points at either a v4 or v6 loopback address.
+// As I understood the OTLP spec, only host:port or an HTTP URL are acceptable.
+// This function is _not_ meant to validate the endpoint, that will happen when
+// otel-go attempts to connect to the endpoint.
+func isLoopbackAddr(u *url.URL) (bool, error) {
+	hostname := u.Hostname()
+
+	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
+		Diag.DetectedLocalhost = true
+		return true, nil
+	}
+
+	ips, err := net.LookupIP(hostname)
+	if err != nil {
+		return false, fmt.Errorf("unable to look up hostname '%s': %s", hostname, err)
+	}
+
+	// all ips returned must be loopback to return true
+	// cases where that isn't true should be super rare, and probably all shenanigans
+	allAreLoopback := true
+	for _, ip := range ips {
+		if !ip.IsLoopback() {
+			allAreLoopback = false
+		}
+	}
+
+	Diag.DetectedLocalhost = allAreLoopback
+	return allAreLoopback, nil
+}
+
+// isInsecureSchema returns true if the provided endpoint is an unencrypted HTTP URL or unix socket
+func isInsecureSchema(endpoint string) bool {
+	return strings.HasPrefix(endpoint, "http://") ||
+		strings.HasPrefix(endpoint, "unix://")
 }

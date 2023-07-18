@@ -84,7 +84,7 @@ func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
 		span.EndTimeUnixNano = uint64(now.UnixNano())
 	}
 
-	if c.IsRecording() {
+	if c.GetIsRecording() {
 		tp := LoadTraceparent(c, span)
 		if tp.Initialized {
 			span.TraceId = tp.TraceId
@@ -130,7 +130,7 @@ func SetSpanStatus(span *tracepb.Span, c Config) {
 
 // generateTraceId generates a random 16 byte trace id
 func generateTraceId(c Config) []byte {
-	if c.IsRecording() {
+	if c.GetIsRecording() {
 		buf := make([]byte, 16)
 		_, err := rand.Read(buf)
 		if err != nil {
@@ -144,7 +144,7 @@ func generateTraceId(c Config) []byte {
 
 // generateSpanId generates a random 8 byte span id
 func generateSpanId(c Config) []byte {
-	if c.IsRecording() {
+	if c.GetIsRecording() {
 		buf := make([]byte, 8)
 		_, err := rand.Read(buf)
 		if err != nil {
@@ -319,7 +319,7 @@ func TraceparentFromProtobufSpan(c Config, span *tracepb.Span) traceparent.Trace
 		Version:     0,
 		TraceId:     span.TraceId,
 		SpanId:      span.SpanId,
-		Sampling:    c.IsRecording(),
+		Sampling:    c.GetIsRecording(),
 		Initialized: true,
 	}
 }
@@ -328,7 +328,7 @@ func TraceparentFromProtobufSpan(c Config, span *tracepb.Span) traceparent.Trace
 // span info to the console according to command-line args.
 func PropagateTraceparent(c Config, span *tracepb.Span, target io.Writer) {
 	var tp traceparent.Traceparent
-	if c.IsRecording() {
+	if c.GetIsRecording() {
 		tp = TraceparentFromProtobufSpan(c, span)
 	} else {
 		// when in non-recording mode, and there is a TP available, propagate that

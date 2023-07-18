@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -20,13 +19,12 @@ import (
 
 // HttpClient holds state information for HTTP/OTLP.
 type HttpClient struct {
-	client  *http.Client
-	config  Config
-	timeout time.Duration
+	client *http.Client
+	config OTLPConfig
 }
 
 // NewHttpClient returns an initialized HttpClient.
-func NewHttpClient(config Config) *HttpClient {
+func NewHttpClient(config OTLPConfig) *HttpClient {
 	c := HttpClient{config: config}
 	return &c
 }
@@ -34,25 +32,17 @@ func NewHttpClient(config Config) *HttpClient {
 // Start sets up the client configuration.
 // TODO: see if there's a way to background start http2 connections?
 func (hc *HttpClient) Start(ctx context.Context) (context.Context, error) {
-	tlsConf := hc.config.TlsConfig()
-	hc.timeout = hc.config.ParseCliTimeout()
-
-	endpointURL := hc.config.GetEndpoint()
-	isLoopback, err := isLoopbackAddr(endpointURL)
-	hc.config.SoftFailIfErr(err)
-	if hc.config.Insecure || (isLoopback && !strings.HasPrefix(hc.config.Endpoint, "https")) {
-		hc.client = &http.Client{Timeout: hc.timeout}
-	} else if !isInsecureSchema(hc.config.Endpoint) {
+	if hc.config.GetInsecure() {
+		hc.client = &http.Client{Timeout: hc.config.GetTimeout()}
+	} else {
 		hc.client = &http.Client{
-			Timeout: hc.timeout,
+			Timeout: hc.config.GetTimeout(),
 			Transport: &http.Transport{
 				DialTLS: func(network, addr string) (net.Conn, error) {
-					return tls.Dial(network, addr, tlsConf)
+					return tls.Dial(network, addr, hc.config.GetTlsConfig())
 				},
 			},
 		}
-	} else {
-		hc.config.SoftFail("BUG in otel-cli: an invalid configuration made it too far. Please report to https://github.com/equinix-labs/otel-cli/issues.")
 	}
 	return ctx, nil
 }
@@ -72,12 +62,12 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 		return ctx, fmt.Errorf("failed to create HTTP POST request: %w", err)
 	}
 
-	for k, v := range hc.config.Headers {
+	for k, v := range hc.config.GetHeaders() {
 		req.Header.Add(k, v)
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 
-	return retry(ctx, hc.config, hc.timeout, func(context.Context) (context.Context, bool, time.Duration, error) {
+	return retry(ctx, hc.config, func(context.Context) (context.Context, bool, time.Duration, error) {
 		var body []byte
 		resp, err := hc.client.Do(req)
 		if uerr, ok := err.(*url.Error); ok {

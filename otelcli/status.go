@@ -60,7 +60,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 
 	ctx := cmd.Context()
 	config := getConfig(ctx)
-	ctx, client := otlpclient.StartClient(ctx, config)
+	ctx, client := StartClient(ctx, config)
 
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
@@ -142,7 +142,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 		SpanData: map[string]string{
 			"trace_id":   hex.EncodeToString(lastSpan.TraceId),
 			"span_id":    hex.EncodeToString(lastSpan.SpanId),
-			"is_sampled": strconv.FormatBool(config.IsRecording()),
+			"is_sampled": strconv.FormatBool(config.GetIsRecording()),
 		},
 		// Diagnostics is deprecated, being replaced by Errors below and eventually
 		// another stringmap of stuff that was tunneled through context.Context

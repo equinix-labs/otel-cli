@@ -64,7 +64,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	started := time.Now()
-	ctx, client := otlpclient.StartClient(ctx, config)
+	ctx, client := StartClient(ctx, config)
 
 	// special case --wait, createBgClient() will wait for the socket to show up
 	// then connect and send a no-op RPC. by this time e.g. --tp-carrier should

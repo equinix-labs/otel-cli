@@ -45,7 +45,7 @@ to sh -c and should not be passed any untrusted input`,
 func doExec(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
-	ctx, client := otlpclient.StartClient(ctx, config)
+	ctx, client := StartClient(ctx, config)
 
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
@@ -82,7 +82,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	span := otlpclient.NewProtobufSpanWithConfig(config)
 
 	// set the traceparent to the current span to be available to the child process
-	if config.IsRecording() {
+	if config.GetIsRecording() {
 		tp := otlpclient.TraceparentFromProtobufSpan(config, span)
 		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
 		// when not recording, and a traceparent is available, pass it through

@@ -28,12 +28,12 @@ func TestConfig_ToStringMap(t *testing.T) {
 
 func TestIsRecording(t *testing.T) {
 	c := DefaultConfig()
-	if c.IsRecording() {
+	if c.GetIsRecording() {
 		t.Fail()
 	}
 	c.Endpoint = "https://localhost:4318"
 
-	if !c.IsRecording() {
+	if !c.GetIsRecording() {
 		t.Fail()
 	}
 }

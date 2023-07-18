@@ -6,9 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"net"
 	"net/url"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -18,8 +16,6 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
-
-const otlpClientVersion = `otel-cli 0.0.4`
 
 // OTLPClient is an interface that allows for StartClient to return either
 // gRPC or HTTP clients.
@@ -31,50 +27,20 @@ type OTLPClient interface {
 
 // TODO: rename to Config once the otelcli Config moves out
 type OTLPConfig interface {
-	TlsConfig() *tls.Config
-	IsRecording() bool
+	GetTlsConfig() *tls.Config
+	GetIsRecording() bool
 	GetEndpoint() *url.URL
+	GetInsecure() bool
+	GetTimeout() time.Duration
+	GetHeaders() map[string]string
+	GetStartupTime() time.Time
 	GetVersion() string
 	GetServiceName() string
 }
 
-// StartClient uses the Config to setup and start either a gRPC or HTTP client,
-// and returns the OTLPClient interface to them.
-func StartClient(ctx context.Context, config Config) (context.Context, OTLPClient) {
-	if !config.IsRecording() {
-		return ctx, NewNullClient(config)
-	}
-
-	if config.Protocol != "" && config.Protocol != "grpc" && config.Protocol != "http/protobuf" {
-		err := fmt.Errorf("invalid protocol setting %q", config.Protocol)
-		Diag.Error = err.Error()
-		config.SoftFail(err.Error())
-	}
-
-	endpointURL := config.GetEndpoint()
-
-	var client OTLPClient
-	if config.Protocol != "grpc" &&
-		(strings.HasPrefix(config.Protocol, "http/") ||
-			endpointURL.Scheme == "http" ||
-			endpointURL.Scheme == "https") {
-		client = NewHttpClient(config)
-	} else {
-		client = NewGrpcClient(config)
-	}
-
-	ctx, err := client.Start(ctx)
-	if err != nil {
-		Diag.Error = err.Error()
-		config.SoftFail("Failed to start OTLP client: %s", err)
-	}
-
-	return ctx, client
-}
-
 // SendSpan connects to the OTLP server, sends the span, and disconnects.
 func SendSpan(ctx context.Context, client OTLPClient, config OTLPConfig, span *tracepb.Span) (context.Context, error) {
-	if !config.IsRecording() {
+	if !config.GetIsRecording() {
 		return ctx, nil
 	}
 
@@ -112,50 +78,13 @@ func SendSpan(ctx context.Context, client OTLPClient, config OTLPConfig, span *t
 
 // deadlineCtx sets timeout on the context if the duration is non-zero.
 // Otherwise it returns the context as-is.
-func deadlineCtx(ctx context.Context, config Config, startupTime time.Time) (context.Context, context.CancelFunc) {
-	if timeout := config.ParseCliTimeout(); timeout > 0 {
+func deadlineCtx(ctx context.Context, timeout time.Duration, startupTime time.Time) (context.Context, context.CancelFunc) {
+	if timeout > 0 {
 		deadline := startupTime.Add(timeout)
 		return context.WithDeadline(ctx, deadline)
 	}
 
 	return ctx, func() {}
-}
-
-// isLoopbackAddr takes a url.URL, looks up the address, then returns true
-// if it points at either a v4 or v6 loopback address.
-// As I understood the OTLP spec, only host:port or an HTTP URL are acceptable.
-// This function is _not_ meant to validate the endpoint, that will happen when
-// otel-go attempts to connect to the endpoint.
-func isLoopbackAddr(u *url.URL) (bool, error) {
-	hostname := u.Hostname()
-
-	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
-		Diag.DetectedLocalhost = true
-		return true, nil
-	}
-
-	ips, err := net.LookupIP(hostname)
-	if err != nil {
-		return false, fmt.Errorf("unable to look up hostname '%s': %s", hostname, err)
-	}
-
-	// all ips returned must be loopback to return true
-	// cases where that isn't true should be super rare, and probably all shenanigans
-	allAreLoopback := true
-	for _, ip := range ips {
-		if !ip.IsLoopback() {
-			allAreLoopback = false
-		}
-	}
-
-	Diag.DetectedLocalhost = allAreLoopback
-	return allAreLoopback, nil
-}
-
-// isInsecureSchema returns true if the provided endpoint is an unencrypted HTTP URL or unix socket
-func isInsecureSchema(endpoint string) bool {
-	return strings.HasPrefix(endpoint, "http://") ||
-		strings.HasPrefix(endpoint, "unix://")
 }
 
 // resourceAttributes calls the OTel SDK to get automatic resource attrs and
@@ -273,15 +202,15 @@ func SaveError(ctx context.Context, t time.Time, err error) (context.Context, er
 // TODO: --otlp-retry-sleep? --otlp-retry-timeout?
 // TODO: span events? hmm... feels weird to plumb spans this deep into the client
 // but it's probably fine?
-func retry(ctx context.Context, config Config, timeout time.Duration, fun retryFun) (context.Context, error) {
-	deadline := config.StartupTime.Add(timeout)
+func retry(ctx context.Context, config OTLPConfig, fun retryFun) (context.Context, error) {
+	deadline := config.GetStartupTime().Add(config.GetTimeout())
 	sleep := time.Duration(0)
 	for {
 		if ctx, keepGoing, wait, err := fun(ctx); err != nil {
 			if err != nil {
 				ctx, _ = SaveError(ctx, time.Now(), err)
 			}
-			config.SoftLog("error on retry %d: %s", Diag.Retries, err)
+			//config.SoftLog("error on retry %d: %s", Diag.Retries, err)
 
 			if keepGoing {
 				if wait > 0 {

@@ -66,6 +66,8 @@ func DefaultConfig() Config {
 		Fail:                         false,
 		StatusCode:                   "unset",
 		StatusDescription:            "",
+		Version:                      "unset",
+		StartupTime:                  time.Now(),
 	}
 }
 
@@ -237,9 +239,9 @@ func (c Config) ToStringMap() map[string]string {
 	}
 }
 
-// IsRecording returns true if an endpoint is set and otel-cli expects to send real
+// GetIsRecording returns true if an endpoint is set and otel-cli expects to send real
 // spans. Returns false if unconfigured and going to run inert.
-func (c Config) IsRecording() bool {
+func (c Config) GetIsRecording() bool {
 	if c.Endpoint == "" && c.TracesEndpoint == "" {
 		Diag.IsRecording = false
 		return false
@@ -530,10 +532,20 @@ func (c Config) WithProtocol(with string) Config {
 	return c
 }
 
+// GetTimeout returns the parsed --timeout value as a time.Duration.
+func (c Config) GetTimeout() time.Duration {
+	return c.ParseCliTimeout()
+}
+
 // WithTimeout returns the config with Timeout set to the provided value.
 func (c Config) WithTimeout(with string) Config {
 	c.Timeout = with
 	return c
+}
+
+// GetHeaders returns the stringmap of configured headers.
+func (c Config) GetHeaders() map[string]string {
+	return c.Headers
 }
 
 // WithHeades returns the config with Heades set to the provided value.
@@ -735,5 +747,16 @@ func (c Config) GetVersion() string {
 // WithVersion returns the config with Version set to the provided value.
 func (c Config) WithVersion(with string) Config {
 	c.Version = with
+	return c
+}
+
+// GetStartupTime returns the configured startup time.
+func (c Config) GetStartupTime() time.Time {
+	return c.StartupTime
+}
+
+// WithStartupTime returns the config with StartupTime set to the provided value.
+func (c Config) WithStartupTime(with time.Time) Config {
+	c.StartupTime = with
 	return c
 }
