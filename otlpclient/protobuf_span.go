@@ -19,6 +19,9 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+type SpanConfig interface {
+}
+
 var emptyTraceId = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 var emptySpanId = []byte{0, 0, 0, 0, 0, 0, 0, 0}
 
@@ -59,101 +62,38 @@ func NewProtobufSpanEvent() *tracepb.Span_Event {
 	}
 }
 
-// NewProtobufSpanWithConfig creates a new span and populates it with information
-// from the provided config struct.
-func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
-	span := NewProtobufSpan()
-	span.TraceId = generateTraceId(c)
-	span.SpanId = generateSpanId(c)
-	span.Name = c.SpanName
-	span.Kind = SpanKindStringToInt(c.Kind)
-	span.Attributes = StringMapAttrsToProtobuf(c.Attributes)
-
-	now := time.Now()
-	if c.SpanStartTime != "" {
-		st := c.ParsedSpanStartTime()
-		span.StartTimeUnixNano = uint64(st.UnixNano())
-	} else {
-		span.StartTimeUnixNano = uint64(now.UnixNano())
-	}
-
-	if c.SpanEndTime != "" {
-		et := c.ParsedSpanEndTime()
-		span.EndTimeUnixNano = uint64(et.UnixNano())
-	} else {
-		span.EndTimeUnixNano = uint64(now.UnixNano())
-	}
-
-	if c.GetIsRecording() {
-		tp := LoadTraceparent(c, span)
-		if tp.Initialized {
-			span.TraceId = tp.TraceId
-			span.ParentSpanId = tp.SpanId
-		}
-	} else {
-		span.TraceId = emptyTraceId
-		span.SpanId = emptySpanId
-	}
-
-	// --force-trace-id, --force-span-id and --force-parent-span-id let the user set their own trace, span & parent span ids
-	// these work in non-recording mode and will stomp trace id from the traceparent
-	var err error
-	if c.ForceTraceId != "" {
-		span.TraceId, err = parseHex(c.ForceTraceId, 16)
-		c.SoftFailIfErr(err)
-	}
-	if c.ForceSpanId != "" {
-		span.SpanId, err = parseHex(c.ForceSpanId, 8)
-		c.SoftFailIfErr(err)
-	}
-	if c.ForceParentSpanId != "" {
-		span.ParentSpanId, err = parseHex(c.ForceParentSpanId, 8)
-		c.SoftFailIfErr(err)
-	}
-
-	SetSpanStatus(span, c)
-
-	return span
-}
-
 // SetSpanStatus checks for status code error in the config and sets the
 // span's 2 values as appropriate.
 // Only set status description when an error status.
 // https://github.com/open-telemetry/opentelemetry-specification/blob/480a19d702470563d32a870932be5ddae798079c/specification/trace/api.md#set-status
-func SetSpanStatus(span *tracepb.Span, c Config) {
-	statusCode := SpanStatusStringToInt(c.StatusCode)
+func SetSpanStatus(span *tracepb.Span, status string, message string) {
+	statusCode := SpanStatusStringToInt(status)
 	if statusCode != tracepb.Status_STATUS_CODE_UNSET {
 		span.Status.Code = statusCode
-		span.Status.Message = c.StatusDescription
+		span.Status.Message = message
 	}
 }
 
 // generateTraceId generates a random 16 byte trace id
-func generateTraceId(c Config) []byte {
-	if c.GetIsRecording() {
-		buf := make([]byte, 16)
-		_, err := rand.Read(buf)
-		if err != nil {
-			c.SoftFail("Failed to generate random data for trace id: %s", err)
-		}
-		return buf
-	} else {
-		return emptyTraceId
+func generateTraceId() []byte {
+	buf := make([]byte, 16)
+	_, err := rand.Read(buf)
+	if err != nil {
+		// should never happen, crash when it does
+		panic("failed to generate random data for trace id: " + err.Error())
 	}
+	return buf
 }
 
 // generateSpanId generates a random 8 byte span id
-func generateSpanId(c Config) []byte {
-	if c.GetIsRecording() {
-		buf := make([]byte, 8)
-		_, err := rand.Read(buf)
-		if err != nil {
-			c.SoftFail("Failed to generate random data for span id: %s", err)
-		}
-		return buf
-	} else {
-		return emptySpanId
+func generateSpanId() []byte {
+	buf := make([]byte, 8)
+	_, err := rand.Read(buf)
+	if err != nil {
+		// should never happen, crash when it does
+		panic("failed to generate random data for span id: " + err.Error())
 	}
+	return buf
 }
 
 // parseHex parses hex into a []byte of length provided. Errors if the input is

@@ -93,7 +93,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 			break
 		}
 
-		span := otlpclient.NewProtobufSpanWithConfig(config)
+		span := config.NewProtobufSpan()
 		span.Name = "otel-cli status"
 		if canaryCount > 0 {
 			span.Name = fmt.Sprintf("otel-cli status canary %d", canaryCount)

@@ -79,7 +79,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	span := otlpclient.NewProtobufSpanWithConfig(config)
+	span := config.NewProtobufSpan()
 
 	// span background is a bit different from span/exec in that it might be
 	// hanging out while other spans are created, so it does the traceparent

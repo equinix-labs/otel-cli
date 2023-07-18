@@ -79,7 +79,7 @@ func doExec(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	span := otlpclient.NewProtobufSpanWithConfig(config)
+	span := config.NewProtobufSpan()
 
 	// set the traceparent to the current span to be available to the child process
 	if config.GetIsRecording() {

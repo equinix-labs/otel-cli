@@ -72,7 +72,7 @@ func (bs BgSpan) Wait(in, reply *struct{}) error {
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
 	// handle --status-code and --status-description args to span end
 	c := bs.config.WithStatusCode(in.StatusCode).WithStatusDescription(in.StatusDesc)
-	otlpclient.SetSpanStatus(bs.span, c)
+	otlpclient.SetSpanStatus(bs.span, c.StatusCode, c.StatusDescription)
 
 	// running the shutdown as a goroutine prevents the client from getting an
 	// error here when the server gets closed. defer didn't do the trick.

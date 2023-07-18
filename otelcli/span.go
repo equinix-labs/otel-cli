@@ -48,7 +48,7 @@ func doSpan(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	ctx, client := StartClient(ctx, config)
-	span := otlpclient.NewProtobufSpanWithConfig(config)
+	span := config.NewProtobufSpan()
 	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
 	config.SoftFailIfErr(err)
 	_, err = client.Stop(ctx)

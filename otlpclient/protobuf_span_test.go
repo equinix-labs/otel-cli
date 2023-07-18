@@ -48,7 +48,7 @@ func TestNewProtobufSpanEvent(t *testing.T) {
 
 func TestNewProtobufSpanWithConfig(t *testing.T) {
 	c := DefaultConfig().WithSpanName("test span 123")
-	span := NewProtobufSpanWithConfig(c)
+	span := c.NewProtobufSpan()
 
 	if span.Name != "test span 123" {
 		t.Error("span event attributes must not be nil")
@@ -56,17 +56,11 @@ func TestNewProtobufSpanWithConfig(t *testing.T) {
 }
 
 func TestGenerateTraceId(t *testing.T) {
-	c := DefaultConfig()
 	// non-recording
-	tid := generateTraceId(c)
+	tid := generateTraceId()
 
 	if !bytes.Equal(tid, emptyTraceId) {
 		t.Error("generated trace id must always be zeroes in non-recording mode")
-	}
-
-	tid = generateTraceId(c.WithEndpoint("localhost:4317"))
-	if bytes.Equal(tid, emptyTraceId) {
-		t.Error("generated trace id must not be zeroes in recording mode")
 	}
 
 	if len(tid) != 16 {
@@ -75,17 +69,11 @@ func TestGenerateTraceId(t *testing.T) {
 }
 
 func TestGenerateSpanId(t *testing.T) {
-	c := DefaultConfig()
 	// non-recording
-	sid := generateSpanId(c)
+	sid := generateSpanId()
 
 	if !bytes.Equal(sid, emptySpanId) {
 		t.Error("generated span id must always be zeroes in non-recording mode")
-	}
-
-	sid = generateSpanId(c.WithEndpoint("localhost:4317"))
-	if bytes.Equal(sid, emptySpanId) {
-		t.Error("generated span id must not be zeroes in recording mode")
 	}
 
 	if len(sid) != 8 {

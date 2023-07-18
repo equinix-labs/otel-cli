@@ -429,15 +429,15 @@ func parseCkvStringMap(in string) (map[string]string, error) {
 	return out, nil
 }
 
-// ParsedSpanStartTime returns config.SpanStartTime as time.Time.
-func (c Config) ParsedSpanStartTime() time.Time {
+// ParseSpanStartTime returns config.SpanStartTime as time.Time.
+func (c Config) ParseSpanStartTime() time.Time {
 	t, err := c.parseTime(c.SpanStartTime, "start")
 	c.SoftFailIfErr(err)
 	return t
 }
 
-// ParsedSpanEndTime returns config.SpanEndTime as time.Time.
-func (c Config) ParsedSpanEndTime() time.Time {
+// ParseSpanEndTime returns config.SpanEndTime as time.Time.
+func (c Config) ParseSpanEndTime() time.Time {
 	t, err := c.parseTime(c.SpanEndTime, "end")
 	c.SoftFailIfErr(err)
 	return t
