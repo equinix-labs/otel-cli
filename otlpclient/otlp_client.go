@@ -237,11 +237,6 @@ func retry(ctx context.Context, config OTLPConfig, fun retryFun) (context.Contex
 		} else {
 			return ctx, nil
 		}
-
-		// It's retries instead of "tries" because "tries" means other things
-		// too. Also, retries can default to 0 and it makes sense, saving
-		// copying in test data.
-		//otelcli.Diag.Retries++
 	}
 }
 
