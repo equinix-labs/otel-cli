@@ -56,11 +56,10 @@ func TestNewProtobufSpanWithConfig(t *testing.T) {
 }
 
 func TestGenerateTraceId(t *testing.T) {
-	// non-recording
 	tid := generateTraceId()
 
-	if !bytes.Equal(tid, emptyTraceId) {
-		t.Error("generated trace id must always be zeroes in non-recording mode")
+	if bytes.Equal(tid, emptyTraceId) {
+		t.Error("generated trace id is all zeroes and should be any other random value")
 	}
 
 	if len(tid) != 16 {
@@ -69,11 +68,10 @@ func TestGenerateTraceId(t *testing.T) {
 }
 
 func TestGenerateSpanId(t *testing.T) {
-	// non-recording
 	sid := generateSpanId()
 
-	if !bytes.Equal(sid, emptySpanId) {
-		t.Error("generated span id must always be zeroes in non-recording mode")
+	if bytes.Equal(sid, emptySpanId) {
+		t.Error("generated span id is all zeroes and should be any other random value")
 	}
 
 	if len(sid) != 8 {
