@@ -12,7 +12,7 @@ import (
 )
 
 // NewProtobufSpan creates a new span and populates it with information
-// from the provided config struct.
+// from the config struct.
 func (c Config) NewProtobufSpan() *tracepb.Span {
 	span := otlpclient.NewProtobufSpan()
 	if c.GetIsRecording() {
