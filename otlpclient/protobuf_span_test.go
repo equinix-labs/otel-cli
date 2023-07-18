@@ -2,9 +2,6 @@ package otlpclient
 
 import (
 	"bytes"
-	"encoding/hex"
-	"fmt"
-	"os"
 	"strconv"
 	"testing"
 
@@ -46,27 +43,11 @@ func TestNewProtobufSpanEvent(t *testing.T) {
 	}
 }
 
-func TestNewProtobufSpanWithConfig(t *testing.T) {
-	c := DefaultConfig().WithSpanName("test span 123")
-	span := NewProtobufSpanWithConfig(c)
-
-	if span.Name != "test span 123" {
-		t.Error("span event attributes must not be nil")
-	}
-}
-
 func TestGenerateTraceId(t *testing.T) {
-	c := DefaultConfig()
-	// non-recording
-	tid := generateTraceId(c)
+	tid := GenerateTraceId()
 
-	if !bytes.Equal(tid, emptyTraceId) {
-		t.Error("generated trace id must always be zeroes in non-recording mode")
-	}
-
-	tid = generateTraceId(c.WithEndpoint("localhost:4317"))
-	if bytes.Equal(tid, emptyTraceId) {
-		t.Error("generated trace id must not be zeroes in recording mode")
+	if bytes.Equal(tid, GetEmptyTraceId()) {
+		t.Error("generated trace id is all zeroes and should be any other random value")
 	}
 
 	if len(tid) != 16 {
@@ -75,17 +56,10 @@ func TestGenerateTraceId(t *testing.T) {
 }
 
 func TestGenerateSpanId(t *testing.T) {
-	c := DefaultConfig()
-	// non-recording
-	sid := generateSpanId(c)
+	sid := GenerateSpanId()
 
-	if !bytes.Equal(sid, emptySpanId) {
-		t.Error("generated span id must always be zeroes in non-recording mode")
-	}
-
-	sid = generateSpanId(c.WithEndpoint("localhost:4317"))
-	if bytes.Equal(sid, emptySpanId) {
-		t.Error("generated span id must not be zeroes in recording mode")
+	if bytes.Equal(sid, GetEmptySpanId()) {
+		t.Error("generated span id is all zeroes and should be any other random value")
 	}
 
 	if len(sid) != 8 {
@@ -255,39 +229,5 @@ func TestCliAttrsToOtel(t *testing.T) {
 				t.Errorf("expected value '%s' for key '%s' but got %t", testAttrs[key], key, attr.Value.GetBoolValue())
 			}
 		}
-	}
-}
-
-func TestPropagateTraceparent(t *testing.T) {
-	config := DefaultConfig().
-		WithTraceparentCarrierFile("").
-		WithTraceparentPrint(false).
-		WithTraceparentPrintExport(false)
-
-	tp := "00-3433d5ae39bdfee397f44be5146867b3-8a5518f1e5c54d0a-01"
-	tid := "3433d5ae39bdfee397f44be5146867b3"
-	sid := "8a5518f1e5c54d0a"
-	os.Setenv("TRACEPARENT", tp)
-
-	span := NewProtobufSpan()
-	span.TraceId, _ = hex.DecodeString(tid)
-	span.SpanId, _ = hex.DecodeString(sid)
-
-	buf := new(bytes.Buffer)
-	PropagateTraceparent(config, span, buf)
-	if buf.Len() != 0 {
-		t.Errorf("nothing was supposed to be written but %d bytes were", buf.Len())
-	}
-
-	config.TraceparentPrint = true
-	config.TraceparentPrintExport = true
-	buf = new(bytes.Buffer)
-	PropagateTraceparent(config, span, buf)
-	if buf.Len() == 0 {
-		t.Error("expected more than zero bytes but got none")
-	}
-	expected := fmt.Sprintf("# trace id: %s\n#  span id: %s\nexport TRACEPARENT=%s\n", tid, sid, tp)
-	if buf.String() != expected {
-		t.Errorf("got unexpected output, expected '%s', got '%s'", expected, buf.String())
 	}
 }

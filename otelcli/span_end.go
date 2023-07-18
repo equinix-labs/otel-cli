@@ -3,13 +3,12 @@ package otelcli
 import (
 	"os"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
 )
 
 // spanEndCmd represents the span event command
-func spanEndCmd(config *otlpclient.Config) *cobra.Command {
+func spanEndCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "end",
 		Short: "Make a span background to end itself and exit gracefully",
@@ -22,7 +21,7 @@ See: otel-cli span background
 		Run: doSpanEnd,
 	}
 
-	defaults := otlpclient.DefaultConfig()
+	defaults := DefaultConfig()
 
 	cmd.Flags().BoolVar(&config.Verbose, "verbose", defaults.Verbose, "print errors on failure instead of always being silent")
 	// TODO

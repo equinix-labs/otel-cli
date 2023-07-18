@@ -15,7 +15,7 @@ import (
 )
 
 // spanBgCmd represents the span background command
-func spanBgCmd(config *otlpclient.Config) *cobra.Command {
+func spanBgCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "background",
 		Short: "create background span handler",
@@ -39,7 +39,7 @@ timeout, (catchable) signals, or deliberate exit.
 		Run: doSpanBackground,
 	}
 
-	defaults := otlpclient.DefaultConfig()
+	defaults := DefaultConfig()
 	cmd.Flags().SortFlags = false // don't sort subcommands
 
 	// it seems like the socket should be required for background but it's
@@ -64,7 +64,7 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	started := time.Now()
-	ctx, client := otlpclient.StartClient(ctx, config)
+	ctx, client := StartClient(ctx, config)
 
 	// special case --wait, createBgClient() will wait for the socket to show up
 	// then connect and send a no-op RPC. by this time e.g. --tp-carrier should
@@ -79,12 +79,12 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	span := otlpclient.NewProtobufSpanWithConfig(config)
+	span := config.NewProtobufSpan()
 
 	// span background is a bit different from span/exec in that it might be
 	// hanging out while other spans are created, so it does the traceparent
 	// propagation before the server starts, instead of after
-	otlpclient.PropagateTraceparent(config, span, os.Stdout)
+	config.PropagateTraceparent(span, os.Stdout)
 
 	sockfile := path.Join(config.BackgroundSockdir, spanBgSockfilename)
 	bgs := createBgServer(ctx, sockfile, span)

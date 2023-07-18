@@ -14,7 +14,7 @@ import (
 )
 
 // execCmd sets up the `otel-cli exec` command
-func execCmd(config *otlpclient.Config) *cobra.Command {
+func execCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "exec",
 		Short: "execute the command provided",
@@ -45,7 +45,7 @@ to sh -c and should not be passed any untrusted input`,
 func doExec(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
-	ctx, client := otlpclient.StartClient(ctx, config)
+	ctx, client := StartClient(ctx, config)
 
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
@@ -79,15 +79,15 @@ func doExec(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	span := otlpclient.NewProtobufSpanWithConfig(config)
+	span := config.NewProtobufSpan()
 
 	// set the traceparent to the current span to be available to the child process
-	if config.IsRecording() {
-		tp := otlpclient.TraceparentFromProtobufSpan(config, span)
+	if config.GetIsRecording() {
+		tp := otlpclient.TraceparentFromProtobufSpan(span, config.GetIsRecording())
 		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
 		// when not recording, and a traceparent is available, pass it through
 	} else if !config.TraceparentIgnoreEnv {
-		tp := otlpclient.LoadTraceparent(config, span)
+		tp := config.LoadTraceparent()
 		if tp.Initialized {
 			child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
 		}
@@ -109,7 +109,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 
 	// set the global exit code so main() can grab it and os.Exit() properly
-	otlpclient.Diag.ExecExitCode = child.ProcessState.ExitCode()
+	Diag.ExecExitCode = child.ProcessState.ExitCode()
 
-	otlpclient.PropagateTraceparent(config, span, os.Stdout)
+	config.PropagateTraceparent(span, os.Stdout)
 }

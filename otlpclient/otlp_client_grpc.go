@@ -2,7 +2,7 @@ package otlpclient
 
 import (
 	"context"
-	"strings"
+	"fmt"
 	"time"
 
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -20,11 +20,11 @@ import (
 type GrpcClient struct {
 	conn   *grpc.ClientConn
 	client coltracepb.TraceServiceClient
-	config Config
+	config OTLPConfig
 }
 
 // NewGrpcClient returns a fresh GrpcClient ready to Start.
-func NewGrpcClient(config Config) *GrpcClient {
+func NewGrpcClient(config OTLPConfig) *GrpcClient {
 	c := GrpcClient{config: config}
 	return &c
 }
@@ -32,7 +32,7 @@ func NewGrpcClient(config Config) *GrpcClient {
 // Start configures and starts the connection to the gRPC server in the background.
 func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 	var err error
-	endpointURL, _ := ParseEndpoint(gc.config)
+	endpointURL := gc.config.GetEndpoint()
 	host := endpointURL.Hostname()
 	if endpointURL.Port() != "" {
 		host = host + ":" + endpointURL.Port()
@@ -40,31 +40,16 @@ func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 
 	grpcOpts := []grpc.DialOption{}
 
-	// Go's TLS does the right thing and forces us to say we want to disable encryption,
-	// but I expect most users of this program to point at a localhost endpoint that might not
-	// have any encryption available, or setting it up raises the bar of entry too high.
-	// The compromise is to automatically flip this flag to true when endpoint contains an
-	// an obvious "localhost", "127.0.0.x", or "::1" address.
-	isLoopback, err := isLoopbackAddr(endpointURL)
-	gc.config.SoftFailIfErr(err)
-	if gc.config.Insecure || (isLoopback && !strings.HasPrefix(gc.config.Endpoint, "https")) {
+	if gc.config.GetInsecure() {
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else if !isInsecureSchema(gc.config.Endpoint) {
-		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig(gc.config))))
+	} else {
+		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(gc.config.GetTlsConfig())))
 	}
 
-	// OTLP examples usually show this with the grpc.WithBlock() dial option to
-	// make the connection synchronous, but it's not the right default for cli
-	// instead, rely on the shutdown methods to make sure everything is flushed
-	// by the time the program exits.
-	if gc.config.Blocking {
-		grpcOpts = append(grpcOpts, grpc.WithBlock())
-	}
-
-	ctx, _ = deadlineCtx(ctx, gc.config, gc.config.StartupTime)
+	ctx, _ = deadlineCtx(ctx, gc.config.GetTimeout(), gc.config.GetStartupTime())
 	gc.conn, err = grpc.DialContext(ctx, host, grpcOpts...)
 	if err != nil {
-		gc.config.SoftFail("could not connect to gRPC/OTLP: %s", err)
+		return ctx, fmt.Errorf("could not connect to gRPC/OTLP: %w", err)
 	}
 
 	gc.client = coltracepb.NewTraceServiceClient(gc.conn)
@@ -77,15 +62,15 @@ func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 // TODO: look into grpc.WaitForReady(), esp for status use cases
 func (gc *GrpcClient) UploadTraces(ctx context.Context, rsps []*tracepb.ResourceSpans) (context.Context, error) {
 	// add headers onto the request
-	if len(gc.config.Headers) > 0 {
-		md := metadata.New(gc.config.Headers)
+	headers := gc.config.GetHeaders()
+	if len(headers) > 0 {
+		md := metadata.New(headers)
 		ctx = metadata.NewOutgoingContext(ctx, md)
 	}
 
 	req := coltracepb.ExportTraceServiceRequest{ResourceSpans: rsps}
 
-	timeout := gc.config.ParseCliTimeout()
-	return retry(ctx, gc.config, timeout, func(innerCtx context.Context) (context.Context, bool, time.Duration, error) {
+	return retry(ctx, gc.config, func(innerCtx context.Context) (context.Context, bool, time.Duration, error) {
 		etsr, err := gc.client.Export(innerCtx, &req)
 		return processGrpcStatus(innerCtx, etsr, err)
 	})

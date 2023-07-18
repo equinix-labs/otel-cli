@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/equinix-labs/otel-cli/otelcli"
-	"github.com/equinix-labs/otel-cli/otlpclient"
 )
 
 // these will be set by goreleaser & ldflags at build time
@@ -16,5 +15,5 @@ var (
 
 func main() {
 	otelcli.Execute(otelcli.FormatVersion(version, commit, date))
-	os.Exit(otlpclient.GetExitCode())
+	os.Exit(otelcli.GetExitCode())
 }

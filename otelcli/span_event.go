@@ -4,13 +4,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
 )
 
 // spanEventCmd represents the span event command
-func spanEventCmd(config *otlpclient.Config) *cobra.Command {
+func spanEventCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "event",
 		Short: "create an OpenTelemetry span event and add it to the background span",
@@ -29,7 +28,7 @@ See: otel-cli span background
 		Run: doSpanEvent,
 	}
 
-	defaults := otlpclient.DefaultConfig()
+	defaults := DefaultConfig()
 
 	cmd.Flags().SortFlags = false
 
@@ -48,7 +47,7 @@ See: otel-cli span background
 
 func doSpanEvent(cmd *cobra.Command, args []string) {
 	config := getConfig(cmd.Context())
-	timestamp := otlpclient.DefaultConfig().ParsedEventTime()
+	timestamp := config.ParsedEventTime()
 	rpcArgs := BgSpanEvent{
 		Name:       config.EventName,
 		Timestamp:  timestamp.Format(time.RFC3339Nano),

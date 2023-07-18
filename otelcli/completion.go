@@ -4,11 +4,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
 )
 
-func completionCmd(config *otlpclient.Config) *cobra.Command {
+func completionCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "completion [bash|zsh|fish|powershell]",
 		Short: "Generate completion script",

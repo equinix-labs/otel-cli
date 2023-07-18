@@ -8,7 +8,7 @@ import (
 )
 
 // spanCmd represents the span command
-func spanCmd(config *otlpclient.Config) *cobra.Command {
+func spanCmd(config *Config) *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "span",
 		Short: "create an OpenTelemetry span and send it",
@@ -47,11 +47,11 @@ Example:
 func doSpan(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
-	ctx, client := otlpclient.StartClient(ctx, config)
-	span := otlpclient.NewProtobufSpanWithConfig(config)
+	ctx, client := StartClient(ctx, config)
+	span := config.NewProtobufSpan()
 	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
 	config.SoftFailIfErr(err)
 	_, err = client.Stop(ctx)
 	config.SoftFailIfErr(err)
-	otlpclient.PropagateTraceparent(config, span, os.Stdout)
+	config.PropagateTraceparent(span, os.Stdout)
 }

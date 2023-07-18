@@ -9,8 +9,7 @@ package otlpclient
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
-	"io"
+	"sort"
 	"strconv"
 	"time"
 
@@ -19,15 +18,15 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-var emptyTraceId = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-var emptySpanId = []byte{0, 0, 0, 0, 0, 0, 0, 0}
+type SpanConfig interface {
+}
 
 // NewProtobufSpan returns an initialized OpenTelemetry protobuf Span.
 func NewProtobufSpan() *tracepb.Span {
 	now := time.Now()
 	span := tracepb.Span{
-		TraceId:                emptyTraceId,
-		SpanId:                 emptySpanId,
+		TraceId:                GetEmptyTraceId(),
+		SpanId:                 GetEmptySpanId(),
 		TraceState:             "",
 		ParentSpanId:           []byte{},
 		Name:                   "BUG IN OTEL-CLI: unset",
@@ -59,114 +58,48 @@ func NewProtobufSpanEvent() *tracepb.Span_Event {
 	}
 }
 
-// NewProtobufSpanWithConfig creates a new span and populates it with information
-// from the provided config struct.
-func NewProtobufSpanWithConfig(c Config) *tracepb.Span {
-	span := NewProtobufSpan()
-	span.TraceId = generateTraceId(c)
-	span.SpanId = generateSpanId(c)
-	span.Name = c.SpanName
-	span.Kind = SpanKindStringToInt(c.Kind)
-	span.Attributes = StringMapAttrsToProtobuf(c.Attributes)
-
-	now := time.Now()
-	if c.SpanStartTime != "" {
-		st := c.ParsedSpanStartTime()
-		span.StartTimeUnixNano = uint64(st.UnixNano())
-	} else {
-		span.StartTimeUnixNano = uint64(now.UnixNano())
-	}
-
-	if c.SpanEndTime != "" {
-		et := c.ParsedSpanEndTime()
-		span.EndTimeUnixNano = uint64(et.UnixNano())
-	} else {
-		span.EndTimeUnixNano = uint64(now.UnixNano())
-	}
-
-	if c.IsRecording() {
-		tp := LoadTraceparent(c, span)
-		if tp.Initialized {
-			span.TraceId = tp.TraceId
-			span.ParentSpanId = tp.SpanId
-		}
-	} else {
-		span.TraceId = emptyTraceId
-		span.SpanId = emptySpanId
-	}
-
-	// --force-trace-id, --force-span-id and --force-parent-span-id let the user set their own trace, span & parent span ids
-	// these work in non-recording mode and will stomp trace id from the traceparent
-	var err error
-	if c.ForceTraceId != "" {
-		span.TraceId, err = parseHex(c.ForceTraceId, 16)
-		c.SoftFailIfErr(err)
-	}
-	if c.ForceSpanId != "" {
-		span.SpanId, err = parseHex(c.ForceSpanId, 8)
-		c.SoftFailIfErr(err)
-	}
-	if c.ForceParentSpanId != "" {
-		span.ParentSpanId, err = parseHex(c.ForceParentSpanId, 8)
-		c.SoftFailIfErr(err)
-	}
-
-	SetSpanStatus(span, c)
-
-	return span
-}
-
 // SetSpanStatus checks for status code error in the config and sets the
 // span's 2 values as appropriate.
 // Only set status description when an error status.
 // https://github.com/open-telemetry/opentelemetry-specification/blob/480a19d702470563d32a870932be5ddae798079c/specification/trace/api.md#set-status
-func SetSpanStatus(span *tracepb.Span, c Config) {
-	statusCode := SpanStatusStringToInt(c.StatusCode)
+func SetSpanStatus(span *tracepb.Span, status string, message string) {
+	statusCode := SpanStatusStringToInt(status)
 	if statusCode != tracepb.Status_STATUS_CODE_UNSET {
 		span.Status.Code = statusCode
-		span.Status.Message = c.StatusDescription
+		span.Status.Message = message
 	}
 }
 
-// generateTraceId generates a random 16 byte trace id
-func generateTraceId(c Config) []byte {
-	if c.IsRecording() {
-		buf := make([]byte, 16)
-		_, err := rand.Read(buf)
-		if err != nil {
-			c.SoftFail("Failed to generate random data for trace id: %s", err)
-		}
-		return buf
-	} else {
-		return emptyTraceId
-	}
+// GetEmptyTraceId returns a 16-byte trace id that's all zeroes.
+func GetEmptyTraceId() []byte {
+	return []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 }
 
-// generateSpanId generates a random 8 byte span id
-func generateSpanId(c Config) []byte {
-	if c.IsRecording() {
-		buf := make([]byte, 8)
-		_, err := rand.Read(buf)
-		if err != nil {
-			c.SoftFail("Failed to generate random data for span id: %s", err)
-		}
-		return buf
-	} else {
-		return emptySpanId
-	}
+// GetEmptySpanId returns an 8-byte span id that's all zeroes.
+func GetEmptySpanId() []byte {
+	return []byte{0, 0, 0, 0, 0, 0, 0, 0}
 }
 
-// parseHex parses hex into a []byte of length provided. Errors if the input is
-// not valid hex or the converted hex is not the right number of bytes.
-func parseHex(in string, expectedLen int) ([]byte, error) {
-	out, err := hex.DecodeString(in)
+// GenerateTraceId generates a random 16 byte trace id
+func GenerateTraceId() []byte {
+	buf := make([]byte, 16)
+	_, err := rand.Read(buf)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing hex string %q: %w", in, err)
+		// should never happen, crash when it does
+		panic("failed to generate random data for trace id: " + err.Error())
 	}
-	if len(out) != expectedLen {
-		return nil, fmt.Errorf("hex string %q is the wrong length, expected %d bytes but got %d", in, expectedLen, len(out))
+	return buf
+}
+
+// GenerateSpanId generates a random 8 byte span id
+func GenerateSpanId() []byte {
+	buf := make([]byte, 8)
+	_, err := rand.Read(buf)
+	if err != nil {
+		// should never happen, crash when it does
+		panic("failed to generate random data for span id: " + err.Error())
 	}
-	return out, nil
+	return buf
 }
 
 // SpanKindIntToString takes an integer/constant protobuf span kind value
@@ -314,74 +247,40 @@ func SpanToStringMap(span *tracepb.Span, rss *tracepb.ResourceSpans) map[string]
 }
 
 // TraceparentFromProtobufSpan builds a Traceparent struct from the provided span.
-func TraceparentFromProtobufSpan(c Config, span *tracepb.Span) traceparent.Traceparent {
+func TraceparentFromProtobufSpan(span *tracepb.Span, recording bool) traceparent.Traceparent {
 	return traceparent.Traceparent{
 		Version:     0,
 		TraceId:     span.TraceId,
 		SpanId:      span.SpanId,
-		Sampling:    c.IsRecording(),
+		Sampling:    recording,
 		Initialized: true,
 	}
 }
 
-// PropagateTraceparent saves the traceparent to file if necessary, then prints
-// span info to the console according to command-line args.
-func PropagateTraceparent(c Config, span *tracepb.Span, target io.Writer) {
-	var tp traceparent.Traceparent
-	if c.IsRecording() {
-		tp = TraceparentFromProtobufSpan(c, span)
-	} else {
-		// when in non-recording mode, and there is a TP available, propagate that
-		tp = LoadTraceparent(c, span)
+// flattenStringMap takes a string map and returns it flattened into a string with
+// keys sorted lexically so it should be mostly consistent enough for comparisons
+// and printing. Output is k=v,k=v style like attributes input.
+func flattenStringMap(mp map[string]string, emptyValue string) string {
+	if len(mp) == 0 {
+		return emptyValue
 	}
 
-	if c.TraceparentCarrierFile != "" {
-		err := tp.SaveToFile(c.TraceparentCarrierFile, c.TraceparentPrintExport)
-		c.SoftFailIfErr(err)
+	var out string
+	keys := make([]string, len(mp)) // for sorting
+	var i int
+	for k := range mp {
+		keys[i] = k
+		i++
 	}
+	sort.Strings(keys)
 
-	if c.TraceparentPrint {
-		tp.Fprint(target, c.TraceparentPrintExport)
-	}
-}
-
-// LoadTraceparent follows otel-cli's loading rules, start with envvar then file.
-// If both are set, the file will override env.
-// When in non-recording mode, the previous traceparent will be returned if it's
-// available, otherwise, a zero-valued traceparent is returned.
-func LoadTraceparent(c Config, span *tracepb.Span) traceparent.Traceparent {
-	tp := traceparent.Traceparent{
-		Version:     0,
-		TraceId:     emptyTraceId,
-		SpanId:      emptySpanId,
-		Sampling:    false,
-		Initialized: true,
-	}
-
-	if !c.TraceparentIgnoreEnv {
-		var err error
-		tp, err = traceparent.LoadFromEnv()
-		if err != nil {
-			Diag.Error = err.Error()
+	for i, k := range keys {
+		out = out + k + "=" + mp[k]
+		if i == len(keys)-1 {
+			break
 		}
+		out = out + ","
 	}
 
-	if c.TraceparentCarrierFile != "" {
-		fileTp, err := traceparent.LoadFromFile(c.TraceparentCarrierFile)
-		if err != nil {
-			Diag.Error = err.Error()
-		} else if fileTp.Initialized {
-			tp = fileTp
-		}
-	}
-
-	if c.TraceparentRequired {
-		if tp.Initialized {
-			return tp
-		} else {
-			c.SoftFail("failed to find a valid traceparent carrier in either environment for file '%s' while it's required by --tp-required", c.TraceparentCarrierFile)
-		}
-	}
-
-	return tp
+	return out
 }

@@ -1,11 +1,13 @@
-package otlpclient
+package otelcli
 
 import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"path"
 	"reflect"
 	"regexp"
 	"sort"
@@ -64,6 +66,8 @@ func DefaultConfig() Config {
 		Fail:                         false,
 		StatusCode:                   "unset",
 		StatusDescription:            "",
+		Version:                      "unset",
+		StartupTime:                  time.Now(),
 	}
 }
 
@@ -235,9 +239,9 @@ func (c Config) ToStringMap() map[string]string {
 	}
 }
 
-// IsRecording returns true if an endpoint is set and otel-cli expects to send real
+// GetIsRecording returns true if an endpoint is set and otel-cli expects to send real
 // spans. Returns false if unconfigured and going to run inert.
-func (c Config) IsRecording() bool {
+func (c Config) GetIsRecording() bool {
 	if c.Endpoint == "" && c.TracesEndpoint == "" {
 		Diag.IsRecording = false
 		return false
@@ -278,6 +282,60 @@ func parseDuration(d string) (time.Duration, error) {
 	}
 
 	return out, nil
+}
+
+// ParseEndpoint takes the endpoint or signal endpoint, augments as needed
+// (e.g. bare host:port for gRPC) and then parses as a URL.
+// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/exporter.md#endpoint-urls-for-otlphttp
+func (config Config) ParseEndpoint() (*url.URL, string) {
+	var endpoint, source string
+	var epUrl *url.URL
+	var err error
+
+	// signal-specific configs get precedence over general endpoint per OTel spec
+	if config.TracesEndpoint != "" {
+		endpoint = config.TracesEndpoint
+		source = "signal"
+	} else if config.Endpoint != "" {
+		endpoint = config.Endpoint
+		source = "general"
+	} else {
+		config.SoftFail("no endpoint configuration available")
+	}
+
+	parts := strings.Split(endpoint, ":")
+	// bare hostname? can only be grpc, prepend
+	if len(parts) == 1 {
+		epUrl, err = url.Parse("grpc://" + endpoint + ":4317")
+		if err != nil {
+			config.SoftFail("error parsing (assumed) gRPC bare host address '%s': %s", endpoint, err)
+		}
+	} else if len(parts) > 1 { // could be URI or host:port
+		// actual URIs
+		// grpc:// is only an otel-cli thing, maybe should drop it?
+		if parts[0] == "grpc" || parts[0] == "http" || parts[0] == "https" {
+			epUrl, err = url.Parse(endpoint)
+			if err != nil {
+				config.SoftFail("error parsing provided %s URI '%s': %s", source, endpoint, err)
+			}
+		} else {
+			// gRPC host:port
+			epUrl, err = url.Parse("grpc://" + endpoint)
+			if err != nil {
+				config.SoftFail("error parsing (assumed) gRPC host:port address '%s': %s", endpoint, err)
+			}
+		}
+	}
+
+	// Per spec, /v1/traces is the default, appended to any url passed
+	// to the general endpoint
+	if strings.HasPrefix(epUrl.Scheme, "http") && source != "signal" && !strings.HasSuffix(epUrl.Path, "/v1/traces") {
+		epUrl.Path = path.Join(epUrl.Path, "/v1/traces")
+	}
+
+	Diag.EndpointSource = source
+	Diag.Endpoint = epUrl.String()
+	return epUrl, source
 }
 
 // SoftLog only calls through to log if otel-cli was run with the --verbose flag.
@@ -371,15 +429,15 @@ func parseCkvStringMap(in string) (map[string]string, error) {
 	return out, nil
 }
 
-// ParsedSpanStartTime returns config.SpanStartTime as time.Time.
-func (c Config) ParsedSpanStartTime() time.Time {
+// ParseSpanStartTime returns config.SpanStartTime as time.Time.
+func (c Config) ParseSpanStartTime() time.Time {
 	t, err := c.parseTime(c.SpanStartTime, "start")
 	c.SoftFailIfErr(err)
 	return t
 }
 
-// ParsedSpanEndTime returns config.SpanEndTime as time.Time.
-func (c Config) ParsedSpanEndTime() time.Time {
+// ParseSpanEndTime returns config.SpanEndTime as time.Time.
+func (c Config) ParseSpanEndTime() time.Time {
 	t, err := c.parseTime(c.SpanEndTime, "end")
 	c.SoftFailIfErr(err)
 	return t
@@ -451,6 +509,11 @@ func (c Config) parseTime(ts, which string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("could not parse span %s time %q as any supported format", which, ts)
 }
 
+func (c Config) GetEndpoint() *url.URL {
+	ep, _ := c.ParseEndpoint()
+	return ep
+}
+
 // WithEndpoint returns the config with Endpoint set to the provided value.
 func (c Config) WithEndpoint(with string) Config {
 	c.Endpoint = with
@@ -469,10 +532,20 @@ func (c Config) WithProtocol(with string) Config {
 	return c
 }
 
+// GetTimeout returns the parsed --timeout value as a time.Duration.
+func (c Config) GetTimeout() time.Duration {
+	return c.ParseCliTimeout()
+}
+
 // WithTimeout returns the config with Timeout set to the provided value.
 func (c Config) WithTimeout(with string) Config {
 	c.Timeout = with
 	return c
+}
+
+// GetHeaders returns the stringmap of configured headers.
+func (c Config) GetHeaders() map[string]string {
+	return c.Headers
 }
 
 // WithHeades returns the config with Heades set to the provided value.
@@ -515,6 +588,11 @@ func (c Config) WithTlsClientKey(with string) Config {
 func (c Config) WithTlsClientCert(with string) Config {
 	c.TlsClientCert = with
 	return c
+}
+
+// GetServiceName returns the configured OTel service name.
+func (c Config) GetServiceName() string {
+	return c.ServiceName
 }
 
 // WithServiceName returns the config with ServiceName set to the provided value.
@@ -658,5 +736,27 @@ func (c Config) WithVerbose(with bool) Config {
 // WithFail returns the config with Fail set to the provided value.
 func (c Config) WithFail(with bool) Config {
 	c.Fail = with
+	return c
+}
+
+// Version returns the program version stored in the config.
+func (c Config) GetVersion() string {
+	return c.Version
+}
+
+// WithVersion returns the config with Version set to the provided value.
+func (c Config) WithVersion(with string) Config {
+	c.Version = with
+	return c
+}
+
+// GetStartupTime returns the configured startup time.
+func (c Config) GetStartupTime() time.Time {
+	return c.StartupTime
+}
+
+// WithStartupTime returns the config with StartupTime set to the provided value.
+func (c Config) WithStartupTime(with time.Time) Config {
+	c.StartupTime = with
 	return c
 }
