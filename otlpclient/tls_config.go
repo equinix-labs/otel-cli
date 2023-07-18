@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strings"
 )
 
 // TlsConfig evaluates otel-cli configuration and returns a tls.Config
@@ -57,6 +56,7 @@ func (config Config) GetTlsConfig() *tls.Config {
 	return tlsConfig
 }
 
+// GetInsecure returns true if the configuration expects a non-TLS connection.
 func (c Config) GetInsecure() bool {
 	endpointURL := c.GetEndpoint()
 
@@ -106,10 +106,4 @@ func isLoopbackAddr(u *url.URL) (bool, error) {
 
 	Diag.DetectedLocalhost = allAreLoopback
 	return allAreLoopback, nil
-}
-
-// isInsecureSchema returns true if the provided endpoint is an unencrypted HTTP URL or unix socket
-func isInsecureSchema(endpoint string) bool {
-	return strings.HasPrefix(endpoint, "http://") ||
-		strings.HasPrefix(endpoint, "unix://")
 }
