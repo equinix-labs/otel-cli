@@ -1,3 +1,23 @@
+## [0.4.0] - 2022-08-09
+
+This focus of this release is a brand-new OTLP client implementation. It has fewer features
+than the opentelemetry-collector code, and allows for more fine-grained control over how
+gRPC and HTTP are configured. Along the way, the `otelcli` and `otlpclient` packages went
+through a couple refactors to organize code better in preparation for adding metrics and
+logs, hopefully in 0.5.0.
+
+### Added
+
+- `--force-parent-span-id` allows forcing the span parent (thanks @domofactor!)
+- `otel-cli status` now includes a list of errors including retries that later succeeded
+
+### Changed
+
+- `--otlp-blocking` is marked deprecated and no longer does anything
+- the OTLP client implementation is no longer using opentelemetry-collector
+- traceparent code is now in a w3c/traceparent package
+- otlpserver.CliEvent is removed entirely, preferring protobuf spans & events
+
 ## [0.3.0] - 2022-05-26
 
 The most important change is that `otel-cli exec` now treats arguments as an argv
