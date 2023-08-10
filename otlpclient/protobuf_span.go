@@ -9,7 +9,6 @@ package otlpclient
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"sort"
 	"strconv"
 	"time"
 
@@ -155,46 +154,6 @@ func SpanStatusStringToInt(status string) tracepb.Status_StatusCode {
 	}
 }
 
-// StringMapAttrsToProtobuf takes a map of string:string, such as that from --attrs
-// and returns them in an []*commonpb.KeyValue
-func StringMapAttrsToProtobuf(attributes map[string]string) []*commonpb.KeyValue {
-	out := []*commonpb.KeyValue{}
-
-	for k, v := range attributes {
-		av := new(commonpb.AnyValue)
-
-		// try to parse as numbers, and fall through to string
-		if i, err := strconv.ParseInt(v, 0, 64); err == nil {
-			av.Value = &commonpb.AnyValue_IntValue{IntValue: i}
-		} else if f, err := strconv.ParseFloat(v, 64); err == nil {
-			av.Value = &commonpb.AnyValue_DoubleValue{DoubleValue: f}
-		} else if b, err := strconv.ParseBool(v); err == nil {
-			av.Value = &commonpb.AnyValue_BoolValue{BoolValue: b}
-		} else {
-			av.Value = &commonpb.AnyValue_StringValue{StringValue: v}
-		}
-
-		akv := commonpb.KeyValue{
-			Key:   k,
-			Value: av,
-		}
-
-		out = append(out, &akv)
-	}
-
-	return out
-}
-
-// SpanAttributesToStringMap converts the span's attributes to a string map.
-// Only used by tests for now.
-func SpanAttributesToStringMap(span *tracepb.Span) map[string]string {
-	out := make(map[string]string)
-	for _, attr := range span.Attributes {
-		out[attr.Key] = AttrValueToString(attr)
-	}
-	return out
-}
-
 // ResourceAttributesToStringMap converts the ResourceSpan's resource attributes to a string map.
 // Only used by tests for now.
 func ResourceAttributesToStringMap(rss *tracepb.ResourceSpans) map[string]string {
@@ -209,20 +168,14 @@ func ResourceAttributesToStringMap(rss *tracepb.ResourceSpans) map[string]string
 	return out
 }
 
-// AttrValueToString coverts a commonpb.KeyValue attribute to a string.
+// SpanAttributesToStringMap converts the span's attributes to a string map.
 // Only used by tests for now.
-func AttrValueToString(attr *commonpb.KeyValue) string {
-	v := attr.GetValue()
-	v.GetIntValue()
-	if _, ok := v.Value.(*commonpb.AnyValue_StringValue); ok {
-		return v.GetStringValue()
-	} else if _, ok := v.Value.(*commonpb.AnyValue_IntValue); ok {
-		return strconv.FormatInt(v.GetIntValue(), 10)
-	} else if _, ok := v.Value.(*commonpb.AnyValue_DoubleValue); ok {
-		return strconv.FormatFloat(v.GetDoubleValue(), byte('f'), -1, 64)
+func SpanAttributesToStringMap(span *tracepb.Span) map[string]string {
+	out := make(map[string]string)
+	for _, attr := range span.Attributes {
+		out[attr.Key] = AttrValueToString(attr)
 	}
-
-	return ""
+	return out
 }
 
 // SpanToStringMap converts a span with some extra data into a stringmap.
@@ -255,32 +208,4 @@ func TraceparentFromProtobufSpan(span *tracepb.Span, recording bool) traceparent
 		Sampling:    recording,
 		Initialized: true,
 	}
-}
-
-// flattenStringMap takes a string map and returns it flattened into a string with
-// keys sorted lexically so it should be mostly consistent enough for comparisons
-// and printing. Output is k=v,k=v style like attributes input.
-func flattenStringMap(mp map[string]string, emptyValue string) string {
-	if len(mp) == 0 {
-		return emptyValue
-	}
-
-	var out string
-	keys := make([]string, len(mp)) // for sorting
-	var i int
-	for k := range mp {
-		keys[i] = k
-		i++
-	}
-	sort.Strings(keys)
-
-	for i, k := range keys {
-		out = out + k + "=" + mp[k]
-		if i == len(keys)-1 {
-			break
-		}
-		out = out + ","
-	}
-
-	return out
 }
