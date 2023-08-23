@@ -186,7 +186,6 @@ func StringMapAttrsToProtobuf(attributes map[string]string) []*commonpb.KeyValue
 }
 
 // SpanAttributesToStringMap converts the span's attributes to a string map.
-// Only used by tests for now.
 func SpanAttributesToStringMap(span *tracepb.Span) map[string]string {
 	out := make(map[string]string)
 	for _, attr := range span.Attributes {
