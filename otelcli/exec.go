@@ -94,7 +94,8 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 
 	if err := child.Run(); err != nil {
-		config.SoftFail("command failed: %s", err)
+                span.SetStatus(codes.Error)
+                span.RecordError(err)
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
