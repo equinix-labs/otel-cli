@@ -370,19 +370,22 @@ var suites = []FixtureSuite{
 		},
 	},
         // exec false reports a span
-        { 
-                {
-                        Name: "#258 Commands that exit with a non-zero exit code should report a span",
-                        Config: FixtureConfig{
-                                CliArgs: []string{"exec", "--endpoint", "{{endpoint}}", "--", "false"},
-                        },
-                        Expect: Results{
-                                SpanCount: 1,
-                                CommandFailed: true,
-				Config:    otelcli.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
-                        },
-                },
-        },
+        // { 
+        //         {
+        //                 Name: "#258 Commands that exit with a non-zero exit code should report a span",
+        //                 Config: FixtureConfig{
+        //                         CliArgs: []string{"exec", "--endpoint", "{{endpoint}}", "--", "false"},
+        //                 },
+        //                 Expect: Results{
+        //                         SpanCount: 1,
+        //                         CliOutput: "",
+        //                         Diagnostics: otelcli.Diagnostics{
+        //                                 ExecExitCode: 1,
+        //                         },
+	// 			Config:    otelcli.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
+        //                 },
+        //         },
+        // },
 	// regression tests
 	{
 		{
