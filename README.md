@@ -24,7 +24,7 @@ can be found on the repo's [Releases](https://github.com/equinix-labs/otel-cli/r
 On most platforms the easiest way is a go get:
 
 ```shell
-go get github.com/equinix-labs/otel-cli
+go install github.com/equinix-labs/otel-cli@latest
 ```
 
 To use the brew tap e.g. on MacOS:
