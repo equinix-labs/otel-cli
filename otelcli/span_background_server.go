@@ -36,8 +36,9 @@ type BgSpanEvent struct {
 
 // BgEnd is an empty struct that can be sent to call End().
 type BgEnd struct {
-	StatusCode string `json:"status_code"`
-	StatusDesc string `json:"status_description"`
+	Attributes map[string]string `json:"span_attributes" env:"OTEL_CLI_ATTRIBUTES"`
+	StatusCode string            `json:"status_code"`
+	StatusDesc string            `json:"status_description"`
 }
 
 // AddEvent takes a BgSpanEvent from the client and attaches an event to the span.
@@ -70,9 +71,18 @@ func (bs BgSpan) Wait(in, reply *struct{}) error {
 // End takes a BgEnd (empty) struct, replies with the usual trace info, then
 // ends the span end exits the background process.
 func (bs BgSpan) End(in *BgEnd, reply *BgSpan) error {
+	// handle --attrs arg to span end by retrieving and merging with/overwriting existing attribtues
+	attrs := make(map[string]string)
+	for k, v := range otlpclient.SpanAttributesToStringMap(bs.span) {
+		attrs[k] = v
+	}
+	for key, value := range in.Attributes {
+		attrs[key] = value
+	}
 	// handle --status-code and --status-description args to span end
-	c := bs.config.WithStatusCode(in.StatusCode).WithStatusDescription(in.StatusDesc)
+	c := bs.config.WithStatusCode(in.StatusCode).WithStatusDescription(in.StatusDesc).WithAttributes(attrs)
 	otlpclient.SetSpanStatus(bs.span, c.StatusCode, c.StatusDescription)
+	bs.span.Attributes = otlpclient.StringMapAttrsToProtobuf(c.Attributes)
 
 	// running the shutdown as a goroutine prevents the client from getting an
 	// error here when the server gets closed. defer didn't do the trick.

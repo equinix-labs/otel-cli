@@ -16,7 +16,8 @@ func spanEndCmd(config *Config) *cobra.Command {
 
 See: otel-cli span background
 
-	otel-cli span end --sockdir $sockdir
+	otel-cli span end --sockdir $sockdir \
+		--attrs "output.length=$(wc -l < output.txt | sed -e 's/^[[:space:]]*//')
 `,
 		Run: doSpanEnd,
 	}
@@ -32,6 +33,7 @@ See: otel-cli span background
 	cmd.Flags().StringVar(&config.SpanEndTime, "end", defaults.SpanEndTime, "an Unix epoch or RFC3339 timestamp for the end of the span")
 
 	addSpanStatusParams(&cmd, config)
+	addAttrParams(&cmd, config)
 
 	return &cmd
 }
@@ -41,6 +43,7 @@ func doSpanEnd(cmd *cobra.Command, args []string) {
 	client, shutdown := createBgClient(config)
 
 	rpcArgs := BgEnd{
+		Attributes: config.Attributes,
 		StatusCode: config.StatusCode,
 		StatusDesc: config.StatusDescription,
 	}
