@@ -88,6 +88,13 @@ func (hc *HttpClient) UploadTraces(ctx context.Context, rsps []*tracepb.Resource
 // processHTTPStatus takes the http.Response and body, returning the same bool, error
 // as retryFunc. Mostly it's broken out so it can be unit tested.
 func processHTTPStatus(ctx context.Context, resp *http.Response, body []byte) (context.Context, bool, time.Duration, error) {
+	// #262 a vendor OTLP server is out of spec and returns JSON instead of protobuf
+	if ct, ok := resp.Header["Content-Type"]; ok {
+		if len(ct) != 1 || ct[0] != "application/x-protobuf" {
+			return ctx, false, 0, fmt.Errorf("server is out of specification: expected content type application/x-protobuf but got %q", ct[0])
+		}
+	}
+
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		// success & partial success
 		// spec says server MUST send 200 OK, we'll be generous and accept any 200
