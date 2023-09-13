@@ -59,7 +59,6 @@ func (hs *HttpServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	headers := make(map[string]string)
 	for k := range req.Header {
-		log.Printf("HEADERS[%q] = %q", k, req.Header.Get(k))
 		headers[k] = req.Header.Get(k)
 	}
 
