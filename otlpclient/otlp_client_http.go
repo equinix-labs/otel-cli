@@ -98,7 +98,7 @@ func processHTTPStatus(ctx context.Context, resp *http.Response, body []byte) (c
 			return ctx, false, 0, fmt.Errorf("unmarshal of server response failed: %w", err)
 		}
 
-		if partial := etsr.GetPartialSuccess(); partial != nil {
+		if partial := etsr.GetPartialSuccess(); partial != nil && partial.RejectedSpans > 0 {
 			// spec says to stop retrying and drop rejected spans
 			return ctx, false, 0, fmt.Errorf("partial success. %d spans were rejected", partial.GetRejectedSpans())
 
