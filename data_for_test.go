@@ -758,7 +758,6 @@ var suites = []FixtureSuite{
 				CliArgs: []string{
 					"span", "end",
 					"--sockdir", ".",
-					// these are validated by checkfuncs defined above ^^
 					"--attrs", "ghi=jkl,abc=def",
 				},
 			},
@@ -799,7 +798,6 @@ var suites = []FixtureSuite{
 				CliArgs: []string{
 					"span", "end",
 					"--sockdir", ".",
-					// these are validated by checkfuncs defined above ^^
 					"--attrs", "ghi=jkl",
 				},
 			},
@@ -840,7 +838,6 @@ var suites = []FixtureSuite{
 				CliArgs: []string{
 					"span", "end",
 					"--sockdir", ".",
-					// these are validated by checkfuncs defined above ^^
 					"--attrs", "ghi=jkl,abc=def",
 				},
 			},
