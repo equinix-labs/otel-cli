@@ -731,6 +731,88 @@ var suites = []FixtureSuite{
 			Expect: Results{Config: otelcli.DefaultConfig()},
 		},
 	},
+	// otel-cli span background, add attrs on span end
+	{
+		{
+			Name: "otel-cli span background (recording) with attrs added on end",
+			Config: FixtureConfig{
+				CliArgs:       []string{"span", "background", "--timeout", "1s", "--sockdir", "."},
+				Env:           map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"},
+				TestTimeoutMs: 2000,
+				Background:    true,
+				Foreground:    false,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig(),
+				SpanData: map[string]string{
+					"span_id":    "*",
+					"trace_id":   "*",
+					"attributes": `abc=def,ghi=jkl`, // weird format because of limitation in OTLP server
+				},
+				SpanCount: 1,
+			},
+		},
+		{
+			Name: "otel-cli span end",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"span", "end",
+					"--sockdir", ".",
+					// these are validated by checkfuncs defined above ^^
+					"--attrs", "ghi=jkl,abc=def",
+				},
+			},
+			Expect: Results{Config: otelcli.DefaultConfig()},
+		},
+		{
+			Name: "otel-cli span background (recording) with attrs added on end",
+			Config: FixtureConfig{
+				Foreground: true, // fg
+			},
+			Expect: Results{Config: otelcli.DefaultConfig()},
+		},
+	},
+	// otel-cli span background, modify and add attrs on span end
+	{
+		{
+			Name: "otel-cli span background (recording) with attrs modified and added on end",
+			Config: FixtureConfig{
+				CliArgs:       []string{"span", "background", "--timeout", "1s", "--sockdir", ".", "--attrs", "abc=123"},
+				Env:           map[string]string{"OTEL_EXPORTER_OTLP_ENDPOINT": "{{endpoint}}"},
+				TestTimeoutMs: 2000,
+				Background:    true,
+				Foreground:    false,
+			},
+			Expect: Results{
+				Config: otelcli.DefaultConfig(),
+				SpanData: map[string]string{
+					"span_id":    "*",
+					"trace_id":   "*",
+					"attributes": `abc=def,ghi=jkl`, // weird format because of limitation in OTLP server
+				},
+				SpanCount: 1,
+			},
+		},
+		{
+			Name: "otel-cli span end",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"span", "end",
+					"--sockdir", ".",
+					// these are validated by checkfuncs defined above ^^
+					"--attrs", "ghi=jkl,abc=def",
+				},
+			},
+			Expect: Results{Config: otelcli.DefaultConfig()},
+		},
+		{
+			Name: "otel-cli span background (recording) with attrs modified and added on end",
+			Config: FixtureConfig{
+				Foreground: true, // fg
+			},
+			Expect: Results{Config: otelcli.DefaultConfig()},
+		},
+	},
 	// otel-cli exec runs echo
 	{
 		{
