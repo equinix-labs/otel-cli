@@ -14,6 +14,9 @@ import (
 )
 
 func TestProcessHTTPStatus(t *testing.T) {
+	headers := http.Header{
+		"Content-Type": []string{"application/x-protobuf"},
+	}
 
 	for _, tc := range []struct {
 		resp      *http.Response
@@ -25,6 +28,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 200,
+				Header:     headers,
 			},
 			body:      etsrSuccessBody(),
 			keepgoing: false,
@@ -34,6 +38,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 200,
+				Header:     headers,
 			},
 			body:      etsrPartialSuccessBody(),
 			keepgoing: false,
@@ -43,6 +48,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 500,
+				Header:     headers,
 			},
 			body:      errorBody(500, "xyz"),
 			keepgoing: false,
@@ -52,6 +58,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 429,
+				Header:     headers,
 			},
 			body:      errorBody(429, "xyz"),
 			keepgoing: true,
@@ -60,6 +67,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 502,
+				Header:     headers,
 			},
 			body:      errorBody(502, "xyz"),
 			keepgoing: true,
@@ -68,6 +76,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 503,
+				Header:     headers,
 			},
 			body:      errorBody(503, "xyz"),
 			keepgoing: true,
@@ -76,6 +85,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 504,
+				Header:     headers,
 			},
 			body:      errorBody(504, "xyz"),
 			keepgoing: true,
@@ -85,6 +95,7 @@ func TestProcessHTTPStatus(t *testing.T) {
 		{
 			resp: &http.Response{
 				StatusCode: 301,
+				Header:     headers,
 			},
 			body:      errorBody(301, "xyz"),
 			keepgoing: false,
@@ -92,10 +103,30 @@ func TestProcessHTTPStatus(t *testing.T) {
 		},
 		// shouldn't happen in the real world...
 		{
-			resp:      &http.Response{},
+			resp:      &http.Response{Header: headers},
 			body:      []byte(""),
 			keepgoing: false,
 			err:       fmt.Errorf("BUG: fell through error checking with status code 0"),
+		},
+		// return a decent error for out-of-spec servers that return JSON after a protobuf payload
+		{
+			resp: &http.Response{
+				StatusCode: 200,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+			},
+			body:      []byte(`{"some": "json"}`),
+			keepgoing: false,
+			err:       fmt.Errorf(`server is out of specification: expected content type application/x-protobuf but got "application/json"`),
+		},
+		// spec requires headers so report that as a server problem too
+		{
+			resp: &http.Response{
+				StatusCode: 200,
+				// no headers!
+			},
+			body:      []byte(""),
+			keepgoing: false,
+			err:       fmt.Errorf("server is out of specification: Content-Type header is missing or mangled"),
 		},
 	} {
 		ctx := context.Background()
