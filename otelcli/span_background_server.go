@@ -162,6 +162,7 @@ func (bgs *bgServer) Run() {
 // Shutdown does a controlled shutdown of the background server. Blocks until
 // the server is turned down cleanly and it's safe to exit.
 func (bgs *bgServer) Shutdown() {
+	os.Remove(bgs.sockfile)
 	close(bgs.quit)
 	bgs.listener.Close()
 	bgs.wg.Wait()
