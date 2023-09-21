@@ -167,7 +167,7 @@ func checkAll(t *testing.T, fixture Fixture, results Results) {
 
 	// many of the basic plumbing tests use status so it has its own set of checks
 	// but these shouldn't run for testing the other subcommands
-	if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" && !fixture.Expect.CommandFailed {
+	if len(fixture.Config.CliArgs) > 0 && fixture.Config.CliArgs[0] == "status" && results.ExitCode == 0 {
 		checkStatusData(t, fixture, results)
 	} else {
 		// checking the text output only makes sense for non-status paths
@@ -485,9 +485,10 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 	t.Logf("[%s] going to exec 'env -i %s %s'", fixture.Name, strings.Join(statusCmd.Env, " "), strings.Join(statusCmd.Args, " "))
 	cliOut, err := statusCmd.CombinedOutput()
 	results.CliOutput = string(cliOut)
+	results.ExitCode = statusCmd.ProcessState.ExitCode()
+	results.CommandFailed = !statusCmd.ProcessState.Exited()
 	if err != nil {
-		results.CommandFailed = true
-		t.Logf("[%s] executing command failed: %s", fixture.Name, err)
+		t.Logf("[%s] command exited with status %d: %s", fixture.Name, results.ExitCode, err)
 	}
 
 	// send stop signals to the timeouts and OTLP server
@@ -497,7 +498,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 
 	// only try to parse status json if it was a status command
 	// TODO: support variations on otel-cli where status isn't the first arg
-	if len(args) > 0 && args[0] == "status" && !fixture.Expect.CommandFailed {
+	if len(args) > 0 && args[0] == "status" && results.ExitCode == 0 {
 		err = json.Unmarshal(cliOut, &results)
 		if err != nil {
 			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Name, err)

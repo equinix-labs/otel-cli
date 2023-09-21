@@ -70,7 +70,8 @@ type Results struct {
 	SpanCount     int            // number of spans received
 	EventCount    int            // number of events received
 	TimedOut      bool           // true when test timed out
-	CommandFailed bool           // otel-cli failed / was killed
+	CommandFailed bool           // otel-cli was killed, did not exit() on its own
+	ExitCode      int            // the process exit code returned by otel-cli
 	Span          *tracepb.Span
 	SpanEvents    []*tracepb.Span_Event
 }
@@ -326,8 +327,8 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				Config:        otelcli.DefaultConfig(),
-				CommandFailed: true,
+				Config:   otelcli.DefaultConfig(),
+				ExitCode: 1,
 				// strips the date off the log line before comparing to expectation
 				CliOutputRe: regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
 				CliOutput: "Error while loading environment variables: could not parse OTEL_CLI_VERBOSE value " +
@@ -369,6 +370,7 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
+
 	// regression tests
 	{
 		{
@@ -463,6 +465,23 @@ var suites = []FixtureSuite{
 					Endpoint:          "http://{{endpoint}}/mycollector/x/1",
 					EndpointSource:    "signal",
 				},
+			},
+		},
+		{
+			Name: "#258 Commands that exit with a non-zero exit code should report a span",
+			Config: FixtureConfig{
+				CliArgs: []string{"exec",
+					"--endpoint", "{{endpoint}}",
+					"--verbose", "--fail",
+					"--", "false",
+				},
+			},
+			Expect: Results{
+				ExitCode:      1,
+				SpanCount:     1,
+				CliOutput:     "",
+				CommandFailed: false, // otel-cli should exit voluntarily in this case
+				Config:        otelcli.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
 			},
 		},
 	},
@@ -950,10 +969,9 @@ var suites = []FixtureSuite{
 				TestTimeoutMs: 1000,
 			},
 			Expect: Results{
-				CommandFailed: true,
-				CliOutputRe:   regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
-				CliOutput:     "invalid protocol setting \"xxx\"\n",
-				Config:        otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				CliOutputRe: regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
+				CliOutput:   "invalid protocol setting \"xxx\"\n",
+				Config:      otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       false,
 					NumArgs:           7,
@@ -961,6 +979,7 @@ var suites = []FixtureSuite{
 					ParsedTimeoutMs:   1000,
 					Endpoint:          "*",
 					EndpointSource:    "*",
+					ExecExitCode:      1,
 				},
 				SpanCount: 0,
 			},
@@ -1039,10 +1058,10 @@ var suites = []FixtureSuite{
 				},
 			},
 			Expect: Results{
-				CommandFailed: true,
-				CliOutputRe:   regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
-				CliOutput:     "invalid protocol setting \"roflcopter\"\n",
-				Config:        otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}"),
+				ExitCode:    1,
+				CliOutputRe: regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
+				CliOutput:   "invalid protocol setting \"roflcopter\"\n",
+				Config:      otelcli.DefaultConfig().WithEndpoint("http://{{endpoint}}"),
 				Diagnostics: otelcli.Diagnostics{
 					IsRecording:       false,
 					NumArgs:           3,
