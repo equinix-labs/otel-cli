@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
+	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // execCmd sets up the `otel-cli exec` command
@@ -95,10 +95,10 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 
 	if err := child.Run(); err != nil {
-                span.Status = & tracev1.Status {
-                        Message: fmt.Sprintln("exec command failed: ", err),
-                        Code: tracev1.Status_STATUS_CODE_ERROR,
-                }
+		span.Status = &tracev1.Status{
+			Message: fmt.Sprintf("exec command failed: %s", err),
+			Code:    tracev1.Status_STATUS_CODE_ERROR,
+		}
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
