@@ -7,10 +7,10 @@ package main_test
 // see TESTING.md for details
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -465,41 +465,67 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 	statusCmd := exec.Command("./otel-cli", args...)
 	statusCmd.Env = mkEnviron(endpoint, fixture.Config.Env, fixture.TlsData)
 
-	cancelProcessTimeout := make(chan struct{}, 1)
-	go func() {
-		select {
-		case <-time.After(serverTimeout):
-			results.TimedOut = true
-			err = statusCmd.Process.Kill()
-			if err != nil {
-				// TODO: this might be a bit fragle, soften this up later if it ends up problematic
-				log.Fatalf("[%s] process kill failed: %s", fixture.Name, err)
+	// have command write output into string buffers
+	var cliOut bytes.Buffer
+	statusCmd.Stdout = &cliOut
+	statusCmd.Stderr = &cliOut
+
+	err = statusCmd.Start()
+	if err != nil {
+		t.Fatalf("[%s] error starting otel-cli: %s", fixture.Name, err)
+	}
+
+	stopKiller := make(chan struct{}, 1)
+	if fixture.Config.KillAfter != 0 {
+		go func() {
+			select {
+			case <-time.After(fixture.Config.KillAfter):
+				err := statusCmd.Process.Signal(fixture.Config.KillSignal)
+				if err != nil {
+					t.Fatalf("[%s] error sending signal %s to pid %d: %s", fixture.Name, fixture.Config.KillSignal, statusCmd.Process.Pid, err)
+				}
+			case <-stopKiller:
+				return
 			}
-		case <-cancelProcessTimeout:
-			return
-		}
-	}()
+		}()
+	} else {
+		go func() {
+			select {
+			case <-time.After(serverTimeout):
+				t.Logf("[%s] timeout, killing process...", fixture.Name)
+				results.TimedOut = true
+				err = statusCmd.Process.Kill()
+				if err != nil {
+					// TODO: this might be a bit fragile, soften this up later if it ends up problematic
+					t.Fatalf("[%s] %d timeout process kill failed: %s", fixture.Name, serverTimeout, err)
+				}
+			case <-stopKiller:
+				return
+			}
+		}()
+	}
 
 	// grab stderr & stdout comingled so that if otel-cli prints anything to either it's not
 	// supposed to it will cause e.g. status json parsing and other tests to fail
 	t.Logf("[%s] going to exec 'env -i %s %s'", fixture.Name, strings.Join(statusCmd.Env, " "), strings.Join(statusCmd.Args, " "))
-	cliOut, err := statusCmd.CombinedOutput()
-	results.CliOutput = string(cliOut)
+	err = statusCmd.Wait()
+
+	results.CliOutput = cliOut.String()
 	results.ExitCode = statusCmd.ProcessState.ExitCode()
 	results.CommandFailed = !statusCmd.ProcessState.Exited()
 	if err != nil {
-		t.Logf("[%s] command exited with status %d: %s", fixture.Name, results.ExitCode, err)
+		t.Logf("[%s] command exited: %s", fixture.Name, err)
 	}
 
 	// send stop signals to the timeouts and OTLP server
-	cancelProcessTimeout <- struct{}{}
 	cancelServerTimeout <- struct{}{}
+	stopKiller <- struct{}{}
 	cs.Stop()
 
 	// only try to parse status json if it was a status command
 	// TODO: support variations on otel-cli where status isn't the first arg
 	if len(args) > 0 && args[0] == "status" && results.ExitCode == 0 {
-		err = json.Unmarshal(cliOut, &results)
+		err = json.Unmarshal(cliOut.Bytes(), &results)
 		if err != nil {
 			t.Errorf("[%s] parsing otel-cli status output failed: %s", fixture.Name, err)
 			t.Logf("[%s] output received: %q", fixture.Name, cliOut)
