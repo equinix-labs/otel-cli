@@ -8,7 +8,9 @@ package main_test
 // TODO: Results.SpanData could become a struct now
 
 import (
+	"os"
 	"regexp"
+	"syscall"
 	"testing"
 	"time"
 
@@ -51,6 +53,10 @@ type FixtureConfig struct {
 	// description in the same file
 	Background bool
 	Foreground bool
+	// for testing signal behavior a time to wait before sending a signal
+	// and the signal to send can be specified
+	KillAfter  time.Duration
+	KillSignal os.Signal
 }
 
 // mostly mirrors otelcli.StatusOutput but we need more
@@ -1178,6 +1184,27 @@ var suites = []FixtureSuite{
 					ParsedTimeoutMs:   1000,
 					Endpoint:          "http://{{endpoint}}/v1/traces",
 					EndpointSource:    "general",
+				},
+			},
+		},
+	},
+	// exec signal and timeout behavior
+	{
+		{
+			Name: "handle ctrl-c gracefully",
+			Config: FixtureConfig{
+				CliArgs:       []string{"exec", "--endpoint", "{{endpoint}}", "--timeout", "2s", "sleep", "1"},
+				KillAfter:     time.Millisecond * 20,
+				KillSignal:    syscall.SIGINT, // control-c
+				TestTimeoutMs: 50,             // if we get to 50ms the signal failed
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				ExitCode:  2,
+				SpanData: map[string]string{
+					"status_code":        "2",
+					"status_description": "exec command failed: signal: interrupt",
 				},
 			},
 		},

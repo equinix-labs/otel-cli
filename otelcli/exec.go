@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -94,6 +95,17 @@ func doExec(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// ctrl-c (sigint) is forwarded to the child process
+	signals := make(chan os.Signal, 10)
+	signalsDone := make(chan struct{})
+	signal.Notify(signals, os.Interrupt)
+	go func() {
+		sig := <-signals
+		child.Process.Signal(sig)
+		// this might not seem necessary but without it, otel-cli exits before sending the span
+		close(signalsDone)
+	}()
+
 	if err := child.Run(); err != nil {
 		span.Status = &tracev1.Status{
 			Message: fmt.Sprintf("exec command failed: %s", err),
@@ -101,6 +113,9 @@ func doExec(cmd *cobra.Command, args []string) {
 		}
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
+
+	close(signals)
+	<-signalsDone
 
 	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
