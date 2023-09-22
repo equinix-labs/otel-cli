@@ -55,6 +55,7 @@ func DefaultConfig() Config {
 		BackgroundSockdir:            "",
 		BackgroundWait:               false,
 		BackgroundSkipParentPidCheck: false,
+		ExecCommandTimeout:           "",
 		StatusCanaryCount:            1,
 		StatusCanaryInterval:         "",
 		SpanStartTime:                "now",
@@ -108,6 +109,8 @@ type Config struct {
 	BackgroundSockdir            string `json:"background_socket_directory" env:""`
 	BackgroundWait               bool   `json:"background_wait" env:""`
 	BackgroundSkipParentPidCheck bool   `json:"background_skip_parent_pid_check"`
+
+	ExecCommandTimeout string `json:"exec_command_timeout" env:"OTEL_CLI_EXEC_CMD_TIMEOUT"`
 
 	StatusCanaryCount    int    `json:"status_canary_count"`
 	StatusCanaryInterval string `json:"status_canary_interval"`
@@ -230,6 +233,7 @@ func (c Config) ToStringMap() map[string]string {
 		"background_socket_directory": c.BackgroundSockdir,
 		"background_wait":             strconv.FormatBool(c.BackgroundWait),
 		"background_skip_pid_check":   strconv.FormatBool(c.BackgroundSkipParentPidCheck),
+		"exec_command_timeout":        c.ExecCommandTimeout,
 		"span_start_time":             c.SpanStartTime,
 		"span_end_time":               c.SpanEndTime,
 		"event_name":                  c.EventName,
@@ -255,6 +259,17 @@ func (c Config) GetIsRecording() bool {
 func (c Config) ParseCliTimeout() time.Duration {
 	out, err := parseDuration(c.Timeout)
 	Diag.ParsedTimeoutMs = out.Milliseconds()
+	c.SoftFailIfErr(err)
+	return out
+}
+
+// ParseExecCommandTimeout parses the --command-timeout string value to a time.Duration.
+// When timeout is unspecified or 0, otel-cli will wait forever for the command to complete.
+func (c Config) ParseExecCommandTimeout() time.Duration {
+	if c.ExecCommandTimeout == "" {
+		return 0
+	}
+	out, err := parseDuration(c.ExecCommandTimeout)
 	c.SoftFailIfErr(err)
 	return out
 }

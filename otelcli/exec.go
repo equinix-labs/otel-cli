@@ -2,6 +2,7 @@ package otelcli
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -41,18 +42,33 @@ to sh -c and should not be passed any untrusted input`,
 	addAttrParams(&cmd, config)
 	addClientParams(&cmd, config)
 
+	defaults := DefaultConfig()
+	cmd.Flags().StringVar(
+		&config.ExecCommandTimeout,
+		"command-timeout",
+		defaults.ExecCommandTimeout,
+		"timeout for otel-cli operations, all timeouts in otel-cli use this value",
+	)
+
 	return &cmd
 }
 
 func doExec(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
-	ctx, client := StartClient(ctx, config)
 
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
 	config.Attributes["arguments"] = ""
 
+	cmdTimeout := config.ParseExecCommandTimeout()
+	// no deadline if there is no command timeout set
+	cmdCtx := ctx
+	if cmdTimeout > 0 {
+		var cancel func()
+		cmdCtx, cancel = context.WithDeadline(ctx, config.StartupTime.Add(cmdTimeout))
+		defer cancel()
+	}
 	var child *exec.Cmd
 	if len(args) > 1 {
 		// CSV-join the arguments to send as an attribute
@@ -60,9 +76,9 @@ func doExec(cmd *cobra.Command, args []string) {
 		csv.NewWriter(buf).WriteAll([][]string{args[1:]})
 		config.Attributes["arguments"] = buf.String()
 
-		child = exec.Command(args[0], args[1:]...)
+		child = exec.CommandContext(cmdCtx, args[0], args[1:]...)
 	} else {
-		child = exec.Command(args[0])
+		child = exec.CommandContext(cmdCtx, args[0])
 	}
 
 	// attach all stdio to the parent's handles
@@ -117,6 +133,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	close(signals)
 	<-signalsDone
 
+	ctx, client := StartClient(ctx, config)
 	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
 		config.SoftFail("unable to send span: %s", err)
