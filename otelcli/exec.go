@@ -58,14 +58,14 @@ func doExec(cmd *cobra.Command, args []string) {
 	config.Attributes["command"] = args[0]
 	config.Attributes["arguments"] = ""
 
-	cmdTimeout := config.ParseExecCommandTimeout()
 	// no deadline if there is no command timeout set
+	cancelCtxDeadline := func() {}
 	cmdCtx := ctx
+	cmdTimeout := config.ParseExecCommandTimeout()
 	if cmdTimeout > 0 {
-		var cancel func()
-		cmdCtx, cancel = context.WithDeadline(ctx, config.StartupTime.Add(cmdTimeout))
-		defer cancel()
+		cmdCtx, cancelCtxDeadline = context.WithDeadline(ctx, time.Now().Add(cmdTimeout))
 	}
+
 	var child *exec.Cmd
 	if len(args) > 1 {
 		// CSV-join the arguments to send as an attribute
@@ -127,8 +127,13 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
+	cancelCtxDeadline()
 	close(signals)
 	<-signalsDone
+
+	// set --timeout on just the OTLP egress, starting now instead of process start time
+	ctx, cancelCtxDeadline = context.WithDeadline(ctx, time.Now().Add(config.GetTimeout()))
+	defer cancelCtxDeadline()
 
 	ctx, client := StartClient(ctx, config)
 	ctx, err := otlpclient.SendSpan(ctx, client, config, span)

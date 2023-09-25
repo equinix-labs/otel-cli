@@ -1233,11 +1233,11 @@ var suites = []FixtureSuite{
 			Config: FixtureConfig{
 				CliArgs: []string{"exec",
 					"--endpoint", "{{endpoint}}",
-					"--command-timeout", "50ms",
-					"--timeout", "30ms",
-					"sleep", "0.04", // depends on GNU sleep's floating point sleeps
+					"--command-timeout", "100ms",
+					"--timeout", "50ms",
+					"sleep", "0.75", // depends on GNU sleep's floating point sleeps
 				},
-				TestTimeoutMs: 70,
+				TestTimeoutMs: 200,
 			},
 			Expect: Results{
 				SpanCount: 1,

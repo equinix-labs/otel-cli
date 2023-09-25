@@ -5,7 +5,6 @@ package otelcli
 import (
 	"context"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -81,7 +80,6 @@ func createRootCmd(config *Config) *cobra.Command {
 // This is called by main.main(). It only needs to happen once.
 func Execute(version string) {
 	config := DefaultConfig()
-	config.StartupTime = time.Now() // record startup time as early as possible timeouts
 	config.Version = version
 
 	// Cobra can tunnel config through context, so set that up now

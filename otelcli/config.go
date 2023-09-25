@@ -68,7 +68,6 @@ func DefaultConfig() Config {
 		StatusCode:                   "unset",
 		StatusDescription:            "",
 		Version:                      "unset",
-		StartupTime:                  time.Now(),
 	}
 }
 
@@ -125,8 +124,7 @@ type Config struct {
 	Fail    bool   `json:"fail" env:"OTEL_CLI_FAIL"`
 
 	// not exported, used to get data from cobra to otlpclient internals
-	StartupTime time.Time `json:"-"`
-	Version     string    `json:"-"`
+	Version string `json:"-"`
 }
 
 // LoadFile reads the file specified by -c/--config and overwrites the
@@ -762,16 +760,5 @@ func (c Config) GetVersion() string {
 // WithVersion returns the config with Version set to the provided value.
 func (c Config) WithVersion(with string) Config {
 	c.Version = with
-	return c
-}
-
-// GetStartupTime returns the configured startup time.
-func (c Config) GetStartupTime() time.Time {
-	return c.StartupTime
-}
-
-// WithStartupTime returns the config with StartupTime set to the provided value.
-func (c Config) WithStartupTime(with time.Time) Config {
-	c.StartupTime = with
 	return c
 }

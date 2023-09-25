@@ -1,7 +1,9 @@
 package otelcli
 
 import (
+	"context"
 	"os"
+	"time"
 
 	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
@@ -47,6 +49,8 @@ Example:
 func doSpan(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(config.GetTimeout()))
+	defer cancel()
 	ctx, client := StartClient(ctx, config)
 	span := config.NewProtobufSpan()
 	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
