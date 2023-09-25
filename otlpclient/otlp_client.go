@@ -193,9 +193,7 @@ func SaveError(ctx context.Context, t time.Time, err error) (context.Context, er
 func retry(ctx context.Context, config OTLPConfig, fun retryFun) (context.Context, error) {
 	deadline, haveDL := ctx.Deadline()
 	if !haveDL {
-		// TODO: upstream callers should set their own deadlines but that's out of scope
-		// for my current PR, so this maintains the old behavor
-		deadline = time.Now().Add(config.GetTimeout())
+		return ctx, fmt.Errorf("BUG in otel-cli: no deadline set before retry()")
 	}
 	sleep := time.Duration(0)
 	for {

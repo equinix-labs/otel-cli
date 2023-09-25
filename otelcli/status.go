@@ -1,6 +1,7 @@
 package otelcli
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -60,6 +61,8 @@ func doStatus(cmd *cobra.Command, args []string) {
 
 	ctx := cmd.Context()
 	config := getConfig(ctx)
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(config.GetTimeout()))
+	defer cancel()
 	ctx, client := StartClient(ctx, config)
 
 	env := make(map[string]string)
