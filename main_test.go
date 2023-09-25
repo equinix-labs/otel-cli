@@ -11,6 +11,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -482,7 +483,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 			case <-time.After(fixture.Config.KillAfter):
 				err := statusCmd.Process.Signal(fixture.Config.KillSignal)
 				if err != nil {
-					t.Fatalf("[%s] error sending signal %s to pid %d: %s", fixture.Name, fixture.Config.KillSignal, statusCmd.Process.Pid, err)
+					log.Fatalf("[%s] error sending signal %s to pid %d: %s", fixture.Name, fixture.Config.KillSignal, statusCmd.Process.Pid, err)
 				}
 			case <-stopKiller:
 				return
@@ -497,7 +498,7 @@ func runOtelCli(t *testing.T, fixture Fixture) (string, Results) {
 				err = statusCmd.Process.Kill()
 				if err != nil {
 					// TODO: this might be a bit fragile, soften this up later if it ends up problematic
-					t.Fatalf("[%s] %d timeout process kill failed: %s", fixture.Name, serverTimeout, err)
+					log.Fatalf("[%s] %d timeout process kill failed: %s", fixture.Name, serverTimeout, err)
 				}
 			case <-stopKiller:
 				return
