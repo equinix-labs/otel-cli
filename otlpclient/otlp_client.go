@@ -33,7 +33,6 @@ type OTLPConfig interface {
 	GetInsecure() bool
 	GetTimeout() time.Duration
 	GetHeaders() map[string]string
-	GetStartupTime() time.Time
 	GetVersion() string
 	GetServiceName() string
 }
@@ -74,17 +73,6 @@ func SendSpan(ctx context.Context, client OTLPClient, config OTLPConfig, span *t
 	}
 
 	return ctx, nil
-}
-
-// deadlineCtx sets timeout on the context if the duration is non-zero.
-// Otherwise it returns the context as-is.
-func deadlineCtx(ctx context.Context, timeout time.Duration, startupTime time.Time) (context.Context, context.CancelFunc) {
-	if timeout > 0 {
-		deadline := startupTime.Add(timeout)
-		return context.WithDeadline(ctx, deadline)
-	}
-
-	return ctx, func() {}
 }
 
 // resourceAttributes calls the OTel SDK to get automatic resource attrs and
@@ -203,7 +191,12 @@ func SaveError(ctx context.Context, t time.Time, err error) (context.Context, er
 // TODO: span events? hmm... feels weird to plumb spans this deep into the client
 // but it's probably fine?
 func retry(ctx context.Context, config OTLPConfig, fun retryFun) (context.Context, error) {
-	deadline := config.GetStartupTime().Add(config.GetTimeout())
+	deadline, haveDL := ctx.Deadline()
+	if !haveDL {
+		// TODO: upstream callers should set their own deadlines but that's out of scope
+		// for my current PR, so this maintains the old behavor
+		deadline = time.Now().Add(config.GetTimeout())
+	}
 	sleep := time.Duration(0)
 	for {
 		if ctx, keepGoing, wait, err := fun(ctx); err != nil {

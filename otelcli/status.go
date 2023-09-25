@@ -81,7 +81,7 @@ func doStatus(cmd *cobra.Command, args []string) {
 
 	var canaryCount int
 	var lastSpan *tracepb.Span
-	deadline := config.StartupTime.Add(config.ParseCliTimeout())
+	deadline := time.Now().Add(config.GetTimeout())
 	interval := config.ParseStatusCanaryInterval()
 	for {
 		// should be rare but a caller could request 0 canaries, in which case the

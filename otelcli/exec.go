@@ -2,6 +2,7 @@ package otelcli
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"os"
@@ -28,10 +29,7 @@ Examples:
 
 otel-cli exec -n my-cool-thing -s interesting-step curl https://cool-service/api/v1/endpoint
 
-otel-cli exec -s "outer span" 'otel-cli exec -s "inner span" sleep 1'
-
-WARNING: this does not clean or validate the command at all before passing it
-to sh -c and should not be passed any untrusted input`,
+otel-cli exec -s "outer span" 'otel-cli exec -s "inner span" sleep 1'`,
 		Run:  doExec,
 		Args: cobra.MinimumNArgs(1),
 	}
@@ -41,17 +39,32 @@ to sh -c and should not be passed any untrusted input`,
 	addAttrParams(&cmd, config)
 	addClientParams(&cmd, config)
 
+	defaults := DefaultConfig()
+	cmd.Flags().StringVar(
+		&config.ExecCommandTimeout,
+		"command-timeout",
+		defaults.ExecCommandTimeout,
+		"timeout for the child process, when 0 otel-cli will wait forever",
+	)
+
 	return &cmd
 }
 
 func doExec(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
-	ctx, client := StartClient(ctx, config)
 
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
 	config.Attributes["arguments"] = ""
+
+	// no deadline if there is no command timeout set
+	cancelCtxDeadline := func() {}
+	cmdCtx := ctx
+	cmdTimeout := config.ParseExecCommandTimeout()
+	if cmdTimeout > 0 {
+		cmdCtx, cancelCtxDeadline = context.WithDeadline(ctx, time.Now().Add(cmdTimeout))
+	}
 
 	var child *exec.Cmd
 	if len(args) > 1 {
@@ -60,9 +73,9 @@ func doExec(cmd *cobra.Command, args []string) {
 		csv.NewWriter(buf).WriteAll([][]string{args[1:]})
 		config.Attributes["arguments"] = buf.String()
 
-		child = exec.Command(args[0], args[1:]...)
+		child = exec.CommandContext(cmdCtx, args[0], args[1:]...)
 	} else {
-		child = exec.Command(args[0])
+		child = exec.CommandContext(cmdCtx, args[0])
 	}
 
 	// attach all stdio to the parent's handles
@@ -114,9 +127,15 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
+	cancelCtxDeadline()
 	close(signals)
 	<-signalsDone
 
+	// set --timeout on just the OTLP egress, starting now instead of process start time
+	ctx, cancelCtxDeadline = context.WithDeadline(ctx, time.Now().Add(config.GetTimeout()))
+	defer cancelCtxDeadline()
+
+	ctx, client := StartClient(ctx, config)
 	ctx, err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
 		config.SoftFail("unable to send span: %s", err)

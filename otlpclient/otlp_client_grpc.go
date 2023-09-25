@@ -46,7 +46,6 @@ func (gc *GrpcClient) Start(ctx context.Context) (context.Context, error) {
 		grpcOpts = append(grpcOpts, grpc.WithTransportCredentials(credentials.NewTLS(gc.config.GetTlsConfig())))
 	}
 
-	ctx, _ = deadlineCtx(ctx, gc.config.GetTimeout(), gc.config.GetStartupTime())
 	gc.conn, err = grpc.DialContext(ctx, host, grpcOpts...)
 	if err != nil {
 		return ctx, fmt.Errorf("could not connect to gRPC/OTLP: %w", err)

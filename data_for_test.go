@@ -1208,5 +1208,42 @@ var suites = []FixtureSuite{
 				},
 			},
 		},
+		{
+			Name: "exec --command-timeout terminates processes",
+			Config: FixtureConfig{
+				CliArgs: []string{"exec",
+					"--endpoint", "{{endpoint}}",
+					"--command-timeout", "20ms",
+					"sleep", "1",
+				},
+				TestTimeoutMs: 50,
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				ExitCode:  2,
+				SpanData: map[string]string{
+					"status_code":        "2",
+					"status_description": "exec command failed: signal: killed",
+				},
+			},
+		},
+		{
+			Name: "exec --command-timeout can run longer than --timeout",
+			Config: FixtureConfig{
+				CliArgs: []string{"exec",
+					"--endpoint", "{{endpoint}}",
+					"--command-timeout", "100ms",
+					"--timeout", "50ms",
+					"sleep", "0.75", // depends on GNU sleep's floating point sleeps
+				},
+				TestTimeoutMs: 200,
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				ExitCode:  0,
+			},
+		},
 	},
 }
