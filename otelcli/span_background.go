@@ -133,6 +133,10 @@ func doSpanBackground(cmd *cobra.Command, args []string) {
 	bgs.Run()
 
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
+
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(config.GetTimeout()))
+	defer cancel()
+
 	_, err := otlpclient.SendSpan(ctx, client, config, span)
 	if err != nil {
 		config.SoftFail("Sending span failed: %s", err)
