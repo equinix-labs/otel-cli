@@ -6,7 +6,7 @@ toolchain go1.21.1
 
 require (
 	github.com/golang/protobuf v1.5.3
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/pterm/pterm v0.12.69
 	github.com/spf13/cobra v1.7.0
