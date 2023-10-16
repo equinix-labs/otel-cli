@@ -1,4 +1,19 @@
-## [0.4.0] - 2022-08-09
+## [0.4.1] - 2023-10-16
+
+Mostly small but impactful changes to `otel-cli exec`.
+
+### Added
+
+- `otel-cli exec --command-timeout 30s` provides a separate command timeout from the otel timeout
+- SIGINT is now caught and passed to the child process
+- attributes can be set or overwrite on a backgrounded span via `otel-cli span end`
+
+### Changed
+
+- bumped several dependencies to the latest release
+- updated README.md
+
+## [0.4.0] - 2023-08-09
 
 This focus of this release is a brand-new OTLP client implementation. It has fewer features
 than the opentelemetry-collector code, and allows for more fine-grained control over how
@@ -18,7 +33,7 @@ logs, hopefully in 0.5.0.
 - traceparent code is now in a w3c/traceparent package
 - otlpserver.CliEvent is removed entirely, preferring protobuf spans & events
 
-## [0.3.0] - 2022-05-26
+## [0.3.0] - 2023-05-26
 
 The most important change is that `otel-cli exec` now treats arguments as an argv
 list instead of munging them into a string. This shouldn't break anyone doing sensible
