@@ -27,6 +27,13 @@ On most platforms the easiest way is a go get:
 go install github.com/equinix-labs/otel-cli@latest
 ```
 
+Docker images are published for each otel-cli release as well:
+
+```shell
+docker pull ghcr.io/equinix-labs/otel-cli:latest
+docker run ghcr.io/equinix-labs/otel-cli:latest status
+```
+
 To use the brew tap e.g. on MacOS:
 
 ```shell
@@ -154,6 +161,18 @@ embedding commas will work fine.
 ```shell
 otel-cli span --attrs item1=value1,\"item2=value2,value3\",item3=value4
 otel-cli span --attrs 'item1=value1,"item2=value2,value3",item3=value4'
+```
+
+### Docker TLS Certificates
+
+As of release 0.4.2, otel-cli containers are built off the latest Alpine base
+image which contains the base CA certificate bundles. In over to override
+these for e.g. a self-signed certificate, the best bet is to volume mount your
+own /etc/ssl into the container, and it should get picked up by otel-cli and Go's
+TLS libraries.
+
+```shell
+docker run -v /etc/ssl:/etc/ssl ghcr.io/equinix-labs/otel-cli:latest status
 ```
 
 ## Easy local dev
