@@ -902,7 +902,7 @@ var suites = []FixtureSuite{
 	// otel-cli exec runs otel-cli exec
 	{
 		{
-			Name: "otel-cli span exec (nested)",
+			Name: "otel-cli exec (nested)",
 			Config: FixtureConfig{
 				CliArgs: []string{
 					"exec", "--name", "outer", "--endpoint", "{{endpoint}}", "--fail", "--verbose", "--",
@@ -912,6 +912,24 @@ var suites = []FixtureSuite{
 				Config:    otelcli.DefaultConfig(),
 				CliOutput: "hello world\n",
 				SpanCount: 2,
+			},
+		},
+	},
+	{
+		{
+			Name: "otel-cli exec with arg injection",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"exec", "--endpoint", "{{endpoint}}",
+					"--force-trace-id", "e39280f2980af3a8600ae98c74f2dabf", "--force-span-id", "023eee2731392b4d",
+					"--",
+					"echo", "{{traceparent}}"},
+			},
+			Expect: Results{
+				Config:      otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				CliOutputRe: regexp.MustCompile(`^\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2} `),
+				CliOutput:   "00-e39280f2980af3a8600ae98c74f2dabf-023eee2731392b4d-01\n",
+				SpanCount:   1,
 			},
 		},
 	},
