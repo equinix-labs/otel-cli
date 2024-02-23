@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/equinix-labs/otel-cli/otlpclient"
+	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -53,6 +54,7 @@ otel-cli exec -s "outer span" 'otel-cli exec -s "inner span" sleep 1'`,
 func doExec(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
+	span := config.NewProtobufSpan()
 
 	// put the command in the attributes, before creating the span so it gets picked up
 	config.Attributes["command"] = args[0]
@@ -60,20 +62,44 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	// no deadline if there is no command timeout set
 	cancelCtxDeadline := func() {}
+	// fork the context for the command so its deadline doesn't impact the otlpclient ctx
 	cmdCtx := ctx
 	cmdTimeout := config.ParseExecCommandTimeout()
 	if cmdTimeout > 0 {
 		cmdCtx, cancelCtxDeadline = context.WithDeadline(ctx, time.Now().Add(cmdTimeout))
 	}
 
+	// pass the existing env but add the latest TRACEPARENT carrier so e.g.
+	// otel-cli exec 'otel-cli exec sleep 1' will relate the spans automatically
+	childEnv := []string{}
+
+	// set the traceparent to the current span to be available to the child process
+	var tp traceparent.Traceparent
+	if config.GetIsRecording() {
+		tp = otlpclient.TraceparentFromProtobufSpan(span, config.GetIsRecording())
+		childEnv = append(childEnv, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
+		// when not recording, and a traceparent is available, pass it through
+	} else if !config.TraceparentIgnoreEnv {
+		tp := config.LoadTraceparent()
+		if tp.Initialized {
+			childEnv = append(childEnv, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
+		}
+	}
+
 	var child *exec.Cmd
 	if len(args) > 1 {
+		tpArgs := make([]string, len(args)-1)
+		// loop over the args replacing {{traceparent}} with the current tp
+		for i, arg := range args[1:] {
+			tpArgs[i] = strings.Replace(arg, "{{traceparent}}", tp.Encode(), -1)
+		}
+
 		// CSV-join the arguments to send as an attribute
 		buf := bytes.NewBuffer([]byte{})
-		csv.NewWriter(buf).WriteAll([][]string{args[1:]})
+		csv.NewWriter(buf).WriteAll([][]string{tpArgs})
 		config.Attributes["arguments"] = buf.String()
 
-		child = exec.CommandContext(cmdCtx, args[0], args[1:]...)
+		child = exec.CommandContext(cmdCtx, args[0], tpArgs...)
 	} else {
 		child = exec.CommandContext(cmdCtx, args[0])
 	}
@@ -83,30 +109,13 @@ func doExec(cmd *cobra.Command, args []string) {
 	child.Stdout = os.Stdout
 	child.Stderr = os.Stderr
 
-	// pass the existing env but add the latest TRACEPARENT carrier so e.g.
-	// otel-cli exec 'otel-cli exec sleep 1' will relate the spans automatically
-	child.Env = []string{}
-
 	// grab everything BUT the TRACEPARENT envvar
 	for _, env := range os.Environ() {
 		if !strings.HasPrefix(env, "TRACEPARENT=") {
-			child.Env = append(child.Env, env)
+			childEnv = append(childEnv, env)
 		}
 	}
-
-	span := config.NewProtobufSpan()
-
-	// set the traceparent to the current span to be available to the child process
-	if config.GetIsRecording() {
-		tp := otlpclient.TraceparentFromProtobufSpan(span, config.GetIsRecording())
-		child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
-		// when not recording, and a traceparent is available, pass it through
-	} else if !config.TraceparentIgnoreEnv {
-		tp := config.LoadTraceparent()
-		if tp.Initialized {
-			child.Env = append(child.Env, fmt.Sprintf("TRACEPARENT=%s", tp.Encode()))
-		}
-	}
+	child.Env = childEnv
 
 	// ctrl-c (sigint) is forwarded to the child process
 	signals := make(chan os.Signal, 10)
@@ -119,6 +128,7 @@ func doExec(cmd *cobra.Command, args []string) {
 		close(signalsDone)
 	}()
 
+	span.StartTimeUnixNano = uint64(time.Now().UnixNano())
 	if err := child.Run(); err != nil {
 		span.Status = &tracev1.Status{
 			Message: fmt.Sprintf("exec command failed: %s", err),
