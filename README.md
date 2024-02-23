@@ -70,6 +70,11 @@ otel-cli exec --kind producer "otel-cli exec --kind consumer sleep 1"
 # used by span and exec. use --tp-ignore-env to ignore it even when present
 export TRACEPARENT=00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01
 
+# you can pass the traceparent to a child via arguments as well
+# {{traceparent}} in any of the command's arguments will be replaced with the traceparent string
+otel-cli exec --name "curl api" -- \
+   curl -H 'traceparent: {{traceparent}}' https://myapi.com/v1/coolstuff
+
 # create a span with a custom start/end time using either RFC3339,
 # same with the nanosecond extension, or Unix epoch, with/without nanos
 otel-cli span --start 2021-03-24T07:28:05.12345Z --end 2021-03-24T07:30:08.0001Z
