@@ -1,3 +1,11 @@
+## [0.4.3] - 2024-02-23
+
+Add injection of `{{traceparent}}` to `otel-cli exec`.
+
+### Added
+
+- `otel-cli exec echo {{traceparent}}` is now supported to pass traceparent to child process
+
 ## [0.4.2] - 2023-12-01
 
 The Docker container now builds off `alpine:latest` instead of `scratch`. This
