@@ -1,3 +1,12 @@
+## [0.4.2] - 2023-12-01
+
+The Docker container now builds off `alpine:latest` instead of `scratch`. This
+makes the default certificate store included with Alpine available to otel-cli.
+
+### Changed
+
+- switch release Dockerfile to base off alpine:latest
+
 ## [0.4.1] - 2023-10-16
 
 Mostly small but impactful changes to `otel-cli exec`.
