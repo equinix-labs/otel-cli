@@ -1,3 +1,12 @@
+## [0.4.4] - 2024-03-11
+
+Fix a typo in the `OTEL_CLI_EXEC_TP_DISABLE_INJECT` envvar.
+
+### Changed
+
+- spell `DISALBE` correctly in `OTEL_CLI_EXEC_TP_DISABLE_INJECT`
+- adds a test for that
+
 ## [0.4.3] - 2024-03-11
 
 Add injection of `{{traceparent}}` to `otel-cli exec` as default behavior, along with

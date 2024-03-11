@@ -948,6 +948,24 @@ var suites = []FixtureSuite{
 				SpanCount: 1,
 			},
 		},
+		{
+			Name: "otel-cli exec returns the {{traceparent}} tag unmodified with OTEL_CLI_EXEC_TP_DISABLE_INJECT",
+			Config: FixtureConfig{
+				Env: map[string]string{
+					"OTEL_CLI_EXEC_TP_DISABLE_INJECT": "true",
+				},
+				CliArgs: []string{
+					"exec", "--endpoint", "{{endpoint}}",
+					"--force-trace-id", "e39280f2980af3a8600ae98c74f2dabf", "--force-span-id", "023eee2731392b4d",
+					"--",
+					"echo", "{{traceparent}}"},
+			},
+			Expect: Results{
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				CliOutput: "{{traceparent}}\n",
+				SpanCount: 1,
+			},
+		},
 	},
 	// validate OTEL_EXPORTER_OTLP_PROTOCOL / --protocol
 	{
