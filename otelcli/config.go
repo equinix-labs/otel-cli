@@ -56,6 +56,7 @@ func DefaultConfig() Config {
 		BackgroundWait:               false,
 		BackgroundSkipParentPidCheck: false,
 		ExecCommandTimeout:           "",
+		ExecTpDisableInject:          false,
 		StatusCanaryCount:            1,
 		StatusCanaryInterval:         "",
 		SpanStartTime:                "now",
@@ -109,7 +110,8 @@ type Config struct {
 	BackgroundWait               bool   `json:"background_wait" env:""`
 	BackgroundSkipParentPidCheck bool   `json:"background_skip_parent_pid_check"`
 
-	ExecCommandTimeout string `json:"exec_command_timeout" env:"OTEL_CLI_EXEC_CMD_TIMEOUT"`
+	ExecCommandTimeout  string `json:"exec_command_timeout" env:"OTEL_CLI_EXEC_CMD_TIMEOUT"`
+	ExecTpDisableInject bool   `json:"exec_tp_disable_inject" env:"OTEL_CLI_EXEC_TP_DISALBE_INJECT"`
 
 	StatusCanaryCount    int    `json:"status_canary_count"`
 	StatusCanaryInterval string `json:"status_canary_interval"`
@@ -232,6 +234,7 @@ func (c Config) ToStringMap() map[string]string {
 		"background_wait":             strconv.FormatBool(c.BackgroundWait),
 		"background_skip_pid_check":   strconv.FormatBool(c.BackgroundSkipParentPidCheck),
 		"exec_command_timeout":        c.ExecCommandTimeout,
+		"exec_tp_disable_inject":      strconv.FormatBool(c.ExecTpDisableInject),
 		"span_start_time":             c.SpanStartTime,
 		"span_end_time":               c.SpanEndTime,
 		"event_name":                  c.EventName,

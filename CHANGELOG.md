@@ -1,3 +1,13 @@
+## [0.4.3] - 2024-03-11
+
+Add injection of `{{traceparent}}` to `otel-cli exec` as default behavior, along with
+the `otel-cli exec --tp-disable-inject` to turn it off (old behavior).
+
+### Added
+
+- `otel-cli exec echo {{traceparent}}` is now supported to pass traceparent to child process
+- `otel-cli exec --tp-disable-inject` will disable this new default behavior
+
 ## [0.4.2] - 2023-12-01
 
 The Docker container now builds off `alpine:latest` instead of `scratch`. This

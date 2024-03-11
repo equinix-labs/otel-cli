@@ -902,7 +902,7 @@ var suites = []FixtureSuite{
 	// otel-cli exec runs otel-cli exec
 	{
 		{
-			Name: "otel-cli span exec (nested)",
+			Name: "otel-cli exec (nested)",
 			Config: FixtureConfig{
 				CliArgs: []string{
 					"exec", "--name", "outer", "--endpoint", "{{endpoint}}", "--fail", "--verbose", "--",
@@ -912,6 +912,40 @@ var suites = []FixtureSuite{
 				Config:    otelcli.DefaultConfig(),
 				CliOutput: "hello world\n",
 				SpanCount: 2,
+			},
+		},
+	},
+	// otel-cli exec echo "{{traceparent}}" and otel-cli exec --tp-disable-inject
+	{
+		{
+			Name: "otel-cli exec with arg injection injects the traceparent",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"exec", "--endpoint", "{{endpoint}}",
+					"--force-trace-id", "e39280f2980af3a8600ae98c74f2dabf", "--force-span-id", "023eee2731392b4d",
+					"--",
+					"echo", "{{traceparent}}"},
+			},
+			Expect: Results{
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				CliOutput: "00-e39280f2980af3a8600ae98c74f2dabf-023eee2731392b4d-01\n",
+				SpanCount: 1,
+			},
+		},
+		{
+			Name: "otel-cli exec --tp-disable-inject returns the {{traceparent}} tag unmodified",
+			Config: FixtureConfig{
+				CliArgs: []string{
+					"exec", "--endpoint", "{{endpoint}}",
+					"--force-trace-id", "e39280f2980af3a8600ae98c74f2dabf", "--force-span-id", "023eee2731392b4d",
+					"--tp-disable-inject",
+					"--",
+					"echo", "{{traceparent}}"},
+			},
+			Expect: Results{
+				Config:    otelcli.DefaultConfig().WithEndpoint("{{endpoint}}"),
+				CliOutput: "{{traceparent}}\n",
+				SpanCount: 1,
 			},
 		},
 	},
