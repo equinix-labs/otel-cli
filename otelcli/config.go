@@ -111,7 +111,7 @@ type Config struct {
 	BackgroundSkipParentPidCheck bool   `json:"background_skip_parent_pid_check"`
 
 	ExecCommandTimeout  string `json:"exec_command_timeout" env:"OTEL_CLI_EXEC_CMD_TIMEOUT"`
-	ExecTpDisableInject bool   `json:"exec_tp_disable_inject" env:"OTEL_CLI_EXEC_TP_DISALBE_INJECT"`
+	ExecTpDisableInject bool   `json:"exec_tp_disable_inject" env:"OTEL_CLI_EXEC_TP_DISABLE_INJECT"`
 
 	StatusCanaryCount    int    `json:"status_canary_count"`
 	StatusCanaryInterval string `json:"status_canary_interval"`
