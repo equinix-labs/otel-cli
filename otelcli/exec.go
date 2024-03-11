@@ -48,6 +48,13 @@ otel-cli exec -s "outer span" 'otel-cli exec -s "inner span" sleep 1'`,
 		"timeout for the child process, when 0 otel-cli will wait forever",
 	)
 
+	cmd.Flags().BoolVar(
+		&config.ExecTpDisableInject,
+		"tp-disable-inject",
+		defaults.ExecTpDisableInject,
+		"disable automatically replacing {{traceparent}} with a traceparent",
+	)
+
 	return &cmd
 }
 
@@ -88,14 +95,19 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	var child *exec.Cmd
 	if len(args) > 1 {
+		buf := bytes.NewBuffer([]byte{})
 		tpArgs := make([]string, len(args)-1)
-		// loop over the args replacing {{traceparent}} with the current tp
-		for i, arg := range args[1:] {
-			tpArgs[i] = strings.Replace(arg, "{{traceparent}}", tp.Encode(), -1)
+
+		if config.ExecTpDisableInject {
+			copy(tpArgs, args[1:])
+		} else {
+			// loop over the args replacing {{traceparent}} with the current tp
+			for i, arg := range args[1:] {
+				tpArgs[i] = strings.Replace(arg, "{{traceparent}}", tp.Encode(), -1)
+			}
 		}
 
 		// CSV-join the arguments to send as an attribute
-		buf := bytes.NewBuffer([]byte{})
 		csv.NewWriter(buf).WriteAll([][]string{tpArgs})
 		config.Attributes["arguments"] = buf.String()
 
