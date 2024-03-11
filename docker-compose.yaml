@@ -8,7 +8,7 @@ services:
       - "14268"
       - "14250"
   otel-collector:
-    image: otel/opentelemetry-collector:0.76.1
+    image: otel/opentelemetry-collector:0.96.0
     volumes:
       - ./configs/otel-collector.yaml:/local.yaml
     command: --config /local.yaml
