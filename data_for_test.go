@@ -915,6 +915,7 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
+	// otel-cli exec echo "{{traceparent}}" and otel-cli exec --tp-disable-inject
 	{
 		{
 			Name: "otel-cli exec with arg injection injects the traceparent",
@@ -931,8 +932,6 @@ var suites = []FixtureSuite{
 				SpanCount: 1,
 			},
 		},
-	},
-	{
 		{
 			Name: "otel-cli exec --tp-disable-inject returns the {{traceparent}} tag unmodified",
 			Config: FixtureConfig{
