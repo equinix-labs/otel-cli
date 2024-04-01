@@ -80,7 +80,7 @@ func (gc *GrpcClient) Stop(ctx context.Context) (context.Context, error) {
 	return ctx, gc.conn.Close()
 }
 
-func processGrpcStatus(ctx context.Context, etsr *coltracepb.ExportTraceServiceResponse, err error) (context.Context, bool, time.Duration, error) {
+func processGrpcStatus(ctx context.Context, _ *coltracepb.ExportTraceServiceResponse, err error) (context.Context, bool, time.Duration, error) {
 	if err == nil {
 		// success!
 		return ctx, false, 0, nil
