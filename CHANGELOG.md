@@ -1,7 +1,17 @@
 ## [0.4.5] - 2024-01-01
 
-Cleaning up warnings, dead code, and updating dependencies. No user-visible
-changes.
+Fix exec attributes, cleanups, and dependency updates.
+
+`otel-cli exec` attributes were broken for the last few releases so @tobert
+felt it was ok to rename them to match the OTel semantic conventions
+now.
+
+### Changed
+
+- using latest deps for grpc, protobuf, and otel
+- exec attributes will now go out with the span
+- exec now sends process.command and process.command_args attributes
+- main_test.go now supports regular expression tests on span data
 
 ## [0.4.4] - 2024-03-11
 
