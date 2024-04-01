@@ -1,19 +1,19 @@
 package otelcli
 
 import (
-	"bytes"
 	"context"
-	"encoding/csv"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"strings"
 	"time"
 
 	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -62,10 +62,7 @@ func doExec(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 	config := getConfig(ctx)
 	span := config.NewProtobufSpan()
-
-	// put the command in the attributes, before creating the span so it gets picked up
-	config.Attributes["command"] = args[0]
-	config.Attributes["arguments"] = ""
+	processAttrs := processArgAttrs(args) // might be overwritten in process setup
 
 	// no deadline if there is no command timeout set
 	cancelCtxDeadline := func() {}
@@ -95,7 +92,6 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	var child *exec.Cmd
 	if len(args) > 1 {
-		buf := bytes.NewBuffer([]byte{})
 		tpArgs := make([]string, len(args)-1)
 
 		if config.ExecTpDisableInject {
@@ -105,11 +101,10 @@ func doExec(cmd *cobra.Command, args []string) {
 			for i, arg := range args[1:] {
 				tpArgs[i] = strings.Replace(arg, "{{traceparent}}", tp.Encode(), -1)
 			}
-		}
 
-		// CSV-join the arguments to send as an attribute
-		csv.NewWriter(buf).WriteAll([][]string{tpArgs})
-		config.Attributes["arguments"] = buf.String()
+			// overwrite process args attributes with the injected values
+			processAttrs = processArgAttrs(append([]string{args[0]}, tpArgs...))
+		}
 
 		child = exec.CommandContext(cmdCtx, args[0], tpArgs...)
 	} else {
@@ -149,6 +144,11 @@ func doExec(cmd *cobra.Command, args []string) {
 	}
 	span.EndTimeUnixNano = uint64(time.Now().UnixNano())
 
+	// append process attributes
+	span.Attributes = append(span.Attributes, processAttrs...)
+	pidAttrs := processPidAttrs(config, int64(child.Process.Pid), int64(os.Getpid()))
+	span.Attributes = append(span.Attributes, pidAttrs...)
+
 	cancelCtxDeadline()
 	close(signals)
 	<-signalsDone
@@ -172,4 +172,64 @@ func doExec(cmd *cobra.Command, args []string) {
 	Diag.ExecExitCode = child.ProcessState.ExitCode()
 
 	config.PropagateTraceparent(span, os.Stdout)
+}
+
+// processArgAttrs turns the provided args list into OTel attributes
+// that can be appended to a protobuf span's span.Attributes.
+// https://opentelemetry.io/docs/specs/semconv/attributes-registry/process/
+func processArgAttrs(args []string) []*commonpb.KeyValue {
+	// convert args to an OpenTelemetry string list
+	avlist := make([]*commonpb.AnyValue, len(args))
+	for i, v := range args {
+		sv := commonpb.AnyValue_StringValue{StringValue: v}
+		av := commonpb.AnyValue{Value: &sv}
+		avlist[i] = &av
+	}
+
+	return []*commonpb.KeyValue{
+		{
+			Key: "process.command",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_StringValue{StringValue: args[0]},
+			},
+		},
+		{
+			Key: "process.command_args",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_ArrayValue{
+					ArrayValue: &commonpb.ArrayValue{
+						Values: avlist,
+					},
+				},
+			},
+		},
+	}
+}
+
+// processPidAttrs returns process.{owner,pid,parent_pid} attributes ready
+// to append to a protobuf span's span.Attributes.
+func processPidAttrs(config Config, ppid, pid int64) []*commonpb.KeyValue {
+	user, err := user.Current()
+	config.SoftLogIfErr(err)
+
+	return []*commonpb.KeyValue{
+		{
+			Key: "process.owner",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_StringValue{StringValue: user.Username},
+			},
+		},
+		{
+			Key: "process.pid",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_IntValue{IntValue: pid},
+			},
+		},
+		{
+			Key: "process.parent_pid",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_IntValue{IntValue: ppid},
+			},
+		},
+	}
 }

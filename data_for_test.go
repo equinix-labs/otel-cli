@@ -548,6 +548,24 @@ var suites = []FixtureSuite{
 				Config:        otelcli.DefaultConfig().WithEndpoint("grpc://{{endpoint}}"),
 			},
 		},
+		{
+			Name: "#316 ensure process command and args are sent as attributes",
+			Config: FixtureConfig{
+				CliArgs: []string{"exec",
+					"--endpoint", "{{endpoint}}",
+					"--verbose", "--fail",
+					"--attrs", "zy=ab", // ensure CLI args still propagate
+					"--", "/bin/echo", "a", "z",
+				},
+			},
+			Expect: Results{
+				SpanCount: 1,
+				CliOutput: "a z\n",
+				SpanData: map[string]string{
+					"attributes": "/^process.command=/bin/echo,process.command_args=/bin/echo,a,z,process.owner=\\w+,process.parent_pid=\\d+,process.pid=\\d+,zy=ab/",
+				},
+			},
+		},
 	},
 	// otel-cli span with no OTLP config should do and print nothing
 	{

@@ -41,7 +41,6 @@ brew tap equinix-labs/otel-cli
 brew install otel-cli
 ```
 
-
 Alternatively, clone the repo and build it locally:
 
 ```shell
