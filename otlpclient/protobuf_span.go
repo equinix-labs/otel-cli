@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/equinix-labs/otel-cli/w3c/traceparent"
@@ -189,7 +190,7 @@ func StringMapAttrsToProtobuf(attributes map[string]string) []*commonpb.KeyValue
 func SpanAttributesToStringMap(span *tracepb.Span) map[string]string {
 	out := make(map[string]string)
 	for _, attr := range span.Attributes {
-		out[attr.Key] = AttrValueToString(attr)
+		out[attr.Key] = AnyValueToString(attr.GetValue())
 	}
 	return out
 }
@@ -203,22 +204,27 @@ func ResourceAttributesToStringMap(rss *tracepb.ResourceSpans) map[string]string
 
 	out := make(map[string]string)
 	for _, attr := range rss.Resource.Attributes {
-		out[attr.Key] = AttrValueToString(attr)
+		out[attr.Key] = AnyValueToString(attr.GetValue())
 	}
 	return out
 }
 
-// AttrValueToString coverts a commonpb.KeyValue attribute to a string.
-// Only used by tests for now.
-func AttrValueToString(attr *commonpb.KeyValue) string {
-	v := attr.GetValue()
-	v.GetIntValue()
+// AnyValueToString coverts a commonpb.KeyValue attribute to a string.
+func AnyValueToString(v *commonpb.AnyValue) string {
 	if _, ok := v.Value.(*commonpb.AnyValue_StringValue); ok {
 		return v.GetStringValue()
 	} else if _, ok := v.Value.(*commonpb.AnyValue_IntValue); ok {
 		return strconv.FormatInt(v.GetIntValue(), 10)
 	} else if _, ok := v.Value.(*commonpb.AnyValue_DoubleValue); ok {
 		return strconv.FormatFloat(v.GetDoubleValue(), byte('f'), -1, 64)
+	} else if _, ok := v.Value.(*commonpb.AnyValue_ArrayValue); ok {
+		values := v.GetArrayValue().GetValues()
+		strValues := make([]string, len(values))
+		for i, v := range values {
+			// recursively convert to string
+			strValues[i] = AnyValueToString(v)
+		}
+		return strings.Join(strValues, ",")
 	}
 
 	return ""

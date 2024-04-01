@@ -1,9 +1,7 @@
 package otelcli
 
 import (
-	"bytes"
 	"context"
-	"encoding/csv"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +12,7 @@ import (
 	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -63,9 +62,25 @@ func doExec(cmd *cobra.Command, args []string) {
 	config := getConfig(ctx)
 	span := config.NewProtobufSpan()
 
-	// put the command in the attributes, before creating the span so it gets picked up
-	config.Attributes["command"] = args[0]
-	config.Attributes["arguments"] = ""
+	// https://opentelemetry.io/docs/specs/semconv/attributes-registry/process/
+	span.Attributes = []*commonpb.KeyValue{
+		&commonpb.KeyValue{
+			Key: "process.command",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_StringValue{StringValue: args[0]},
+			},
+		},
+		&commonpb.KeyValue{ // will be overwritten if there are arguments
+			Key: "process.command_args",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_ArrayValue{
+					ArrayValue: &commonpb.ArrayValue{
+						Values: []*commonpb.AnyValue{},
+					},
+				},
+			},
+		},
+	}
 
 	// no deadline if there is no command timeout set
 	cancelCtxDeadline := func() {}
@@ -95,7 +110,6 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	var child *exec.Cmd
 	if len(args) > 1 {
-		buf := bytes.NewBuffer([]byte{})
 		tpArgs := make([]string, len(args)-1)
 
 		if config.ExecTpDisableInject {
@@ -107,9 +121,29 @@ func doExec(cmd *cobra.Command, args []string) {
 			}
 		}
 
-		// CSV-join the arguments to send as an attribute
-		csv.NewWriter(buf).WriteAll([][]string{tpArgs})
-		config.Attributes["arguments"] = buf.String()
+		// convert args to an OpenTelemetry string list
+		// https://opentelemetry.io/docs/specs/semconv/attributes-registry/process/
+		avlist := make([]*commonpb.AnyValue, len(tpArgs)+1)
+		avlist[0] = &commonpb.AnyValue{
+			Value: &commonpb.AnyValue_StringValue{
+				StringValue: args[0],
+			},
+		}
+		for i, v := range tpArgs {
+			sv := commonpb.AnyValue_StringValue{StringValue: v}
+			av := commonpb.AnyValue{Value: &sv}
+			avlist[i+1] = &av
+		}
+		span.Attributes[1] = &commonpb.KeyValue{
+			Key: "process.command_args",
+			Value: &commonpb.AnyValue{
+				Value: &commonpb.AnyValue_ArrayValue{
+					ArrayValue: &commonpb.ArrayValue{
+						Values: avlist,
+					},
+				},
+			},
+		}
 
 		child = exec.CommandContext(cmdCtx, args[0], tpArgs...)
 	} else {
