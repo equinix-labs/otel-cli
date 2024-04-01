@@ -1,3 +1,8 @@
+## [0.4.5] - 2024-01-01
+
+Cleaning up warnings, dead code, and updating dependencies. No user-visible
+changes.
+
 ## [0.4.4] - 2024-03-11
 
 Fix a typo in the `OTEL_CLI_EXEC_TP_DISABLE_INJECT` envvar.
