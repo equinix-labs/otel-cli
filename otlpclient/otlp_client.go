@@ -198,11 +198,6 @@ func retry(ctx context.Context, _ OTLPConfig, fun retryFun) (context.Context, er
 	sleep := time.Duration(0)
 	for {
 		if ctx, keepGoing, wait, err := fun(ctx); err != nil {
-			if err != nil {
-				ctx, _ = SaveError(ctx, time.Now(), err)
-			}
-			//config.SoftLog("error on retry %d: %s", Diag.Retries, err)
-
 			if keepGoing {
 				if wait > 0 {
 					if time.Now().Add(wait).After(deadline) {
