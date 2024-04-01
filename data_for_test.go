@@ -171,6 +171,64 @@ var suites = []FixtureSuite{
 			},
 		},
 	},
+	// everything works as expected with fully-loaded options
+	{
+		{
+			Name: "fully loaded command line",
+			Config: FixtureConfig{
+				ServerProtocol: grpcProtocol,
+				TestTimeoutMs:  1000,
+				Env: map[string]string{
+					"TRACEPARENT": "00-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-AAAAAAAAAAAAAAAA-01",
+				},
+				CliArgs: []string{
+					"span",
+					"--endpoint", "{{endpoint}}",
+					"--protocol", "grpc",
+					"--insecure",
+					"--timeout", "500000us", // 500ms
+					"--fail", "--verbose",
+					"--name", "slartibartfast",
+					"--service", "Starship Bistromath",
+					"--kind", "server",
+					"--start", "308534400",
+					"--end", "1979-10-12T23:59:59Z",
+					"--attrs", "protagonist=DentArthurdent,medium=book",
+					"--otlp-headers", "lue=42",
+					"--force-span-id", "BBBBBBBBBBBBBBBB",
+					"--tp-required",
+					"--tp-print",
+					"--tp-export",
+				},
+			},
+			Expect: Results{
+				SpanCount: 1,
+				Config:    otelcli.DefaultConfig(),
+				Diagnostics: otelcli.Diagnostics{
+					IsRecording:        true,
+					NumArgs:            8,
+					ParsedTimeoutMs:    1000,
+					DetectedLocalhost:  true,
+					InsecureSkipVerify: true,
+				},
+				SpanData: map[string]string{
+					"span_id":    "*",
+					"trace_id":   "*",
+					"attributes": `medium=book,protagonist=DentArthurdent`,
+				},
+				Headers: map[string]string{
+					":authority":   "{{endpoint}}\n",
+					"content-type": "application/grpc\n",
+					"user-agent":   "*",
+					"lue":          "42\n",
+				},
+				CliOutput: "" +
+					"# trace id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n" +
+					"#  span id: bbbbbbbbbbbbbbbb\n" +
+					"export TRACEPARENT=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01\n",
+			},
+		},
+	},
 	// TLS connections
 	{
 		{
