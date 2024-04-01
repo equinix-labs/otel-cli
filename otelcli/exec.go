@@ -64,13 +64,13 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	// https://opentelemetry.io/docs/specs/semconv/attributes-registry/process/
 	span.Attributes = []*commonpb.KeyValue{
-		&commonpb.KeyValue{
+		{
 			Key: "process.command",
 			Value: &commonpb.AnyValue{
 				Value: &commonpb.AnyValue_StringValue{StringValue: args[0]},
 			},
 		},
-		&commonpb.KeyValue{ // will be overwritten if there are arguments
+		{ // will be overwritten if there are arguments
 			Key: "process.command_args",
 			Value: &commonpb.AnyValue{
 				Value: &commonpb.AnyValue_ArrayValue{
