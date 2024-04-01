@@ -287,13 +287,6 @@ Then it should just work to run otel-cli:
 go run . span -n "testing" -s "my first test span"
 ```
 
-## Ideas
-
-   * add some shell examples for:
-      * using bash trap(1p) to send events
-   * examples for connecting collector to other vendors' OTLP endpoints
-   * span background doodles: https://gist.github.com/tobert/ceb2cd9b18ab7ab09e1ea7e3bf150d9d
-
 ## Contributing
 
 Please file issues and PRs on the GitHub project at https://github.com/equinix-labs/otel-cli
@@ -310,10 +303,12 @@ To release, a GitHub personal access token is required. The release also needs t
 in git.
 
 ```shell
-git checkout main # make sure we tag on main
-git pull --rebase # get the latest HEAD
-git tag v0.1.1    # tag HEAD with the next version
-git push --tags   # push new tag up to GitHub
+docker login ghcr.io # log into GitHub Docker repo
+gh repo list         # make sure GitHub PAT is working
+git checkout main    # release tags must be off the main branch
+git pull --rebase    # get the latest HEAD
+git tag v0.1.1       # tag HEAD with the next version
+git push --tags      # push new tag up to GitHub
 goreleaser release --rm-dist
 ```
 

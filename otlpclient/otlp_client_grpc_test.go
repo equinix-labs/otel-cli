@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/google/go-cmp/cmp"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestProcessGrpcStatus(t *testing.T) {
@@ -85,7 +85,7 @@ func retryWithInfo(wait int64) error {
 	st := status.New(codes.ResourceExhausted, "Server unavailable")
 	if wait > 0 {
 		st, err = st.WithDetails(&errdetails.RetryInfo{
-			RetryDelay: &duration.Duration{Seconds: wait},
+			RetryDelay: &durationpb.Duration{Seconds: wait},
 		})
 		if err != nil {
 			panic("error creating retry info")

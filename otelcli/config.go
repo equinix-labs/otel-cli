@@ -3,6 +3,7 @@ package otelcli
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -14,8 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 var detectBrokenRFC3339PrefixRe *regexp.Regexp
@@ -138,11 +137,11 @@ func (c *Config) LoadFile() error {
 
 	js, err := os.ReadFile(c.CfgFile)
 	if err != nil {
-		return errors.Wrapf(err, "failed to read file '%s'", c.CfgFile)
+		return fmt.Errorf("failed to read file '%s': %w", c.CfgFile, err)
 	}
 
 	if err := json.Unmarshal(js, c); err != nil {
-		return errors.Wrapf(err, "failed to parse json data in file '%s'", c.CfgFile)
+		return fmt.Errorf("failed to parse json data in file '%s': %w", c.CfgFile, err)
 	}
 
 	return nil
@@ -181,19 +180,19 @@ func (c *Config) LoadEnv(getenv func(string) string) error {
 			case int:
 				intVal, err := strconv.ParseInt(envVal, 10, 64)
 				if err != nil {
-					return errors.Wrapf(err, "could not parse %s value %q as an int", envVar, envVal)
+					return fmt.Errorf("could not parse %s value %q as an int: %w", envVar, envVal, err)
 				}
 				target.SetInt(intVal)
 			case bool:
 				boolVal, err := strconv.ParseBool(envVal)
 				if err != nil {
-					return errors.Wrapf(err, "could not parse %s value %q as an bool", envVar, envVal)
+					return fmt.Errorf("could not parse %s value %q as an bool: %w", envVar, envVal, err)
 				}
 				target.SetBool(boolVal)
 			case map[string]string:
 				mapVal, err := parseCkvStringMap(envVal)
 				if err != nil {
-					return errors.Wrapf(err, "could not parse %s value %q as a map", envVar, envVal)
+					return fmt.Errorf("could not parse %s value %q as a map: %w", envVar, envVal, err)
 				}
 				mapValVal := reflect.ValueOf(mapVal)
 				target.Set(mapValVal)
@@ -294,7 +293,7 @@ func parseDuration(d string) (time.Duration, error) {
 	} else if secs, serr := strconv.ParseInt(d, 10, 0); serr == nil {
 		out = time.Second * time.Duration(secs)
 	} else {
-		return time.Duration(0), fmt.Errorf("unable to parse duration string %q: %s", d, err)
+		return time.Duration(0), fmt.Errorf("unable to parse duration string %q: %w", d, err)
 	}
 
 	return out, nil
@@ -468,15 +467,19 @@ func (c Config) ParsedEventTime() time.Time {
 
 // parseTime tries to parse Unix epoch, then RFC3339, both with/without nanoseconds
 func (c Config) parseTime(ts, which string) (time.Time, error) {
-	var uterr, utnerr, utnnerr, rerr, rnerr error
+	// errors accumulate as parsing methods are attempted
+	// thrown away when one succeeds, joined & returned if none succeed
+	errs := []error{}
 
 	if ts == "now" {
 		return time.Now(), nil
 	}
 
 	// Unix epoch time
-	if i, uterr := strconv.ParseInt(ts, 10, 64); uterr == nil {
+	if i, err := strconv.ParseInt(ts, 10, 64); err == nil {
 		return time.Unix(i, 0), nil
+	} else {
+		errs = append(errs, fmt.Errorf("could not parse span %s time %q as Unix Epoch: %w", which, ts, err))
 	}
 
 	// date --rfc-3339 returns an invalid format for Go because it has a
@@ -489,40 +492,33 @@ func (c Config) parseTime(ts, which string) (time.Time, error) {
 	if epochNanoTimeRE.MatchString(ts) {
 		parts := strings.Split(ts, ".")
 		if len(parts) == 2 {
-			secs, utnerr := strconv.ParseInt(parts[0], 10, 64)
-			nsecs, utnnerr := strconv.ParseInt(parts[1], 10, 64)
-			if utnerr == nil && utnnerr == nil && secs > 0 {
+			secs, secsErr := strconv.ParseInt(parts[0], 10, 64)
+			nsecs, usecsErr := strconv.ParseInt(parts[1], 10, 64)
+			if secsErr == nil && usecsErr == nil && secs > 0 {
 				return time.Unix(secs, nsecs), nil
+			} else {
+				errs = append(errs, fmt.Errorf("could not parse span %s time %q as Unix Epoch: %w", which, ts, secsErr))
+				errs = append(errs, fmt.Errorf("could not parse span %s time %q as Unix Epoch.Nano: %w", which, ts, usecsErr))
 			}
 		}
 	}
 
 	// try RFC3339 then again with nanos
-	t, rerr := time.Parse(time.RFC3339, ts)
-	if rerr != nil {
-		t, rnerr := time.Parse(time.RFC3339Nano, ts)
-		if rnerr == nil {
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		// try again with nanos
+		if t, innerErr := time.Parse(time.RFC3339Nano, ts); innerErr == nil {
 			return t, nil
+		} else {
+			errs = append(errs, fmt.Errorf("could not parse span %s time %q as RFC3339 %w", which, ts, err))
+			errs = append(errs, fmt.Errorf("could not parse span %s time %q as RFC3339Nano %w", which, ts, innerErr))
 		}
 	} else {
 		return t, nil
 	}
 
-	// none of the formats worked, print whatever errors are remaining
-	if uterr != nil {
-		return time.Time{}, fmt.Errorf("could not parse span %s time %q as Unix Epoch: %s", which, ts, uterr)
-	}
-	if utnerr != nil || utnnerr != nil {
-		return time.Time{}, fmt.Errorf("could not parse span %s time %q as Unix Epoch.Nano: %s | %s", which, ts, utnerr, utnnerr)
-	}
-	if rerr != nil {
-		return time.Time{}, fmt.Errorf("could not parse span %s time %q as RFC3339: %s", which, ts, rerr)
-	}
-	if rnerr != nil {
-		return time.Time{}, fmt.Errorf("could not parse span %s time %q as RFC3339Nano: %s", which, ts, rnerr)
-	}
-
-	return time.Time{}, fmt.Errorf("could not parse span %s time %q as any supported format", which, ts)
+	errs = append(errs, fmt.Errorf("could not parse span %s time %q as any supported format", which, ts))
+	return time.Time{}, errors.Join(errs...)
 }
 
 func (c Config) GetEndpoint() *url.URL {

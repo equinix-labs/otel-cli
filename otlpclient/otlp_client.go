@@ -190,7 +190,7 @@ func SaveError(ctx context.Context, t time.Time, err error) (context.Context, er
 // TODO: --otlp-retry-sleep? --otlp-retry-timeout?
 // TODO: span events? hmm... feels weird to plumb spans this deep into the client
 // but it's probably fine?
-func retry(ctx context.Context, config OTLPConfig, fun retryFun) (context.Context, error) {
+func retry(ctx context.Context, _ OTLPConfig, fun retryFun) (context.Context, error) {
 	deadline, haveDL := ctx.Deadline()
 	if !haveDL {
 		return ctx, fmt.Errorf("BUG in otel-cli: no deadline set before retry()")
@@ -198,11 +198,6 @@ func retry(ctx context.Context, config OTLPConfig, fun retryFun) (context.Contex
 	sleep := time.Duration(0)
 	for {
 		if ctx, keepGoing, wait, err := fun(ctx); err != nil {
-			if err != nil {
-				ctx, _ = SaveError(ctx, time.Now(), err)
-			}
-			//config.SoftLog("error on retry %d: %s", Diag.Retries, err)
-
 			if keepGoing {
 				if wait > 0 {
 					if time.Now().Add(wait).After(deadline) {
