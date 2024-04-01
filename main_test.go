@@ -311,8 +311,8 @@ func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 		}
 
 		if re, ok := spanRegexChecks[what]; ok {
-			// * means if the above RE returns cleanly then pass the test
 			if wantVal == "*" {
+				// * means if the above RE returns cleanly then pass the test
 				if re.MatchString(gotVal) {
 					delete(gotSpan, what)
 					delete(wantSpan, what)
@@ -323,8 +323,21 @@ func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 		}
 	}
 
-	// do a diff on a generated map that sets values to * when the * check succeeded
 	injectMapVars(fixture.Endpoint, wantSpan, fixture.TlsData)
+
+	// a regular expression can be put in e.g. /^foo$/ to get evaluated as RE
+	for key, wantVal := range wantSpan {
+		if strings.HasPrefix(wantVal, "/") && strings.HasSuffix(wantVal, "/") {
+			re := regexp.MustCompile(wantVal[1 : len(wantVal)-1]) // slice strips the /'s off
+			if !re.MatchString(gotSpan[key]) {
+				t.Errorf("regular expression %q did not match on %q", wantVal, gotSpan[key])
+			}
+			delete(gotSpan, key) // delete from both maps so cmp.Diff ignores them
+			delete(wantSpan, key)
+		}
+	}
+
+	// do a diff on a generated map that sets values to * when the * check succeeded
 	if diff := cmp.Diff(wantSpan, gotSpan); diff != "" {
 		t.Errorf("[%s] otel span info did not match fixture (-want +got):\n%s", fixture.Name, diff)
 	}
