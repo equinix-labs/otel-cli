@@ -1,6 +1,5 @@
 FROM golang:latest AS builder
 
-RUN mkdir /build
 WORKDIR /build
 COPY . .
 ENV CGO_ENABLED=0
