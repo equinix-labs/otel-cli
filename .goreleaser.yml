@@ -39,6 +39,9 @@ builds:
         goarch: 386
       - goos: freebsd
         goarch: arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
 
 nfpms:
   - package_name: otel-cli

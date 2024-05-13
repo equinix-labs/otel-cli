@@ -17,6 +17,7 @@ jobs:
       # otel-cli's main test needs the binary built ahead of time
       # also this validates it can acutally build before we get there
       - name: Build
-        run: go build -v
+        # build with -s -w to reduce binary size and verify that build in test
+        run: go build -v -ldflags="-s -w -X main.version=test -X main.commit=${{ github.sha }}"
       - name: Test
         run: go test -v ./...
