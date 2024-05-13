@@ -3,7 +3,7 @@ FROM golang:latest AS builder
 WORKDIR /build
 COPY . .
 ENV CGO_ENABLED=0
-RUN go build -o otel-cli .
+RUN go build -ldflags="-w -s" -o otel-cli .
 
 FROM scratch AS otel-cli
 
