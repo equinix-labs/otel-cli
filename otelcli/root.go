@@ -71,6 +71,7 @@ func createRootCmd(config *Config) *cobra.Command {
 	rootCmd.AddCommand(execCmd(config))
 	rootCmd.AddCommand(statusCmd(config))
 	rootCmd.AddCommand(serverCmd(config))
+	rootCmd.AddCommand(versionCmd(config))
 	rootCmd.AddCommand(completionCmd(config))
 
 	return rootCmd
