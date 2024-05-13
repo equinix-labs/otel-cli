@@ -1,3 +1,18 @@
+## [0.4.6] - 2024-05-13
+
+Build smaller binaries and add version subcommand.
+
+### Added
+
+- `otel-cli version` will now report version information of the binary (if any)
+
+### Changed
+
+- linker flags now contain `-s -w` to reduce binary size
+   - change made in build Dockerfile, goreleaser, and GH Actions
+   - contribution from @Ipmi-13, thank you!
+- goreleaser now does the -X flags so `otel-cli version` will work right
+
 ## [0.4.5] - 2024-01-01
 
 Fix exec attributes, cleanups, and dependency updates.
