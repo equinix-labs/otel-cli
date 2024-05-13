@@ -12,6 +12,7 @@ Build smaller binaries and add version subcommand.
    - change made in build Dockerfile, goreleaser, and GH Actions
    - contribution from @Ipmi-13, thank you!
 - goreleaser now does the -X flags so `otel-cli version` will work right
+- removed Content-Length from functional tests bc it's not fixed with gzip in play
 
 ## [0.4.5] - 2024-01-01
 

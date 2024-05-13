@@ -1302,7 +1302,6 @@ var suites = []FixtureSuite{
 					"Content-Type":                "application/x-protobuf",
 					"Accept-Encoding":             "gzip",
 					"User-Agent":                  "Go-http-client/1.1",
-					"Content-Length":              "232",
 					"X-Otel-Cli-Otlpserver-Token": "abcdefgabcdefg",
 				},
 				Diagnostics: otelcli.Diagnostics{

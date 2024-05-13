@@ -345,6 +345,12 @@ func checkSpanData(t *testing.T, fixture Fixture, results Results) {
 
 // checkHeaders compares the expected and received headers.
 func checkHeaders(t *testing.T, fixture Fixture, results Results) {
+	// gzip encoding makes automatically comparing values tricky, so ignore it
+	// unless the test actually specifies a length
+	if _, ok := fixture.Expect.Headers["Content-Length"]; !ok {
+		delete(results.Headers, "Content-Length")
+	}
+
 	injectMapVars(fixture.Endpoint, fixture.Expect.Headers, fixture.TlsData)
 	injectMapVars(fixture.Endpoint, results.Headers, fixture.TlsData)
 
