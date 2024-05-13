@@ -170,7 +170,7 @@ otel-cli span --attrs 'item1=value1,"item2=value2,value3",item3=value4'
 ### Docker TLS Certificates
 
 As of release 0.4.2, otel-cli containers are built off the latest Alpine base
-image which contains the base CA certificate bundles. In over to override
+image which contains the base CA certificate bundles. In order to override
 these for e.g. a self-signed certificate, the best bet is to volume mount your
 own /etc/ssl into the container, and it should get picked up by otel-cli and Go's
 TLS libraries.
