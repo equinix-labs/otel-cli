@@ -19,21 +19,20 @@ processors:
   batch:
 
 exporters:
-  # set to debug and your traces will get printed to the console spammily
-  logging:
-    logLevel: debug
+  # set to detailed and your traces will get printed to the console spammily
+  debug:
+    verbosity: detailed
   # Lightstep: set & export LIGHTSTEP_TOKEN and enable below
   otlp/1:
     endpoint: "ingest.lightstep.com:443"
     headers:
       "lightstep-access-token": "${LIGHTSTEP_TOKEN}"
-  # Honeycomb: set & export HONEYCOMB_TEAM to the auth token, and set/export
-  # HONEYCOMB_DATASET to the dataset name you want to use, then enable below
+  # Honeycomb: set & export HONEYCOMB_TEAM to the auth token
+  # You may also want to set HONEYCOMB_DATASET for legacy accounts.
   otlp/2:
     endpoint: "api.honeycomb.io:443"
     headers:
       "x-honeycomb-team": "${HONEYCOMB_TEAM}"
-      "x-honeycomb-dataset": "${HONEYCOMB_DATASET}"
   # Elastic: set & export the ELASTIC_TOKEN to the auth token for the APM server.
   otlp/3:
     endpoint: "xxx.elastic-cloud.com:443"
@@ -44,11 +43,11 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      # only enable logging by default
-      exporters: [logging]
+      # only enable debug by default
+      exporters: [debug]
       # Lightstep:
-      # exporters: [logging, otlp/1]
+      # exporters: [debug, otlp/1]
       # Honeycomb:
-      # exporters: [logging, otlp/2]
+      # exporters: [debug, otlp/2]
       # Elastic:
-      # exporters: [logging, otlp/3]
+      # exporters: [debug, otlp/3]
