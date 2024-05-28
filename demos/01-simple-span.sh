@@ -10,7 +10,7 @@ et=$(date +%s.%N)
 
 # don't worry, there are also short options :)
 ../otel-cli span \
-	--service  "demo.sh"     \
+	--service  "otel-cli-demo"    \
 	--name     "hello world" \
 	--kind     "client"      \
 	--start    $st           \
