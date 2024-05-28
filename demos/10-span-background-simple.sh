@@ -2,7 +2,7 @@
 # an otel-cli demo of span background
 
 ../otel-cli span background \
-    --service $0 \
+    --service otel-cli-demo \
     --name "executing $0" \
     --timeout 2 &
 #               ^ run otel-cli in the background

@@ -263,18 +263,16 @@ if you're using one of those vendors today. It's still pretty easy to get starte
 # `local/otel-vendor-config.yaml` according to the comments inside
 export LIGHTSTEP_TOKEN= # Lightstep API key (otlp/1 in the yaml)
 export HONEYCOMB_TEAM=  # Honeycomb API key (otlp/2 in the yaml)
-export HONEYCOMB_DATASET=playground # Honeycomb dataset
 export ELASTIC_TOKEN= # Elastic token for the APM server.
 
 docker run \
    --env LIGHTSTEP_TOKEN \
    --env HONEYCOMB_TEAM \
-   --env HONEYCOMB_DATASET \
    --env ELASTIC_TOKEN \
    --name otel-collector \
    --net host \
-   --volume $(pwd)/local/otel-vendor-config.yaml:/local.yaml \
-   public.ecr.aws/aws-observability/aws-otel-collector:latest \
+   --volume $(pwd)/configs/otel-vendor-config.yaml:/local.yaml \
+   otel/opentelemetry-collector-contrib:0.101.0 \
       --config /local.yaml
 ```
 

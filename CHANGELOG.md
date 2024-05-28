@@ -13,6 +13,8 @@ Build smaller binaries and add version subcommand.
    - contribution from @Ipmi-13, thank you!
 - goreleaser now does the -X flags so `otel-cli version` will work right
 - removed Content-Length from functional tests bc it's not fixed with gzip in play
+- updated demos, added one
+- updated instructions in README.md
 
 ## [0.4.5] - 2024-01-01
 

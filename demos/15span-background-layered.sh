@@ -11,13 +11,15 @@ set -x
 carrier=$(mktemp)    # traceparent propagation via tempfile
 sockdir=$(mktemp -d) # a unix socket will be created here
 
+export OTEL_SERVICE_NAME="otel-cli-demo"
+
 # start the span background server, set up trace propagation, and
 # time out after 10 seconds (which shouldn't be reached)
 ../otel-cli span background \
+    --verbose --fail \
     --tp-carrier $carrier \
     --sockdir $sockdir \
     --tp-print \
-    --service $0 \
     --name "$0 script execution" \
     --timeout 10 &
 
@@ -26,6 +28,7 @@ data1=$(uuidgen)
 # add an event to the span running in the background, with an attribute
 # set to the uuid we just generated
 ../otel-cli span event \
+    --verbose \
     --name "did a thing" \
     --sockdir $sockdir \
     --attrs "data1=$data1"
@@ -34,13 +37,13 @@ data1=$(uuidgen)
 sleep 1
 
 # add an event that says we wasted some time
-../otel-cli span event --name "slept 1 second" --sockdir $sockdir
+../otel-cli span event --verbose --name "slept 1 second" --sockdir $sockdir
 
 # run a shorter sleep inside a child span, also note that this is using
 # --tp-required so this will fail loudly if there is no traceparent
 # available
 ../otel-cli exec \
-    --service $0 \
+    --verbose --fail \
     --name "sleep 0.2" \
     --tp-required \
     --tp-carrier $carrier \

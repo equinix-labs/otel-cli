@@ -13,10 +13,12 @@ set -x
 carrier=$(mktemp)    # traceparent propagation via tempfile
 sockdir=$(mktemp -d) # a unix socket will be created here
 
+export OTEL_SERVICE_NAME="otel-cli-demo"
+
 ../otel-cli span background \
     --tp-carrier $carrier \
     --sockdir $sockdir \
-    --service $0 \
+    --service otel-cli \
     --name "$0 script execution #1" \
     --timeout 10 &
 
@@ -32,7 +34,7 @@ sockdir=$(mktemp -d) # a unix socket will be created here
 ../otel-cli span background \
     --tp-carrier $carrier \
     --sockdir $sockdir \
-    --service $0 \
+    --service otel-cli \
     --name "$0 script execution #2" \
     --timeout 10 &
 
