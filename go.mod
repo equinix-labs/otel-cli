@@ -11,9 +11,9 @@ require (
 	go.opentelemetry.io/otel v1.27.0
 	go.opentelemetry.io/otel/sdk v1.27.0
 	go.opentelemetry.io/proto/otlp v1.1.0
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240325203815-454cdb8f5daa
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240610135401-a8a62080eff3
 	google.golang.org/grpc v1.64.0
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.1
 )
 
 require (
