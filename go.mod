@@ -2,7 +2,7 @@ module github.com/equinix-labs/otel-cli
 
 go 1.21
 
-toolchain go1.21.1
+toolchain go1.22.4
 
 require (
 	github.com/google/go-cmp v0.6.0
