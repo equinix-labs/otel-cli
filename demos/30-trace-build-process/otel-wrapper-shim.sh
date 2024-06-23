@@ -18,8 +18,8 @@
 #
 # For more complex build processes, I have found jaeger to be quite good, because it also includes
 # a black "critical path line". See https://www.jaegertracing.io/docs/1.54/getting-started/ for
-# their all-in-one docker conainer setup instructions. Otherwise, everything else sis the same as
-# when using otel-desktop-viewer
+# their all-in-one docker conainer setup instructions. Otherwise, everything else is the same as
+# when using otel-desktop-viewer.
 
 set -euo pipefail
 
