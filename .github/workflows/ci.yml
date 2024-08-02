@@ -3,7 +3,6 @@ on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,13 +10,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - name: Setup
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '>=1.20.0'
+          go-version-file: go.mod
+      - name: Get dependencies
+        run: go mod download
       # otel-cli's main test needs the binary built ahead of time
       # also this validates it can acutally build before we get there
       - name: Build
         # build with -s -w to reduce binary size and verify that build in test
         run: go build -v -ldflags="-s -w -X main.version=test -X main.commit=${{ github.sha }}"
       - name: Test
-        run: go test -v ./...
+        run: go test -v -cover -parallel 4 ./...
