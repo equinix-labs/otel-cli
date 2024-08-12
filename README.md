@@ -63,7 +63,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
 otel-cli exec --service my-service --name "curl google" curl https://google.com
 
 # otel-cli propagates context via envvars so you can chain it to create child spans
-otel-cli exec --kind producer "otel-cli exec --kind consumer sleep 1"
+otel-cli exec --kind producer -- otel-cli exec --kind consumer sleep 1
 
 # if a traceparent envvar is set it will be automatically picked up and
 # used by span and exec. use --tp-ignore-env to ignore it even when present
