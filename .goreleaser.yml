@@ -32,6 +32,7 @@ builds:
       - amd64
       - arm64
       - 386
+      - riscv64
     goarm:
       - 7
     ignore:
@@ -107,14 +108,28 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--platform=linux/arm64/v8"
+  - image_templates:
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-riscv64"
+    dockerfile: release/Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+      - "--platform=linux/riscv64"
 
 docker_manifests:
   - name_template: "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}"
     image_templates:
     - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
     - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-riscv64"
   - name_template: "ghcr.io/equinix-labs/otel-cli:latest"
     image_templates:
     - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
     - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-riscv64"
     use: docker
