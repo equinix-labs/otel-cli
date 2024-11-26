@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/reflection"
 )
 
 // GrpcServer is a gRPC/OTLP server handle.
@@ -36,6 +37,8 @@ func NewGrpcServer(cb Callback, stop Stopper) *GrpcServer {
 	}
 
 	coltracepb.RegisterTraceServiceServer(s.server, &s)
+
+	reflection.Register(s.server)
 
 	// single place to stop the server, used by timeout and max-spans
 	go func() {
