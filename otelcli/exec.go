@@ -30,7 +30,7 @@ Examples:
 
 otel-cli exec -n my-cool-thing -s interesting-step curl https://cool-service/api/v1/endpoint
 
-otel-cli exec -s "outer span" 'otel-cli exec -s "inner span" sleep 1'`,
+otel-cli exec -s "outer span" -- otel-cli exec -s "inner span" sleep 1`,
 		Run:  doExec,
 		Args: cobra.MinimumNArgs(1),
 	}
