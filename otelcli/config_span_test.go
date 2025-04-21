@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/tobert/otel-cli/otlpclient"
+	"github.com/equinix-labs/otel-cli/otlpclient"
 )
 
 func TestPropagateTraceparent(t *testing.T) {

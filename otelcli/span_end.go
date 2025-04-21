@@ -3,7 +3,7 @@ package otelcli
 import (
 	"os"
 
-	"github.com/tobert/otel-cli/w3c/traceparent"
+	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
 )
 

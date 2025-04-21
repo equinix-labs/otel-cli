@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tobert/otel-cli/otlpclient"
+	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )

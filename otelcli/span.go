@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/tobert/otel-cli/otlpclient"
+	"github.com/equinix-labs/otel-cli/otlpclient"
 	"github.com/spf13/cobra"
 )
 

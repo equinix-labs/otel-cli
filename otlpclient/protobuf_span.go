@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tobert/otel-cli/w3c/traceparent"
+	"github.com/equinix-labs/otel-cli/w3c/traceparent"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )

@@ -45,7 +45,7 @@ builds:
 
 nfpms:
   - package_name: otel-cli
-    homepage: https://github.com/tobert/otel-cli
+    homepage: https://github.com/equinix-labs/otel-cli
     maintainer: Amy Tobey <atobey@equinix.com>
     description: OpenTelemetry CLI Application (Server & Client)
     license: Apache 2.0
@@ -65,17 +65,17 @@ archives:
     rlcp: true
 
 brews:
-  # This means the repository must be tobert/homebrew-otel-cli
+  # This means the repository must be equinix-labs/homebrew-otel-cli
   - name: "otel-cli"
-    url_template: "https://github.com/tobert/otel-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/equinix-labs/otel-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     tap:
-      owner: "tobert"
+      owner: "equinix-labs"
       name: "homebrew-otel-cli"
       token: "{{ .Env.GITHUB_TOKEN }}"
     commit_author:
       name: "tobert"
       email: "atobey@equinix.com"
-    homepage: "https://github.com/tobert/otel-cli"
+    homepage: "https://github.com/equinix-labs/otel-cli"
     description: "OpenTelemetry command-line tool for sending events from shell scripts & similar environments"
     license: "Apache-2.0"
     # If set to auto, the release will not be uploaded to the homebrew tap
@@ -84,7 +84,7 @@ brews:
 
 dockers:
   - image_templates:
-    - "ghcr.io/tobert/otel-cli:{{ .Tag }}-amd64"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
     dockerfile: release/Dockerfile
     use: buildx
     build_flag_templates:
@@ -96,7 +96,7 @@ dockers:
       - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--platform=linux/amd64"
   - image_templates:
-    - "ghcr.io/tobert/otel-cli:{{ .Tag }}-arm64v8"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
     dockerfile: release/Dockerfile
     use: buildx
     build_flag_templates:
@@ -109,12 +109,12 @@ dockers:
       - "--platform=linux/arm64/v8"
 
 docker_manifests:
-  - name_template: "ghcr.io/tobert/otel-cli:{{ .Tag }}"
+  - name_template: "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}"
     image_templates:
-    - "ghcr.io/tobert/otel-cli:{{ .Tag }}-amd64"
-    - "ghcr.io/tobert/otel-cli:{{ .Tag }}-arm64v8"
-  - name_template: "ghcr.io/tobert/otel-cli:latest"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
+  - name_template: "ghcr.io/equinix-labs/otel-cli:latest"
     image_templates:
-    - "ghcr.io/tobert/otel-cli:{{ .Tag }}-amd64"
-    - "ghcr.io/tobert/otel-cli:{{ .Tag }}-arm64v8"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-amd64"
+    - "ghcr.io/equinix-labs/otel-cli:{{ .Tag }}-arm64v8"
     use: docker
