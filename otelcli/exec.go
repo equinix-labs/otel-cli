@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
-	"github.com/equinix-labs/otel-cli/w3c/traceparent"
+	"github.com/tobert/otel-cli/otlpclient"
+	"github.com/tobert/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"

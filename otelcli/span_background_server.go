@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
+	"github.com/tobert/otel-cli/otlpclient"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 

@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otelcli"
-	"github.com/equinix-labs/otel-cli/otlpclient"
+	"github.com/tobert/otel-cli/otelcli"
+	"github.com/tobert/otel-cli/otlpclient"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 

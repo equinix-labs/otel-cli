@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpserver"
+	"github.com/tobert/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )

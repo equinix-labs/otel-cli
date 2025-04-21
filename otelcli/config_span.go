@@ -6,8 +6,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/otlpclient"
-	"github.com/equinix-labs/otel-cli/w3c/traceparent"
+	"github.com/tobert/otel-cli/otlpclient"
+	"github.com/tobert/otel-cli/w3c/traceparent"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
