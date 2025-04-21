@@ -55,7 +55,7 @@ func SendSpan(ctx context.Context, client OTLPClient, config OTLPConfig, span *t
 			},
 			ScopeSpans: []*tracepb.ScopeSpans{{
 				Scope: &commonpb.InstrumentationScope{
-					Name:                   "github.com/equinix-labs/otel-cli",
+					Name:                   "github.com/tobert/otel-cli",
 					Version:                config.GetVersion(),
 					Attributes:             []*commonpb.KeyValue{},
 					DroppedAttributesCount: 0,

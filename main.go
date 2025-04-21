@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/equinix-labs/otel-cli/otelcli"
+	"github.com/tobert/otel-cli/otelcli"
 )
 
 // these will be set by goreleaser & ldflags at build time

@@ -19,32 +19,32 @@ cost does not slow down your program too much.
 
 We publish a number of package formats for otel-cli, including tar.gz, zip (windows),
 apk (Alpine), rpm (Red Hat variants), deb (Debian variants), and a brew tap. These
-can be found on the repo's [Releases](https://github.com/equinix-labs/otel-cli/releases) page.
+can be found on the repo's [Releases](https://github.com/tobert/otel-cli/releases) page.
 
 On most platforms the easiest way is a go get:
 
 ```shell
-go install github.com/equinix-labs/otel-cli@latest
+go install github.com/tobert/otel-cli@latest
 ```
 
 Docker images are published for each otel-cli release as well:
 
 ```shell
-docker pull ghcr.io/equinix-labs/otel-cli:latest
-docker run ghcr.io/equinix-labs/otel-cli:latest status
+docker pull ghcr.io/tobert/otel-cli:latest
+docker run ghcr.io/tobert/otel-cli:latest status
 ```
 
 To use the brew tap e.g. on MacOS:
 
 ```shell
-brew tap equinix-labs/otel-cli
+brew tap tobert/otel-cli
 brew install otel-cli
 ```
 
 Alternatively, clone the repo and build it locally:
 
 ```shell
-git clone git@github.com:equinix-labs/otel-cli.git
+git clone git@github.com:tobert/otel-cli.git
 cd otel-cli
 go build
 ```
@@ -176,7 +176,7 @@ own /etc/ssl into the container, and it should get picked up by otel-cli and Go'
 TLS libraries.
 
 ```shell
-docker run -v /etc/ssl:/etc/ssl ghcr.io/equinix-labs/otel-cli:latest status
+docker run -v /etc/ssl:/etc/ssl ghcr.io/tobert/otel-cli:latest status
 ```
 
 ## Easy local dev
@@ -198,7 +198,7 @@ README. However, the good news is that it's fairly easy to do! You can follow th
 
 If you're planning on making changes to otel-cli, we recommend building the project locally: `go build`
 
-But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/equinix-labs/otel-cli`. This will place the command in your `GOPATH`. If your `GOPATH` is in your `PATH` you should be all set.
+But, if you just want to quickly try out otel-cli, you can also just install it directly: `go get github.com/tobert/otel-cli`. This will place the command in your `GOPATH`. If your `GOPATH` is in your `PATH` you should be all set.
 
 ### 3. A system to receive/inspect the traces you generate
 
@@ -286,12 +286,12 @@ go run . span -n "testing" -s "my first test span"
 
 ## Contributing
 
-Please file issues and PRs on the GitHub project at https://github.com/equinix-labs/otel-cli
+Please file issues and PRs on the GitHub project at https://github.com/tobert/otel-cli
 
 ## Releases
 
 Releases are managed by goreleaser. Currently this is limited to @tobert due to rules in
-the equinix-labs organization. For now releases are not automated, but will be by the time
+the tobert organization. For now releases are not automated, but will be by the time
 a v1.0 rolls out and the test suite is robust enough that we feel confident.
 
 Testing the release: `goreleaser release --snapshot --rm-dist`

@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/equinix-labs/otel-cli/w3c/traceparent"
+	"github.com/tobert/otel-cli/w3c/traceparent"
 	"github.com/spf13/cobra"
 )
 
