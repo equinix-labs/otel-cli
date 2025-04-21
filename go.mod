@@ -1,4 +1,4 @@
-module github.com/tobert/otel-cli
+module github.com/equinix-labs/otel-cli
 
 go 1.21
 
@@ -23,6 +23,7 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

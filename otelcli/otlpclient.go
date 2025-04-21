@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tobert/otel-cli/otlpclient"
+	"github.com/equinix-labs/otel-cli/otlpclient"
 )
 
 // StartClient uses the Config to setup and start either a gRPC or HTTP client,

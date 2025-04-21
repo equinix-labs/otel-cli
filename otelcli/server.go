@@ -3,7 +3,7 @@ package otelcli
 import (
 	"strings"
 
-	"github.com/tobert/otel-cli/otlpserver"
+	"github.com/equinix-labs/otel-cli/otlpserver"
 	"github.com/spf13/cobra"
 )
 
