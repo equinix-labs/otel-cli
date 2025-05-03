@@ -146,8 +146,10 @@ func doExec(cmd *cobra.Command, args []string) {
 
 	// append process attributes
 	span.Attributes = append(span.Attributes, processAttrs...)
-	pidAttrs := processPidAttrs(config, int64(child.Process.Pid), int64(os.Getpid()))
-	span.Attributes = append(span.Attributes, pidAttrs...)
+	if child.Process != nil {
+		pidAttrs := processPidAttrs(config, int64(child.Process.Pid), int64(os.Getpid()))
+		span.Attributes = append(span.Attributes, pidAttrs...)
+	}
 
 	cancelCtxDeadline()
 	close(signals)
