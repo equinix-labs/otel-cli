@@ -7,7 +7,7 @@ toolchain go1.22.4
 require (
 	github.com/google/go-cmp v0.6.0
 	github.com/pterm/pterm v0.12.79
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.10.1
 	go.opentelemetry.io/otel v1.27.0
 	go.opentelemetry.io/otel/sdk v1.27.0
 	go.opentelemetry.io/proto/otlp v1.1.0
@@ -30,7 +30,7 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.opentelemetry.io/otel/metric v1.27.0 // indirect
 	go.opentelemetry.io/otel/trace v1.27.0 // indirect
